@@ -22,7 +22,7 @@ way past the send rules. Audit findings from the same day are filed as
 separate tasks by severity.
 
 - [TASK-188: Hourly baseline on every estimate (parent)](TASK-188-hourly-baseline-every-estimate.md) — children TASK-189 to TASK-195, in order.
-- [TASK-197: AI line suggestions cannot set their own price](TASK-197-item-suggester-price-cap.md) — High.
+- [TASK-197: AI line suggestions never set a price](TASK-197-item-suggester-price-cap.md) — High.
 - [TASK-199: Painting edit prices lines with the account's rates](TASK-199-painting-edit-account-rates.md) — Medium, latent.
 - [TASK-200: Multi-option estimates keep correct totals and line types](TASK-200-multi-option-create-edit.md) — Medium, latent.
 - [TASK-201: Room-by-room engine path is atomic and keeps adjustments](TASK-201-engine-path-atomic.md) — Medium, latent.

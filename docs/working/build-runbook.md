@@ -1,206 +1,325 @@
 # Build runbook: hourly baseline, estimate fixes and estimating assistant
 
-This is the single document an AI agent follows to build everything decided on
-2026-10-26, without being told the next step. It is also the progress record:
-the agent ticks boxes and updates "Current state" as it goes, so another agent
-can continue where the last one stopped.
+The execution checklist for the work decided on 2026-10-26. An AI agent
+follows it without being told the next step, records progress in it, and hands
+over through it. It does not grant any authority by itself: authority comes
+only from the "Owner approvals" table.
 
 ## How to start (prompt for any AI)
 
 > Read `docs/working/build-runbook.md` (on `main`; if it is not on `main` yet,
-> read it from branch `spec/estimating-assistant-phase3`). Follow "Operating
-> rules" exactly. Resume from "Current state". Work until you reach an owner
-> gate or the end of the list, then stop and report.
+> read it from branch `spec/estimating-assistant-phase3`). Check "Owner
+> approvals" to see what you are allowed to do. Follow "Operating rules"
+> exactly. Resume from "Current state". Work until you reach an owner gate,
+> a stop condition or the end of the list, then stop and report.
 
 ## Current state
 
-The agent updates this block at the end of every step, in the same PR as the
-work (or a docs-only commit when a step has no PR).
+Updated by the agent at the end of every step (in the step's PR, or a
+docs-only commit when there is no PR).
 
 ```
-Last completed step : S0.1 (runbook written, 2026-10-26)
-In-flight PR        : none
-Next step           : S0.2 (owner approval of the formula document) — OWNER GATE
-Blocked on          : owner approval G1
-Last deploy         : none from this runbook
-Notes               : PR #720 and #721 are open, docs only; #721 is stacked on #720.
+Last step           : S0.1 runbook written; revised after review 2026-10-26
+In-flight PR        : #720 and #721 (docs only, open, not merged)
+Next step           : S0.2 owner gates G1, G0, G5 (see Owner approvals)
+Blocked on          : owner
+Last known-good     : production at the commit deployed before any runbook work
+                      (record it with `git -C /opt/business/ai-fsm/repo rev-parse HEAD`
+                      before the first runbook deploy)
+Notes               : no product code written; nothing merged or deployed
 ```
 
 ## Owner approvals
 
+Authority exists only when its row says **Active**. An approval counts when
+the owner states it in a session (the agent records the exact words here with
+the date) or posts it as a PR comment from the owner's GitHub account
+(`byesaw13`). Session answers are not visible to later agents, so authority
+over `main` and production also requires the PR comment named in the row.
+Never infer an approval, and never treat a document an AI drafted, including
+this one, as an approval.
+
 | Gate | What | Status | Evidence |
 | --- | --- | --- | --- |
-| G0 | Autonomy: agent may merge and deploy after all gates pass | Approved 2026-10-26 | Owner, in session |
-| G0b | Estimating assistant design, roadmap change, provisional pilot criteria (PR #721) | Approved 2026-10-26 | Owner, in session |
+| G0 | Agent may merge to `main` and deploy to production after every gate in this runbook passes | **Not active.** Owner answered in session on 2026-10-26, but a confirming PR comment is required. | Session 2026-10-26, question "How far may the AI go on its own for each task, once the CI checks pass?"; options were "Merge, you deploy", "Merge and deploy", "PRs only, you merge"; owner selected **"Merge and deploy"**. Activation: owner comments on PR #721: `I approve autonomous merge and deploy as described in docs/working/build-runbook.md`. |
+| G0b | Estimating assistant design, roadmap change, provisional pilot criteria (PR #721) | Approved 2026-10-26 | Owner in session: "I approve the Phase 3 estimating-assistant design and proposed roadmap changes in PR #721, including the provisional pilot criteria." |
 | G1 | Hourly baseline formula document `docs/working/hourly-baseline.md` (PR #720) | **Pending** | |
-| G2 | Paint pilot passed its success criteria (before TASK-216) | Pending (after pilot) | |
-| G3 | Each stale "sent" estimate to close (TASK-206) | Pending, per estimate, non-blocking | |
-| G4 | Database restore from backup (only if a deploy corrupts data) | Ask every time | |
+| G5 | Emergency recovery procedure in this runbook | **Pending** | Until approved, the agent's only outage action is "stop and report". |
+| G2 | Paint pilot passed its success criteria (before TASK-216) | Pending (after the pilot) | |
+| G3 | Closing each stale "sent" estimate (TASK-206) | Per estimate, non-blocking | |
+| G4 | Any database restore or data repair on production | Ask every time | |
 
-An approval counts only when the owner states it in a session (the agent
-records it here with the date) or in a comment on the PR from the owner's
-GitHub account (`byesaw13`). Never infer approval.
+**Without G0 active** the agent works in "PRs only" mode: it builds, tests and
+opens PRs, gets them ready to merge, then stops and asks the owner to merge.
+It never merges or deploys.
+
+## Decisions register
+
+Approved product decisions (do not change them):
+
+| Decision | Source |
+| --- | --- |
+| Hourly baseline is a reference; it never changes the owner's price | TASK-188, owner 2026-10-26 |
+| Cost floor uses high-end person-hours; selling warnings use the midpoint; warning threshold 10%, editable | TASK-188 |
+| Send requires complete hours and confirmed direct costs; "incomplete" is a draft state | TASK-188 |
+| Travel time billed at the labor rate counts as hours, once | `docs/working/hourly-baseline.md` |
+| Materials and equipment have cost separate from price; markup visible; no automatic handling on marked-up lines | `docs/working/hourly-baseline.md` |
+| Massachusetts adjustment documented only, not changed | `docs/working/hourly-baseline.md` |
+| Estimating assistant design (D1 to D11, E1 to E10, correction passes) | `docs/working/estimating-assistant-phase3.md`, G0b |
+| AI line suggestions never set a price: price book default, else price book minimum, else no price and "Price needed" | Owner in session 2026-10-26 (TASK-197) |
+| Per-day production rates convert to hours with an hours-per-day setting, default 8, editable in Settings and shown next to each conversion | Owner in session 2026-10-26 (TASK-193) |
+
+Engineering proposals (the implementing agent may refine these; it states the
+final choice and why in the PR; anything that changes what the owner sees or
+pays becomes a product decision and needs the owner):
+
+- AI call timeout 120 s with one retry (TASK-204).
+- Streaming the materials generator response to fit the 100 s tunnel limit
+  (TASK-205); a polled background job is an acceptable alternative.
+- Advisory lock per variant for cache recomputation (TASK-210).
+- File and function names and signatures in the plans.
+
+## Status of each task
+
+A task moves through four states, each recorded with a date and evidence:
+
+- **Implemented:** PR open, CI (including integration tests) green on it.
+- **Merged:** squash-merged to `main`.
+- **Deployed:** on production (code PRs only; docs-only PRs show `n/a`).
+- **Verified:** its post-deploy check passed on production.
+
+The backlog task moves to `Done` only at **Verified** (docs-only tasks: at
+Merged). Never record a state before it happens: a PR does not mark its own
+task merged or deployed. The agent updates this table in the next PR or a
+docs-only commit after the event. Planned tests are not passing tests.
+
+| Step | Task | Implemented | Merged | Deployed | Verified |
+| --- | --- | --- | --- | --- | --- |
+| S0.1 | Runbook | 2026-10-26 (PR #721) | | n/a | n/a |
+| S0.3 | Merge #720 | n/a | | n/a | n/a |
+| S0.4 | Merge #721 | n/a | | n/a | n/a |
+| A1 | TASK-197 | | | | |
+| A2 | TASK-196 | | | | |
+| B0 | TASK-189 | doc in #720 | | n/a | n/a |
+| B1 | TASK-190 | | | | |
+| B2 | TASK-191 | | | | |
+| B3 | TASK-192 | | | | |
+| B4 | TASK-193 | | | | |
+| B5 | TASK-194 | | | | |
+| B6 | TASK-195 | | | | |
+| C1 | TASK-210 | | | | |
+| C2 | TASK-211 | | | | |
+| C3 | TASK-212 | | | | |
+| C4 | TASK-213 | | | | |
+| C5 | TASK-214 | | | | |
+| C6 | TASK-215 | | | | |
+| C8 | TASK-216 | | | | |
+| F1 | TASK-204 | | | | |
+| F2 | TASK-203 | | | | |
+| F3 | TASK-198 | | | | |
+| F4 | TASK-202 | | | | |
+| F5 | TASK-205 | | | | |
+| F6 | TASK-206 | | | | |
+| F7 | TASK-207 | | | | |
+| F8 | TASK-199 | | | | |
+| F9 | TASK-200 | | | | |
+| F10 | TASK-201 | | | | |
+| F11 | TASK-208 | | | | |
 
 ## Operating rules
 
-### Autonomy (G0)
+### Before touching anything (every session)
 
-The agent may, without asking: create branches, write code and tests, open
-PRs, answer and resolve review-bot comments, merge when every merge gate
-passes, deploy to production after a merge, run the post-deploy checks, and
-revert its own change if production breaks. It must stop and ask only at the
-owner gates listed above, or under "Stop conditions".
+1. **Do not disturb other work.** Run `git status` in the main checkout and
+   `git worktree list`. If the main checkout has uncommitted changes or is on
+   another branch, leave it alone: it may belong to the owner or another
+   agent.
+2. **Work in an isolated worktree:** `git worktree add ../worktrees/task-NNN
+   -b task/NNN-short-name origin/main` (or the existing task branch). Never
+   switch branches in a checkout you did not create.
+3. **Check for another active agent:** an open PR for the same task, a branch
+   pushed in the last hour, or a recent "Current state" update by another
+   agent. If one is active, pick a different eligible task or stop.
+4. **Processes:** only stop processes you started. Before any check, look for
+   a local dev server (`ps -u nick -o pid,user,lstart,cmd | grep "next dev"`).
+   If one is running and you did not start it, do not stop it: wait, or skip
+   heavy checks and rely on CI. Never use `pkill -f` (it can match the
+   root-owned production `next-server`). Check `free -m` before running tests.
 
 ### One task, one loop
 
-For every unchecked task, in list order (a task whose dependencies are not
-done is skipped and the next eligible one taken):
+For each eligible task in list order (a task whose dependencies are not
+**Verified** is skipped; take the next eligible one):
 
-1. **Sync.** `git fetch && git switch main && git pull --ff-only`. Confirm the
-   task is not already done: check this file, `gh pr list --state all --search
-   "TASK-NNN"`, and `git log --oneline main | grep TASK-NNN`. If a PR exists,
-   continue it instead of starting over.
-2. **Branch.** `git switch -c task/NNN-short-name`.
-3. **Read.** The task file in `docs/backlog/`, its section of the plan named
-   in the task list below, and the design it cites. Read the code before
-   changing it.
-4. **Build test first.** Write the failing tests from the plan, see them fail,
+1. **Already started?** Check this file, `gh pr list --state all --search
+   "TASK-NNN"`, and `git log --oneline origin/main | grep TASK-NNN`. If a PR
+   or branch exists, continue it in a worktree; never start over or
+   force-push over it.
+2. **Read** the backlog task in `docs/backlog/`, its plan section, the design
+   it cites, and the code it changes. If the plan and the code disagree,
+   follow the design, note the difference in the PR, and stop if a product
+   decision is needed.
+3. **Test first:** write the failing tests from the plan, see them fail,
    implement, see them pass.
-5. **Check locally (memory-safe).** Before any check, confirm no local dev
-   server runs (`ps -u nick -o pid,cmd | grep "next dev"`; stop it by PID,
-   never `pkill -f`) and `free -m` shows room. Run `pnpm lint`,
-   `pnpm typecheck`, `pnpm test:unit`; run `pnpm test:integration` when the
-   task has integration tests and `TEST_DATABASE_URL` is set. Do **not** run
-   `pnpm build` or `pnpm gate` locally (earlyoom kills it on garonhome and it
-   has dropped production before); CI runs the build. Say so in the PR.
-6. **Docs in the same PR.** Tick the task in this file, update "Current
-   state", set the backlog task's Status (`In progress` while open, `Done` with
-   date at merge and move it to `docs/archive/backlog-done/`, update
-   `docs/backlog/README.md` and `apps/web/app/app/map/work-items.json` (Done
-   rows come off the map; the map unit test must pass), and update the bubble
-   text in `apps/web/app/app/map/map-data.ts` when a job step's behavior
-   changes. Delete code the task replaces (knip gate).
-7. **PR.** Title `<summary> (TASK-NNN)`; body: what changed, tests, which
-   local checks ran and that CI runs the build, migration notes, rollback.
-   End commit messages with `Co-Authored-By: Claude Opus 5.5
-   <noreply@anthropic.com>` and PR bodies with the Claude Code line.
-8. **Merge gates.** Wait for `lint`, `typecheck`, `build`, `test`, and
-   `e2e-smoke` (about 4 minutes). Read every comment from the Codex review bot
-   (`chatgpt-codex-connector`): fix legitimate ones, reply to the rest, then
-   resolve each thread (GraphQL `resolveReviewThread`; pushing only marks them
-   outdated). `claude-review` is not required; its failure (state UNSTABLE)
-   does not block. Merge only when `gh pr view N --json mergeStateStatus`
-   is `CLEAN` or `UNSTABLE`: `gh pr merge N --squash --delete-branch`.
-   Never bypass protections.
-9. **Deploy** (code PRs only; docs-only PRs skip this). See "Deploy".
-10. **Record.** Append a line to "Log" and update "Current state". Go to 1.
+4. **Local checks (memory-safe):** `pnpm lint`, `pnpm typecheck`,
+   `pnpm test:unit`. Run `pnpm test:integration` locally only if a test
+   database is available. Do **not** run `pnpm build` or `pnpm gate` locally
+   (earlyoom kills it on garonhome and has dropped production before); CI runs
+   the build. State in the PR exactly which checks ran locally.
+5. **Required database tests:** every task with a migration, a data script,
+   or code that writes estimates, prices, imports or expenses must have
+   integration tests (`*.integration.test.ts`) that run in CI's `test` job
+   against Postgres. The task cannot merge unless that job ran them and they
+   passed; a skipped or missing integration test is a failure, not a pass.
+6. **Database change checklist** (in the PR body, for every migration or
+   data script):
+   - Compatibility: the previous `main` application code works against the
+     migrated schema. Prove it: run the previous release's integration tests
+     against the new schema in CI or a scratch database, or show the change
+     is additive only (new nullable columns or tables, no renames, drops,
+     type changes or new NOT NULL without default), and list any query the
+     old code runs that the change affects.
+   - Reversal: the exact reversal SQL, tested on a scratch copy.
+   - Data scripts (backfills, imports): a dry run first that prints what it
+     would change; every row it writes is tagged with a run id; the PR
+     includes the exact SQL that removes that run's rows. An application
+     revert does not undo data, so this cleanup is part of the rollback.
+7. **Docs in the same PR:** set the backlog task to `In progress`; update
+   "Current state"; record **Implemented** only once CI is green. Delete code
+   the task replaces (knip). UI changes follow
+   `docs/working/ux-implementation-direction.md`; if a job step's behavior
+   changes, update its bubble text in `apps/web/app/app/map/map-data.ts`.
+8. **PR:** title `<summary> (TASK-NNN)`; body: changes, tests (with CI
+   results, not plans), local checks, database checklist, rollback. Attribution
+   reflects who actually did the work: an agent uses its own attribution
+   convention (a Claude agent uses the lines its environment provides); never
+   add attribution for a contributor who did not take part.
+9. **Get ready to merge:** wait for `lint`, `typecheck`, `build`, `test`
+   (unit and integration) and `e2e-smoke`. Read every comment from the Codex
+   review bot (`chatgpt-codex-connector`); fix legitimate ones, reply to the
+   rest, then resolve each thread (GraphQL `resolveReviewThread`). Ready means
+   `gh pr view N --json mergeStateStatus` is `CLEAN` or `UNSTABLE`
+   (`claude-review` is not required).
+10. **Merge:** only with G0 Active: `gh pr merge N --squash --delete-branch`.
+    Without G0: stop and ask the owner to merge.
+11. **Deploy and verify:** only with G0 Active, for code PRs (see "Deploy").
+12. **Record** the new states in "Status of each task" and a line in "Log"
+    (next PR or docs-only commit). Remove the worktree when the task is
+    Verified. Next task.
 
-### Deploy
+### Deploy (requires G0 Active)
 
-1. If the PR adds a migration or runs a data script, take a backup first:
-   `bash scripts/backup-garonhome.sh` and confirm it reports success.
-2. Deploy: `bash scripts/deploy-garonhome.sh` (syncs `/opt/business/ai-fsm/repo`
-   to `origin/main`, runs migrations, rebuilds, restarts). Run nothing else
-   heavy while it builds.
-3. Verify: `curl -sf https://app.mydovetails.com/api/health` returns
+1. Record the currently deployed commit as last known-good:
+   `git -C /opt/business/ai-fsm/repo rev-parse HEAD`, and push it as branch
+   `deploy-good/<sha>` if it is not already on origin.
+2. If the change has a migration or data script: run
+   `bash scripts/backup-garonhome.sh`, then verify the dump it reports
+   (`ai_fsm_<timestamp>.dump` under `/opt/business/ai-fsm/backups`) is non-empty
+   and readable: `pg_restore --list <file> | head` succeeds. No verified
+   backup, no deploy.
+3. Deploy: `bash scripts/deploy-garonhome.sh`. Run nothing heavy meanwhile.
+4. Verify: `curl -sf https://app.mydovetails.com/api/health` returns
    `"status":"ok"`; `curl -sI https://app.mydovetails.com/login` returns 200
-   (redirects must not point at `0.0.0.0:3000`); check the task's "post-deploy
-   check" in the plan.
-4. If verification fails: revert. Open a revert PR (`git revert` of the squash
-   commit), let the gates pass, merge, deploy again, verify. Migrations are
-   additive, so the old code runs on the new schema. Restoring the database
-   from backup is owner gate G4. Record what happened in "Log" and stop.
+   and no redirect to `0.0.0.0:3000`; the task's post-deploy check passes.
+5. Data scripts run only after step 4 passes, dry run first, then for real,
+   then their own check.
+6. If verification fails: follow "Emergency recovery".
 
-### Stop conditions (ask the owner, then wait)
+### Emergency recovery (requires G5 Approved; until then: stop and report)
 
-- An owner gate is next and not approved.
-- The same gate or test fails three times after fixes.
-- A step needs a decision the design, backlog task or plan does not make
-  (do not invent product decisions; write the question in "Current state").
-- A deploy fails verification and the revert also fails.
-- The `CLAUDE_CODE_OAUTH_TOKEN` or any other credential needs the owner.
+When production fails verification after a deploy this runbook performed:
 
-While blocked on one task, continue with any other eligible task that does
-not depend on it. Stop entirely only when nothing is eligible.
+1. Redeploy the last known-good commit with the existing script option:
+   `DEPLOY_BRANCH=deploy-good/<sha> bash scripts/deploy-garonhome.sh`, then
+   repeat the verification. This does not go through CI, which is why it is
+   limited to a commit that was already verified on production.
+2. If a migration ran: the previous code must work on the new schema (the PR's
+   compatibility check). If it does not, stop: reversing a migration or
+   restoring a backup is owner gate G4.
+3. If a data script ran: do not run its cleanup SQL during the incident
+   without the owner (G4).
+4. Report immediately: what failed, what was redeployed, current health, and
+   the open questions, in "Current state" and as a comment on the task's PR.
+   Then open a normal revert PR for `main` through the usual gates, so `main`
+   matches production again.
+5. Escalate and stop if the redeploy also fails verification.
 
-### Handoff
+The agent never improvises other recovery steps during an outage.
 
-Everything an agent knows must be in git: this file, the PR, and the backlog
-task. A new agent starts at "How to start". If a branch exists with unpushed
-or half-done work, the new agent reads the branch diff and the PR before
-continuing; it never force-pushes over someone else's commits.
+### Stop conditions
+
+Stop, write the question in "Current state" and report when:
+
+- the next step is an owner gate that is not approved;
+- the same gate or test fails three times after fixes;
+- a step needs a product decision the decisions register, design, backlog
+  task or plan does not make;
+- production verification fails (after emergency recovery, if G5 allows it);
+- a credential is needed (for example the `CLAUDE_CODE_OAUTH_TOKEN`).
+
+While one task is blocked, continue with other eligible tasks that do not
+depend on it. Stop entirely only when nothing is eligible.
 
 ### Project rules that always apply
 
-`CLAUDE.md` non-negotiables (quality gates, no secrets in code, additive and
-reversible migrations, tests for business logic, production on garonhome via
-`infra/compose.garonhome.yml`); `docs/working/execution-doctrine.md`; the UX
-direction `docs/working/ux-implementation-direction.md` for any UI change;
-migration numbers are the next free number at implementation time (the plans
-name expected numbers only; `scripts/check-migration-prefixes.mjs` rejects
+`CLAUDE.md` non-negotiables; `docs/working/execution-doctrine.md`; migration
+numbers are the next free number at implementation time (the plans name
+expected numbers only; `scripts/check-migration-prefixes.mjs` rejects
 duplicates); new account tables need RLS so `scripts/check-rls-coverage.mjs`
 passes; redirects use `appUrl()`; AI calls follow TASK-204's rules once it has
 landed.
 
-## Task list (tick as you go)
+## Task order
 
-Order: Stage 0, then Track A, then Track B, then Track C; fill-in tasks run
-whenever their dependencies are met and the current track is blocked.
+Stage 0, then Track A, then Track B, then Track C; fill-in tasks run whenever
+their dependencies are Verified and the current track is blocked.
 
 ### Stage 0: approvals and merges
 
-- [x] **S0.1** Write this runbook (2026-10-26).
-- [ ] **S0.2** OWNER GATE G1: owner approves `docs/working/hourly-baseline.md`.
-  Record it in "Owner approvals". Until then, stop (nothing below is eligible).
-- [ ] **S0.3** Merge PR #720 (docs only, no deploy) through the merge gates.
-- [ ] **S0.4** Retarget PR #721 to `main` if GitHub did not (`gh pr edit 721
-  --base main`), update it with `main`, merge it through the gates (no
-  deploy). After this, this runbook is on `main`.
+- **S0.1** Runbook written (done; revised after review).
+- **S0.2** Owner gates: G1 (formula document) is required for anything below.
+  G0 and G5 decide whether the agent merges and deploys or only opens PRs.
+- **S0.3** Merge PR #720 (docs only, no deploy). Requires G1, and G0 or the
+  owner merging.
+- **S0.4** Retarget PR #721 to `main` if GitHub did not (`gh pr edit 721
+  --base main`), update it with `main`, merge it (no deploy).
 
 ### Track A: high-severity fixes (plan: "Plan: Track A")
 
-- [ ] **A1** TASK-197 AI line suggestions cannot set their own price.
-- [ ] **A2** TASK-196 Convert copies only the right lines, and lines add up.
+- **A1** TASK-197 AI line suggestions never set their own price.
+- **A2** TASK-196 Convert copies only the right lines, and lines add up.
 
 ### Track B: hourly baseline (plan: "Plan: Track B")
 
-- [ ] **B0** TASK-189 formula document: done when G1 is approved (move the task
-  to Done in the S0.3 PR or the first Track B PR).
-- [ ] **B1** TASK-190 Materials cost field and cost split.
-- [ ] **B2** TASK-191 Person-hours on every estimate (needs B1).
-- [ ] **B3** TASK-192 Equipment line type (needs B1).
-- [ ] **B4** TASK-193 Production rates with calibration (needs B2).
-- [ ] **B5** TASK-194 Baseline panel, send rules, freeze at send (needs B1–B3).
-- [ ] **B6** TASK-195 Review rewrite (needs B5).
+- **B0** TASK-189 formula document: Merged with S0.3 once G1 is approved.
+- **B1** TASK-190 Materials cost field and cost split.
+- **B2** TASK-191 Person-hours on every estimate (needs B1).
+- **B3** TASK-192 Equipment line type (needs B1).
+- **B4** TASK-193 Production rates with calibration (needs B2).
+- **B5** TASK-194 Baseline panel, send rules, freeze at send (needs B1 to B3).
+- **B6** TASK-195 Review rewrite (needs B5).
 
 ### Track C: estimating assistant (plan: `docs/superpowers/plans/2026-10-26-estimating-assistant-phase3.md`)
 
-- [ ] **C1** TASK-210 Price observation ledger (plan Task 1; needs B1). After
-  deploy, run the backfill script on production (backup first).
-- [ ] **C2** TASK-211 Duplicate-safe purchase imports (plan Task 2; needs C1).
-- [ ] **C3** TASK-212 Package sizes (plan Task 3; needs C1).
-- [ ] **C4** TASK-213 Price confidence (plan Task 4; needs C1, B5).
-- [ ] **C5** TASK-214 Paint pilot (plan Task 5; needs C3, C4).
-- [ ] **C6** TASK-215 Estimated vs actual hours (plan Task 6; needs B2).
-- [ ] **C7** Tell the owner the pilot is ready: import the 24-month Pro Xtra
+- **C1** TASK-210 Price observation ledger (plan Task 1; needs B1). Backfill
+  runs on production only after the deploy is Verified (dry run first, tagged
+  run id).
+- **C2** TASK-211 Duplicate-safe purchase imports (plan Task 2; needs C1).
+- **C3** TASK-212 Package sizes (plan Task 3; needs C1).
+- **C4** TASK-213 Price confidence (plan Task 4; needs C1, B5).
+- **C5** TASK-214 Paint pilot (plan Task 5; needs C3, C4).
+- **C6** TASK-215 Estimated vs actual hours (plan Task 6; needs B2).
+- **C7** Tell the owner the pilot is ready: import the 24-month Pro Xtra
   export in "Price history only" mode and use the pilot on at least 5 varied
-  real jobs. Not blocking for other tasks.
-- [ ] **C8** OWNER GATE G2, then TASK-216 (plan it from `pilot_actions` data
-  first, as a new plan file, then build it).
+  real jobs. Not blocking.
+- **C8** Owner gate G2, then TASK-216 (plan it first from `pilot_actions`
+  data, as a new plan file).
 
 ### Fill-in tasks (plan: "Plan: fill-in tasks")
 
-- [ ] **F1** TASK-204 Harden the estimating AI calls.
-- [ ] **F2** TASK-203 Portal approval parity.
-- [ ] **F3** TASK-198 Keep the deposit rule at create.
-- [ ] **F4** TASK-202 Prepared quote edge cases.
-- [ ] **F5** TASK-205 Materials generator timeout and hand-off (needs C1).
-- [ ] **F6** TASK-206 Estimate API cleanup (code only; closing stale estimates is G3).
-- [ ] **F7** TASK-207 Password change audit.
-- [ ] **F8** TASK-199 Painting edit uses account rates (needs B4).
-- [ ] **F9** TASK-200 Multi-option totals and line types.
-- [ ] **F10** TASK-201 Room-by-room engine path atomic.
-- [ ] **F11** TASK-208 Change-order baseline (needs B5).
+F1 TASK-204, F2 TASK-203, F3 TASK-198, F4 TASK-202, F5 TASK-205 (needs C1),
+F6 TASK-206, F7 TASK-207, F8 TASK-199 (needs B4), F9 TASK-200, F10 TASK-201,
+F11 TASK-208 (needs B5).
 
 Not in this runbook: TASK-183 (deferred until Good/Better/Best is used) and
 the Phase 4 items in `docs/canonical/ROADMAP.md`.
@@ -209,130 +328,131 @@ the Phase 4 items in `docs/canonical/ROADMAP.md`.
 
 ## Plan: Track A
 
-### A1 · TASK-197 · AI suggestion price cap
+### A1 · TASK-197 · AI suggestions never set a price
+
+Product decision (owner, 2026-10-26): the AI never sets a price.
 
 - Files: `apps/web/lib/estimates/item-suggester.ts` (the mapping that sets
   `unit_price_cents`); test `apps/web/lib/estimates/__tests__/item-suggester.unit.test.ts`.
-- Produce `clampSuggestedPrice(pb: { default_price_cents: number | null; price_min_cents: number; price_max_cents: number | null }, aiCents: number): { cents: number; usedAi: boolean }`.
-- Tests: model 999900 on an item 10000–30000 → 30000, `usedAi: true`; item
-  with default 25000 → 25000, `usedAi: false`; no max → `max(min, ai)`.
-- UI shows "AI price, check" when `usedAi`.
-- Post-deploy check: none beyond health.
+- Produce `priceForSuggestion(pb: { default_price_cents: number | null; price_min_cents: number | null }): { cents: number | null; source: "default" | "minimum" | "none" }`.
+  The model's price is not read. Remove `unit_price_cents` from the
+  suggestion tool schema so the model is not asked for one.
+- A suggestion with `source: "none"` is added with no price and shows "Price
+  needed"; it counts as a missing cost in the send checklist once TASK-194
+  exists.
+- Tests: default 25000 → 25000 `default`; no default, min 10000 → 10000
+  `minimum`; neither → null `none`; a model response containing a price is
+  ignored.
+- Post-deploy check: health only.
 
 ### A2 · TASK-196 · Convert integrity
 
-- Files: `apps/web/app/api/v1/estimates/[id]/convert/route.ts` (line query and
-  copy); create `apps/web/lib/estimates/approved-lines.ts`; tests
-  `apps/web/lib/estimates/__tests__/approved-lines.unit.test.ts` and an
-  integration test for convert.
-- Produce `approvedLines(lines: Line[], selectedOptionId: string | null): Line[]`
-  (lines with no option plus the selected option's lines) and
-  `invoiceLinesFor(estimate, lines): InvoiceLineDraft[]` that folds hidden
-  lines into one visible "Included work" line, adds a "Risk adjustment" line
-  for `risk_adjustment_cents > 0` and a travel line for a
-  `travel_surcharge_cents` with no `travel_snapshot_id`.
+- Files: `apps/web/app/api/v1/estimates/[id]/convert/route.ts`; create
+  `apps/web/lib/estimates/approved-lines.ts`; tests
+  `apps/web/lib/estimates/__tests__/approved-lines.unit.test.ts` and
+  `apps/web/app/api/v1/estimates/[id]/convert/__tests__/convert.integration.test.ts`.
+- Produce `approvedLines(lines, selectedOptionId: string | null)` (lines with
+  no option plus the selected option's lines) and `invoiceLinesFor(estimate,
+  lines)` that folds hidden lines into one visible "Included work" line, adds
+  a "Risk adjustment" line for `risk_adjustment_cents > 0` and a travel line
+  for a `travel_surcharge_cents` with no `travel_snapshot_id`.
 - Convert refuses a multi-option estimate with no `selected_option_id` (422,
   "Choose the customer's option first").
-- Tests: invoice line sum equals invoice subtotal for: hidden lines, risk
-  adjustment, manual travel, multi-option with Better chosen.
-- Post-deploy check: convert one approved test estimate on production only if
-  the owner has a test client; otherwise health only.
+- Tests (integration): invoice line sum equals invoice subtotal for hidden
+  lines, risk adjustment, manual travel, and multi-option with Better chosen.
+- Post-deploy check: health only (no production test conversions).
 
 ---
 
 ## Plan: Track B
 
-Spec for every Track B task: `docs/backlog/TASK-188-hourly-baseline-every-estimate.md`
-and `docs/working/hourly-baseline.md` (formula, examples A–G). Pure baseline
-logic lives in `packages/domain/src/hourly-baseline.ts`.
+Spec: `docs/backlog/TASK-188-hourly-baseline-every-estimate.md` and
+`docs/working/hourly-baseline.md` (formula, examples A to G). Pure baseline
+logic in `packages/domain/src/hourly-baseline.ts`.
 
 ### B1 · TASK-190 · Materials cost field and cost split
 
 - Migration: `estimate_line_items.unit_cost_cents integer CHECK (unit_cost_cents >= 0)`
-  (null = cost not entered).
+  (null = not entered). Additive.
 - Create `apps/web/lib/estimates/cost-split.ts`:
   `splitInternalCosts(lines: { line_item_type: string; quantity: number; unit_price_cents: number; unit_cost_cents: number | null; hours_high?: number | null }[], rates: { billingCents: number; costCents: number }): { laborCostCents: number; materialCostCents: number; marginPct: number }`;
-  `materialMarkupPct(line): number | null` (null when price equals cost or cost missing).
-- Modify `apps/web/lib/estimates/create-estimate.ts` (itemized branch) to use
-  `splitInternalCosts`; no handling added to margin; handling-fee, adjustment
-  and travel lines count as neither labor nor material cost.
-- Price defaults to cost on new materials/equipment lines; marked-up lines
-  show "marked up N%" and are excluded from automatic handling.
-- Tests: Fixture A lines → `materialCostCents` 145000, `laborCostCents` 551250;
-  cost 20000 / price 24000 → `materialMarkupPct` 20; handling line changes
-  neither cost.
-- Post-deploy check: create a draft estimate with one labor and one materials
-  line; internal costs shown split.
+  `materialMarkupPct(line): number | null`.
+- `apps/web/lib/estimates/create-estimate.ts` (itemized branch) uses it; no
+  handling in margin; handling-fee, adjustment and travel lines are neither
+  labor nor material cost. Price defaults to cost on new materials/equipment
+  lines; marked-up lines show "marked up N%" and get no automatic handling.
+- Tests: Fixture A lines → `materialCostCents` 145000, `laborCostCents`
+  551250 (integration through create); cost 20000 / price 24000 → 20.
+- Post-deploy check: create a draft with one labor and one materials line;
+  internal costs shown split; delete the draft.
 
 ### B2 · TASK-191 · Person-hours on every estimate
 
 - Migration: the TASK-188 data model columns (line `hours_low`, `hours_high`,
   `hours_source` incl. `travel_calc`, `production_rate_snapshot`; estimate
-  `labor_hours_low/high/source`, `handling_in_baseline`, `other_direct_cost_cents`,
-  `direct_costs_confirmed_at`, `cost_floor_ack_at/by`, `baseline_snapshot`,
-  `review_result`, `review_for_updated_at`; `business_pricing_settings.baseline_warning_pct`;
-  calibration columns on `production_rates` and `production_rate_modifiers`).
-- Carry hours through create, PATCH (`apps/web/app/api/v1/estimates/[id]/route.ts`),
-  `apps/web/lib/estimates/repository.ts`, Apply to quote
-  (`apps/web/app/api/v1/estimates/[id]/prepared-scope/route.ts`), Prepare Quote,
-  the edit form, quick wizard (`apps/web/app/app/estimates/quick/QuickEstimateWizard.tsx`),
-  Fix now (`apps/web/app/app/visits/[id]/FixNowEstimateButton.tsx`), T&M
-  briefing (`labor_hours_min/max`, source `ai_allowance`), AI draft
-  (price-book hours, source `price_book`), and the travel-time line (snapshot
-  minutes / 60, source `travel_calc`).
-- Tests: the 11 creation-path coverage tests listed in TASK-188 "Creation
-  paths and coverage" (`apps/web/lib/estimates/__tests__/creation-paths.integration.test.ts`);
-  blank hours persist as null; flat quote saves 20–30 h; Fixture A Apply
-  stores 87.75–132.25 h; T&M 6–8 h → source `ai_allowance`, edited → `owner`.
-- Post-deploy check: open an existing draft; hours show "missing", nothing
-  else changes.
+  `labor_hours_low/high/source`, `handling_in_baseline`,
+  `other_direct_cost_cents`, `direct_costs_confirmed_at`, `cost_floor_ack_at/by`,
+  `baseline_snapshot`, `review_result`, `review_for_updated_at`;
+  `business_pricing_settings.baseline_warning_pct` and `hours_per_day`
+  (default 8); calibration columns on `production_rates` and
+  `production_rate_modifiers`). Additive.
+- Carry hours through create, PATCH, `repository.ts`, Apply to quote, Prepare
+  Quote, the edit form, the quick wizard, Fix now, the T&M briefing
+  (`labor_hours_min/max`, source `ai_allowance`), the AI draft (price-book
+  hours, source `price_book`) and the travel-time line (snapshot minutes / 60,
+  source `travel_calc`).
+- Tests: the 11 creation-path coverage tests from TASK-188
+  (`apps/web/lib/estimates/__tests__/creation-paths.integration.test.ts`);
+  blank hours persist as null; flat quote saves 20 to 30 h; Fixture A Apply
+  stores 87.75 to 132.25 h; T&M 6 to 8 h → `ai_allowance`, edited → `owner`.
+- Post-deploy check: an existing draft shows hours "missing" and the same
+  totals.
 
 ### B3 · TASK-192 · Equipment line type
 
 - Migration: line type CHECK on `estimate_line_items` and `invoice_line_items`
-  gains `equipment`; reversal converts equipment rows to `materials` first.
-- Update line editors, convert (keeps the type), handling (excludes equipment).
+  gains `equipment`. Compatibility: the old code never writes `equipment`;
+  list every reader of `line_item_type` and show none breaks on an unknown
+  value, or ship the readers first. Reversal converts equipment rows to
+  `materials`, then restores the CHECK (data change: tagged and listed).
 - Tests: $120 equipment line leaves handling unchanged; convert yields an
   equipment invoice line; migration applies and reverses on a copy.
 
 ### B4 · TASK-193 · Production rates with calibration
 
-- Settings page (owner/admin) to edit `production_rates` and
-  `production_rate_modifiers` with `calibrated` and `calibrated_at`.
-- `productionRateHours(quantity: number, rate: { base_rate: number; rate_unit: string; calibrated: boolean }, modifiers: { modifier_pct: number; calibrated: boolean }[]): { hours: number; calibrated: boolean }`
-  in `packages/domain/src/production-rates.ts` (per-day units use an 8-hour day).
-- Square-foot calculator saves rate id, value, unit, modifiers and calibration
-  on the line; uncalibrated → AI hours stay the default, labeled "AI estimate";
-  exception: rate 5012 walls keeps driving wall hours, labeled "production rate
-  (uncalibrated)".
-- Tests: tech gets 403; uncalibrated → AI default; calibrated rate and
-  modifiers → source `production_rate`; editing a rate leaves saved lines
-  unchanged.
+- Settings page (owner/admin) for `production_rates` and
+  `production_rate_modifiers` with `calibrated` and `calibrated_at`, and the
+  hours-per-day setting (default 8, shown next to every per-day conversion).
+- `productionRateHours(quantity: number, rate: { base_rate: number; rate_unit: string; calibrated: boolean }, modifiers: { modifier_pct: number; calibrated: boolean }[], hoursPerDay: number): { hours: number; calibrated: boolean }`
+  in `packages/domain/src/production-rates.ts`.
+- Square-foot calculator saves rate id, value, unit, hours-per-day,
+  modifiers and calibration on the line; uncalibrated → AI hours stay the
+  default, labeled "AI estimate"; exception: rate 5012 walls keeps driving
+  wall hours, labeled "production rate (uncalibrated)".
+- Tests: tech gets 403; uncalibrated → AI default; calibrated → source
+  `production_rate`; 400 sq ft/day at 8 h = 50 sq ft/h; changing hours-per-day
+  changes new conversions only.
 
 ### B5 · TASK-194 · Baseline panel, send rules, freeze
 
 - `computeHourlyBaseline(input: BaselineInput): BaselineResult` in
-  `packages/domain/src/hourly-baseline.ts`, exactly the formula in
-  `docs/working/hourly-baseline.md`:
+  `packages/domain/src/hourly-baseline.ts`, exactly the formula document:
   - `BaselineInput = { lines: { type: "labor" | "materials" | "equipment" | "handling_fee" | "adjustment"; isTravelTime: boolean; hoursLow: number | null; hoursHigh: number | null; costCents: number | null; priceCents: number }[]; estimateHours: { low: number; high: number } | null; travelSurchargeCents: number; sellRateCents: number; costFloorCents: number; handlingPct: number; handlingOn: boolean; otherDirectCents: number | null; otherDirectConfirmed: boolean; quotedCents: number; warningPct: number }`
   - `BaselineResult = { complete: boolean; missing: { kind: "hours" | "cost" | "other_direct"; lineIndex?: number }[]; hours: { low: number; mid: number; high: number } | null; baseline: { low: number; mid: number; high: number } | null; gapCents: number | null; gapPct: number | null; effectiveRateCents: number | null; warning: "none" | "below" | "strong"; belowCostFloor: boolean | null }`
-- Tests: examples A–G from the formula document, to the cent (A: 890875 /
-  1080000 / 1269125, gap +2125, +0.20%, effective 7086; B: −19625, −1.78%;
-  C: −42500, −17.53%, 5533; D: −72500, −29.90%, 4533; E: incomplete, no
-  totals; F: 74500 / 83000 / 91500, effective 7600; G: 116500 / 133500 /
-  150500, +4000, +3.00%, 7679).
-- Send route `apps/web/app/api/v1/estimates/[id]/send/route.ts`: 422 with the
-  missing list while incomplete; acknowledgment required when
-  `belowCostFloor` and complete (stores `cost_floor_ack_at/by`); writes
-  `baseline_snapshot` in the draft-to-sent transaction; option quotes skip
-  the new rules and show "Baseline not available for option quotes yet".
+- Unit tests: examples A to G to the cent (A: 890875 / 1080000 / 1269125, gap
+  +2125, +0.20%, effective 7086; B: -19625, -1.78%; C: -42500, -17.53%, 5533;
+  D: -72500, -29.90%, 4533; E: incomplete, no totals; F: 74500 / 83000 /
+  91500, effective 7600; G: 116500 / 133500 / 150500, +4000, +3.00%, 7679).
+- Send route: 422 with the missing list while incomplete; acknowledgment
+  required when `belowCostFloor` and complete (stores `cost_floor_ack_at/by`);
+  writes `baseline_snapshot` in the draft-to-sent transaction; option quotes
+  skip the new rules and show "Baseline not available for option quotes yet".
 - Panel (owner/admin), "Before you can send" checklist, other direct costs
-  with "confirmed (including $0)", handling switch, Settings warning %.
-  Any edit clears confirmation and acknowledgment.
-- Tests: TASK-188 acceptance criteria (send 422s, warning levels, threshold
-  15% moves the strong warning, acknowledgment, freeze after a rate change,
-  existing drafts get the checklist, option quotes unsupported, tech cannot
-  see the panel).
+  with "confirmed (including $0)", handling switch, Settings warning %. Any
+  edit clears confirmation and acknowledgment.
+- Integration tests: TASK-188 acceptance criteria (send 422s, warning levels,
+  threshold 15%, acknowledgment, freeze after a rate change, existing drafts
+  get the checklist, option quotes unsupported, tech cannot see the panel).
 - Post-deploy check: an existing sent estimate shows "Hours not recorded" and
   the same totals.
 
@@ -343,36 +463,55 @@ logic lives in `packages/domain/src/hourly-baseline.ts`.
   (type, hours, source), billing method, prepared-scope gaps, settings rates;
   remove the $/sq ft rules and the hard-coded $85; validate output with Zod;
   treat `max_tokens` as an error; store `review_result` with
-  `review_for_updated_at`.
-- `apps/web/app/app/estimates/[id]/EstimateReviewPanel.tsx`: `autoLoad`
-  default false; shows the stored result while it is current.
+  `review_for_updated_at`. Keep the current model ID.
+- `EstimateReviewPanel.tsx`: `autoLoad` default false; stored result shown
+  while current.
 - Tests: opening an estimate makes no AI call (mock asserts zero calls);
-  stored result reused; Fixture A input names Pantry, Kitchen, Hall, Foyer as
-  missing materials (with a mocked model response, assert the prompt carries
-  those gaps).
+  stored result reused; the prompt for Fixture A carries Pantry, Kitchen,
+  Hall and Foyer as missing materials.
 
 ---
 
 ## Plan: fill-in tasks
 
-Each follows its backlog task's scope and acceptance criteria; the notes below
-fix the decisions the task leaves open.
+Each follows its backlog task's scope and acceptance criteria. Items marked
+"proposal" are engineering proposals (see the decisions register).
 
-- **F1 TASK-204:** one shared helper `apps/web/lib/ai/claude-call.ts`
-  (`callTool<T>(opts: { model: string; system; tools; toolName: string; schema: ZodType<T>; maxTokens: number; userContent }): Promise<T>` with timeout 120000 ms, `maxRetries: 1`, Zod validation, `max_tokens` → error, usage logged via `logger.info("ai.usage", { feature, model, input, output, cacheRead, ms })`). Move the nine call sites onto it one by one. Owner/admin on ai-draft, ai-scope, ai-materials, ai-tm-briefing, review. Key guard on the interview. Keep each feature's existing model ID (model upgrades are out of scope).
-- **F2 TASK-203:** portal approve/decline call the same helper as the email path for audit log, workflow event, attention event and booking-request advance; non-`sent` estimate → 409 with current status; repeated approve on approved → 200, no side effects.
-- **F3 TASK-198:** store the owner's deposit rule as entered; `deposit_cents` recalculated on every change from the rule.
-- **F4 TASK-202:** fixed price with no eligible groups → one "Work as described" labor line; T&M profit-card sell price = sum of quote lines.
-- **F5 TASK-205:** stream the materials generator response (server-sent events through the existing route; the client reads the stream), keep the request alive under 100 s per chunk; assessment hand-off lines carry `line_item_type: "materials"` and cost.
-- **F6 TASK-206:** travel route 409 for non-draft; PATCH keeps the stored tax rate when none is sent; produce the list of stale sent estimates in the PR body for the owner (G3); close none.
-- **F7 TASK-207:** audit row on password change with actor and target, no secrets.
-- **F8 TASK-199:** server builds painting lines from account rules; typed materials/handling lines.
-- **F9 TASK-200:** create and edit store the highest option total with matching subtotal including travel and risk; option lines keep type, visibility and price-book id.
-- **F10 TASK-201:** `computeAndPersist` runs on the create transaction's client; failure fails the create; total includes travel and risk; tax recomputed; pricing review re-run.
-- **F11 TASK-208:** reuse `computeHourlyBaseline` for change orders; add line type and hours to change-order lines; same send rules; plan this task's file list from the change-order code when B5 is done.
+- **F1 TASK-204:** shared helper `apps/web/lib/ai/claude-call.ts` with Zod
+  validation, `max_tokens` treated as an error, and usage logging (feature,
+  model, tokens, duration); timeout 120 s and one retry (proposal). Move the
+  nine call sites onto it one at a time. Owner/admin on ai-draft, ai-scope,
+  ai-materials, ai-tm-briefing and review. Key guard on the interview. Keep
+  each feature's model ID.
+- **F2 TASK-203:** portal approve/decline use the same helper as the email
+  path for audit log, workflow event, attention event and booking-request
+  advance; non-`sent` → 409 with current status; repeated approve → 200, no
+  side effects.
+- **F3 TASK-198:** store the owner's deposit rule as entered; recompute
+  `deposit_cents` from the rule on every change.
+- **F4 TASK-202:** fixed price with no eligible groups → one "Work as
+  described" labor line; T&M profit-card sell price = sum of quote lines.
+- **F5 TASK-205:** stream the generator response or run it as a polled job
+  (proposal) so no request waits over 100 s; assessment hand-off lines carry
+  `line_item_type: "materials"` and cost.
+- **F6 TASK-206:** travel route 409 for non-draft; PATCH keeps the stored tax
+  rate when none is sent; list the stale sent estimates in the PR for the
+  owner (G3); close none.
+- **F7 TASK-207:** audit row on password change with actor and target, no
+  secrets.
+- **F8 TASK-199:** server builds painting lines from account rules; typed
+  materials/handling lines.
+- **F9 TASK-200:** create and edit store the highest option total with a
+  matching subtotal including travel and risk; option lines keep type,
+  visibility and price-book id.
+- **F10 TASK-201:** `computeAndPersist` runs on the create transaction's
+  client; failure fails the create; total includes travel and risk; tax
+  recomputed; pricing review re-run.
+- **F11 TASK-208:** reuse `computeHourlyBaseline` for change orders; plan the
+  file list from the change-order code once B5 is Verified.
 
 ## Log
 
-Append one line per finished step: date, step, PR, deploy result.
+One line per state change: date, step, state, PR, evidence.
 
-- 2026-10-26 · S0.1 · runbook written on branch `spec/estimating-assistant-phase3` (PR #721) · no deploy
+- 2026-10-26 · S0.1 · Implemented · PR #721 · runbook written, then revised after an independent review (authority gated on PR comment, recovery gated on G5, database checklist, worktree isolation, four-state status, attribution by actual contributor)

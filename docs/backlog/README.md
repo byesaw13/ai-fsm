@@ -179,7 +179,7 @@ closed in tests; owner-flow AC still open.
 | TASK-194 | [Baseline panel, send rules and freeze at send](TASK-194-baseline-panel-send-rules.md) | 002 | Proposed |
 | TASK-195 | [Rewrite the estimate review around the baseline](TASK-195-review-rewrite.md) | 002 | Proposed |
 | TASK-196 | [Convert to invoice copies only the right lines, and lines add up](TASK-196-invoice-convert-integrity.md) | 004 | Proposed |
-| TASK-197 | [AI line suggestions cannot set their own price](TASK-197-item-suggester-price-cap.md) | 002 | Proposed |
+| TASK-197 | [AI line suggestions never set a price](TASK-197-item-suggester-price-cap.md) | 002 | Proposed |
 | TASK-198 | [Keep the deposit rule when it works out to $0 at create](TASK-198-deposit-rule-kept-at-create.md) | 004 | Proposed |
 | TASK-199 | [Painting edit prices lines with the account's rates](TASK-199-painting-edit-account-rates.md) | 002 | Proposed |
 | TASK-200 | [Multi-option estimates keep correct totals and line types](TASK-200-multi-option-create-edit.md) | 002 | Proposed |

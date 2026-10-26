@@ -184,7 +184,8 @@ Clarifications (fixed decisions):
 - Review rule for "hours but no materials price": prepared-scope groups whose
   confirmed tasks have hours and every materials_cents null.
 - Production-rate hours = quantity / rate (sqft_per_hour) or quantity / rate x
-  8 (per_day units, 8-hour day), multiplied by (1 + sum of applied modifier
+  hours per day (per_day units; an editable setting, default 8, owner
+  decision 2026-10-26), multiplied by (1 + sum of applied modifier
   modifier_pct). Editing rates and calibration is owner/admin only.
 
 Children (order and reason):
