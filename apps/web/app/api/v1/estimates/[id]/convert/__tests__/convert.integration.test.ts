@@ -173,6 +173,10 @@ describe.skipIf(!RUN)("estimate convert integrity", () => {
         { label: "Better", sort_order: 1, line_items: [{ description: "Paint walls and trim", quantity: 1, unit_price_cents: 420_000 }] },
       ],
     });
+    // Approval refuses a multi-option estimate with no pick, so the row is
+    // moved with the two transitions the database allows. selected_option_id
+    // stays null.
+    await db(`UPDATE estimates SET status = 'sent', sent_at = now() WHERE id = $1`, [data.id]);
     await db(`UPDATE estimates SET status = 'approved' WHERE id = $1`, [data.id]);
     const refused = await api("POST", `/api/v1/estimates/${data.id}/convert`);
     expect(refused.status).toBe(422);
