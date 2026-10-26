@@ -19,15 +19,14 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : S0.1 runbook written; revised after review 2026-10-26
-In-flight PR        : #720 and #721 (docs only, open, not merged)
-Next step           : S0.3 merge PR #720 (G1 approved). Merging needs G0 active
-                      (owner's PR comment on #721) or the owner merging.
-Blocked on          : G0 activation comment, or owner merge of #720
-Last known-good     : production at the commit deployed before any runbook work
-                      (record it with `git -C /opt/business/ai-fsm/repo rev-parse HEAD`
-                      before the first runbook deploy)
-Notes               : no product code written; nothing merged or deployed
+Last step           : S0.3 PR #720 merged by the owner (ddd2a31b) and deployed;
+                      verified 2026-10-26 19:39 UTC
+In-flight PR        : #721 (docs; main merged in, retargeted to main) — S0.4
+Next step           : S0.4 merge #721; then A1 (TASK-197)
+Blocked on          : nothing for S0.4; G0 activation comment still absent
+Last known-good     : ddd2a31b (branch deploy-good/ddd2a31b); previous 7a68ace6
+                      (branch deploy-good/7a68ace6)
+Notes               : no product code written yet
 ```
 
 ## Owner approvals
@@ -97,11 +96,11 @@ docs-only commit after the event. Planned tests are not passing tests.
 | Step | Task | Implemented | Merged | Deployed | Verified |
 | --- | --- | --- | --- | --- | --- |
 | S0.1 | Runbook | 2026-10-26 (PR #721) | | n/a | n/a |
-| S0.3 | Merge #720 | n/a | | n/a | n/a |
+| S0.3 | Merge #720 | n/a | 2026-10-26 (owner, ddd2a31b) | 2026-10-26 | 2026-10-26 (health ok, /login 200) |
 | S0.4 | Merge #721 | n/a | | n/a | n/a |
 | A1 | TASK-197 | | | | |
 | A2 | TASK-196 | | | | |
-| B0 | TASK-189 | doc in #720 | | n/a | n/a |
+| B0 | TASK-189 | doc in #720 | 2026-10-26 (#720) | n/a | n/a |
 | B1 | TASK-190 | | | | |
 | B2 | TASK-191 | | | | |
 | B3 | TASK-192 | | | | |
@@ -515,5 +514,6 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 
 One line per state change: date, step, state, PR, evidence.
 
+- 2026-10-26 · S0.3 · Merged by owner (#720, ddd2a31b); deployed 19:39 UTC; verified /api/health ok, /login 200, /app/map 307 to relative /login; last known-good branches deploy-good/7a68ace6 and deploy-good/ddd2a31b
 - 2026-10-26 · S0.2 · G1 and G5 approved in session; G0 approved in session, awaiting PR comment to activate
 - 2026-10-26 · S0.1 · Implemented · PR #721 · runbook written, then revised after an independent review (authority gated on PR comment, recovery gated on G5, database checklist, worktree isolation, four-state status, attribution by actual contributor)
