@@ -1,7 +1,7 @@
 # TASK-197: AI line suggestions never set a price
 
 Status:
-In progress
+Done (2026-10-26). Verified on production: /api/health ok and /login HTTP/2 200 at 22:06 UTC. Squash 1a8cc54c (#722).
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -26,9 +26,9 @@ Owner decision (2026-10-26): the AI never sets or proposes a price.
   model for a price.
 
 Acceptance Criteria:
-- [ ] An item with a default price uses it; with no default but a minimum,
+- [x] An item with a default price uses it; with no default but a minimum,
       uses the minimum; with neither, has no price and shows "Price needed".
-- [ ] A model response containing a price never changes the line's price.
+- [x] A model response containing a price never changes the line's price.
 
 Related:
 TASK-204.

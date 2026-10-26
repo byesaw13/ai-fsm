@@ -10,6 +10,7 @@ import {
   getTravelSnapshot,
 } from "@/lib/travel/snapshots";
 import { resolveIssueDueDate } from "@ai-fsm/domain";
+import { approvedLines, invoiceLinesFor, invoiceMoneyFor, type ConvertSourceLine } from "@/lib/estimates/approved-lines";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,10 @@ export const dynamic = "force-dynamic";
  * - Only owner/admin may convert
  * - Idempotent: repeated calls return the existing invoice (no duplicates)
  * - Line items copied with estimate_line_item_id FK for traceability
- * - Totals snapshotted in cents at conversion time
+ * - Shared lines plus the chosen option only; hidden lines fold into Included work
+ * - Multi-option with no chosen option is refused (422)
+ * - Totals snapshotted in cents at conversion time. A standard estimate keeps
+ *   its stored total. A multi-option invoice is priced from the chosen lines.
  * - Audit record written on first conversion
  *
  * Source evidence:
@@ -40,7 +44,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       const estimateResult = await client.query(
         `SELECT e.id, e.status, e.client_id, e.job_id, e.property_id,
                 e.subtotal_cents, e.tax_cents, e.total_cents, e.deposit_cents,
-                e.notes, e.created_by, e.travel_snapshot_id
+                e.notes, e.created_by, e.travel_snapshot_id,
+                e.presentation_mode, e.selected_option_id,
+                e.risk_adjustment_cents, e.travel_surcharge_cents
          FROM estimates e
          WHERE e.id = $1 AND e.account_id = $2`,
         [id, session.accountId]
@@ -65,6 +71,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         notes: string | null;
         created_by: string;
         travel_snapshot_id: string | null;
+        presentation_mode: string;
+        selected_option_id: string | null;
+        risk_adjustment_cents: number;
+        travel_surcharge_cents: number;
       };
 
       // 2. Enforce prerequisite: only approved estimates can be converted
@@ -100,39 +110,97 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         };
       }
 
-      // 3b. Reconcile against any deposit/progress invoices already billed so the
-      //     final invoice credits them and the stages never double-bill.
-      const reconciliation = reconcileFinalInvoice({
-        invoiceTotalCents: estimate.total_cents,
-        depositInvoices: await loadCreditedInvoicesForEstimate(client, id, session.accountId),
-      });
+      // A Good/Better/Best estimate has no single approved price until the
+      // customer picks. Checked after the idempotency return so a second
+      // convert still finds the invoice.
+      if (estimate.presentation_mode === "multi_option" && !estimate.selected_option_id) {
+        throw Object.assign(new Error("Choose the customer's option first"), { code: "OPTION_REQUIRED" });
+      }
 
-      // 4. Fetch estimate line items for copying (exclude travel — re-materialized
-      //    as itemized mileage + travel-time lines from the snapshot below)
+      // 4. Approved lines only: shared lines plus the chosen option. Hidden
+      //    lines fold into one Included work line. Risk and a non-snapshot
+      //    travel surcharge become their own lines so the lines add up.
       const lineItemsResult = await client.query(
-        `SELECT id, description, quantity, unit_price_cents, total_cents, sort_order,
-                adjustment_type
+        `SELECT id, option_id, description, quantity, unit_price_cents, total_cents, sort_order,
+                adjustment_type, visible_to_customer
          FROM estimate_line_items
          WHERE estimate_id = $1
          ORDER BY sort_order ASC, created_at ASC`,
         [id]
       );
-      const lineItems = (
-        lineItemsResult.rows as Array<{
-          id: string;
-          description: string;
-          quantity: number;
-          unit_price_cents: number;
-          total_cents: number;
-          sort_order: number;
-          adjustment_type: string | null;
-        }>
-      ).filter(
-        (item) =>
-          item.adjustment_type !== "travel_surcharge" &&
-          !item.description.includes("<!--travel-charge-->") &&
-          !item.description.toLowerCase().includes("travel and service-area")
+      const sourceLines: ConvertSourceLine[] = (lineItemsResult.rows as Array<{
+        id: string;
+        option_id: string | null;
+        description: string;
+        quantity: string | number;
+        unit_price_cents: string | number;
+        total_cents: string | number;
+        sort_order: string | number;
+        adjustment_type: string | null;
+        visible_to_customer: boolean;
+      }>).map((item) => ({
+        id: item.id,
+        option_id: item.option_id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unit_price_cents: Number(item.unit_price_cents),
+        total_cents: Number(item.total_cents),
+        sort_order: Number(item.sort_order),
+        adjustment_type: item.adjustment_type,
+        visible_to_customer: item.visible_to_customer,
+      }));
+      const chosen = approvedLines(sourceLines, estimate.selected_option_id);
+      const lineItems = invoiceLinesFor(
+        {
+          risk_adjustment_cents: Number(estimate.risk_adjustment_cents),
+          travel_surcharge_cents: Number(estimate.travel_surcharge_cents),
+          travel_snapshot_id: estimate.travel_snapshot_id,
+        },
+        chosen,
       );
+
+      let optionMoney: { subtotal_cents: number; tax_cents: number } | null = null;
+      if (estimate.presentation_mode === "multi_option" && estimate.selected_option_id) {
+        const optionResult = await client.query<{ subtotal_cents: number; tax_cents: number }>(
+          `SELECT subtotal_cents, tax_cents FROM estimate_options
+           WHERE id = $1 AND estimate_id = $2`,
+          [estimate.selected_option_id, id],
+        );
+        if (optionResult.rowCount === 0) {
+          throw Object.assign(new Error("That option is not part of this estimate"), { code: "OPTION_REQUIRED" });
+        }
+        optionMoney = {
+          subtotal_cents: Number(optionResult.rows[0].subtotal_cents),
+          tax_cents: Number(optionResult.rows[0].tax_cents),
+        };
+      }
+
+      // Snapshot travel is re-added below. Its charge is already inside a
+      // standard estimate's stored total. A multi-option parent total is not
+      // the chosen option, so the charge has to be added to the drafted sum.
+      let snapshotTravelCents = 0;
+      const snap = estimate.travel_snapshot_id
+        ? await getTravelSnapshot(client, estimate.travel_snapshot_id)
+        : null;
+      if (snap && snap.total_travel_charge_cents > 0 && snap.charge_mode !== "waive") {
+        snapshotTravelCents = snap.total_travel_charge_cents;
+      }
+      const money = invoiceMoneyFor({
+        presentation_mode: estimate.presentation_mode,
+        subtotal_cents: Number(estimate.subtotal_cents),
+        tax_cents: Number(estimate.tax_cents),
+        total_cents: Number(estimate.total_cents),
+        option: optionMoney,
+        drafted_lines: lineItems,
+        snapshot_travel_cents: snapshotTravelCents,
+      });
+
+      // 3b. Reconcile against any deposit/progress invoices already billed so the
+      //     final invoice credits them and the stages never double-bill.
+      const reconciliation = reconcileFinalInvoice({
+        invoiceTotalCents: money.total_cents,
+        depositInvoices: await loadCreditedInvoicesForEstimate(client, id, session.accountId),
+      });
 
       // 5. Generate unique invoice number (inside transaction to avoid race)
       const invoiceNumber = await generateInvoiceNumber(
@@ -177,9 +245,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           id, // estimate_id FK
           estimate.property_id,
           invoiceNumber,
-          estimate.subtotal_cents,
-          estimate.tax_cents,
-          estimate.total_cents,
+          money.subtotal_cents,
+          money.tax_cents,
+          money.total_cents,
           reconciliation.depositCreditCents,
           finalNotes,
           finalDueDate, // TASK-078: null until job completes
@@ -208,7 +276,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
             invoiceId,
-            item.id,
+            item.estimate_line_item_id,
             item.description,
             item.quantity,
             item.unit_price_cents,
@@ -221,18 +289,15 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       // 7b. Materialize itemized travel lines (mileage + travel time) from the
       //     carried snapshot so the invoice itemization always shows travel —
       //     even when the estimate used include_in_labor (surcharge field only).
-      if (estimate.travel_snapshot_id) {
-        const snap = await getTravelSnapshot(client, estimate.travel_snapshot_id);
-        if (snap && snap.total_travel_charge_cents > 0 && snap.charge_mode !== "waive") {
-          const travelSettings = await loadTravelSettings(client, session.accountId);
-          await ensureInvoiceTravelLinesFromSnapshot(client, {
-            invoiceId,
-            snapshot: snap,
-            settingsLineTitle: travelSettings.customer_facing_line_title,
-            settingsLineDescription: travelSettings.customer_facing_description,
-            replaceExisting: true,
-          });
-        }
+      if (snap && snap.total_travel_charge_cents > 0 && snap.charge_mode !== "waive") {
+        const travelSettings = await loadTravelSettings(client, session.accountId);
+        await ensureInvoiceTravelLinesFromSnapshot(client, {
+          invoiceId,
+          snapshot: snap,
+          settingsLineTitle: travelSettings.customer_facing_line_title,
+          settingsLineDescription: travelSettings.customer_facing_description,
+          replaceExisting: true,
+        });
       }
 
       // 8. Audit log the conversion event
@@ -248,7 +313,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           estimate_id: id,
           invoice_number: invoiceNumber,
           invoice_kind: "final",
-          total_cents: estimate.total_cents,
+          total_cents: money.total_cents,
           deposit_credit_cents: reconciliation.depositCreditCents,
           balance_due_cents: reconciliation.balanceDueCents,
           line_item_count: lineItems.length,
@@ -281,6 +346,19 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           },
         },
         { status: 404 }
+      );
+    }
+
+    if (err.code === "OPTION_REQUIRED") {
+      return NextResponse.json(
+        {
+          error: {
+            code: "OPTION_REQUIRED",
+            message: err.message,
+            traceId: session.traceId,
+          },
+        },
+        { status: 422 }
       );
     }
 

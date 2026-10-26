@@ -1,7 +1,7 @@
 # TASK-196: Convert to invoice copies only the right lines, and lines add up
 
 Status:
-Proposed
+In progress
 
 Epic:
 EPIC-004 Billing & Profitability

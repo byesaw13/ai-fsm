@@ -72,7 +72,7 @@ export const BRANCHES: MapNode[] = [
     kind: "branch",
     step: 4,
     intended: "A clear price for the agreed work, approved by the customer before the job starts.",
-    built: "Prepare Quote on the assessment turns the walkthrough into a draft: work by room, measured quantities, starting hours and questions. Rooms can list only the walls being painted, areas left unpainted and a vaulted peak; wall painting hours come from your pace and paint from the area. It opens as one row per room with labor, materials and what still needs you; open a room to adjust its tasks, or answer its questions and type a note, and Revise shows what would change and why before you keep it. Itemize materials lists what each room needs, priced from your saved materials first, and Apply sends that list to the job's buy list. You choose T&M or a fixed price, see the modeled profit, then Apply to quote. The customer opens a link, types their name, and signs. That accepts the quote; on a Good/Better/Best quote they must pick an option, and the deposit follows that option. The job and final bill do not follow the pick yet. Extra work can be drafted in the office. The customer has no link to approve the added price. A suggested price-book line uses the book's price, or says Price needed.",
+    built: "Prepare Quote on the assessment turns the walkthrough into a draft: work by room, measured quantities, starting hours and questions. Rooms can list only the walls being painted, areas left unpainted and a vaulted peak; wall painting hours come from your pace and paint from the area. It opens as one row per room with labor, materials and what still needs you; open a room to adjust its tasks, or answer its questions and type a note, and Revise shows what would change and why before you keep it. Itemize materials lists what each room needs, priced from your saved materials first, and Apply sends that list to the job's buy list. You choose T&M or a fixed price, see the modeled profit, then Apply to quote. The customer opens a link, types their name, and signs. That accepts the quote; on a Good/Better/Best quote they must pick an option, and the deposit follows that option. The job does not follow the pick yet. The final bill copies the chosen option, and its lines add up to its subtotal. Extra work can be drafted in the office. The customer has no link to approve the added price. A suggested price-book line uses the book's price, or says Price needed.",
     records: [
       { name: "estimates", holds: "The quote, its status, and its total." },
       { name: "estimate_line_items", holds: "Each priced line." },
@@ -115,7 +115,7 @@ export const BRANCHES: MapNode[] = [
     kind: "branch",
     step: 7,
     intended: "The charge for the job. The customer can pay by card, and the receipt stays.",
-    built: "The bill is for the job. The customer opens a link and pays. What is still owed also shows on their home page.",
+    built: "The bill is for the job. Converted from a quote, it shows the approved lines, including only the chosen option on a Good/Better/Best quote, and those lines add up to the subtotal. The customer opens a link and pays. What is still owed also shows on their home page.",
     records: [
       { name: "invoices", holds: "The bill, its total, and what has been paid." },
       { name: "payments", holds: "Each payment against that bill." },
