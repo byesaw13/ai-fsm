@@ -5,6 +5,14 @@ re-keying, and keeping estimate structure consistent across jobs.
 
 ## Active tasks
 
+## Estimating assistant, Phase 3 slice (TASK-209 to TASK-216)
+
+Approved by the owner 2026-10-26. Design: `docs/working/estimating-assistant-phase3.md`.
+Foundation plus paint pilot first; the four other formula families follow only
+after the pilot passes. Starts after PR #720 merges.
+
+- [TASK-209: Estimating assistant, Phase 3 slice (parent)](TASK-209-estimating-assistant-phase3.md) — children TASK-210 to TASK-216.
+
 ## Hourly baseline and estimate audit (TASK-188 to TASK-206)
 
 Owner decisions 2026-10-26: every estimate is compared with the company's
