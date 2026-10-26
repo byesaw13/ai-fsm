@@ -112,13 +112,14 @@ export function LineItemsTable({
                       min="0"
                       step="0.01"
                       value={row.unit_price}
+                      placeholder="Price needed"
                       onChange={(e) => onUpdate(i, "unit_price", e.target.value)}
                       disabled={disabled}
                       data-testid={`${p}line-item-price-${i}`}
                     />
                   </td>
                   <td style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", paddingLeft: "var(--space-2)" }}>
-                    {formatCents(lineTotal(row))}
+                    {row.unit_price.trim() === "" ? "Price needed" : formatCents(lineTotal(row))}
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: "var(--space-1)" }}>
