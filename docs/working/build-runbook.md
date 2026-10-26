@@ -22,7 +22,7 @@ docs-only commit when there is no PR).
 Last step           : A2 (TASK-196) verified on production at 2026-10-26
                       22:51 UTC. Squash e7b27ef9 (#723). Health ok, /login
                       HTTP/2 200, no redirect to 0.0.0.0:3000.
-In-flight PR        : B1 (TASK-190), branch task/190-materials-cost
+In-flight PR        : #724 — B1 (TASK-190)
 Next step           : B1 (TASK-190)
 Blocked on          : nothing
 Last known-good     : e7b27ef9 (branch deploy-good/e7b27ef9); previous 1a8cc54c
@@ -516,7 +516,7 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 
 One line per state change: date, step, state, PR, evidence.
 
-- 2026-10-26 · B1 · In progress · branch task/190-materials-cost · materials cost separate from the customer price
+- 2026-10-26 · B1 · In progress · #724 · materials cost separate from the customer price
 - 2026-10-26 · A2 · Verified · health ok and /login HTTP/2 200 at 22:51 UTC; known-good deploy-good/e7b27ef9
 - 2026-10-26 · A2 · Deployed · e7b27ef9 · web recreated and healthy ~22:51 UTC. No migration, so no backup. Worker image left as it was.
 - 2026-10-26 · A2 · Merged · #723 · squash e7b27ef9 at 22:44 UTC
