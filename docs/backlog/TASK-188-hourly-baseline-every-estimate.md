@@ -103,7 +103,18 @@ warning; at or beyond the configurable threshold (default 10%) below it, a
 stronger warning. Warnings never block. Existing minimum-charge checks stay.
 
 Owner decisions (2026-10-26):
+- Scope is the whole estimating system: every creation path listed under
+  "Creation paths and coverage" below. Fixture A is only the math test.
 - Reference only: the baseline never changes the price the owner sets.
+- Good/Better/Best (multi-option) quotes are explicitly unsupported by the new
+  baseline checks until TASK-183 adds a per-option baseline: the panel says
+  "Baseline not available for option quotes yet", no combined baseline is
+  ever computed or shown, and the new send rules do not apply to them.
+  Existing checks (pricing review, minimum charge) still apply.
+- Existing quotes: sent and approved versions are preserved untouched. Existing
+  drafts must meet the new send rules before sending, with a clear way to add
+  what is missing (TASK-194 checklist).
+- Change orders are out of scope here (TASK-208).
 - Cost-floor check uses high-end person-hours; selling warnings use the
   midpoint; the full range is always shown.
 - Sending requires complete hours and confirmed direct costs; "incomplete" is
@@ -143,8 +154,11 @@ Clarifications (fixed decisions):
   materials, handling, equipment, travel, other_direct}, baseline: {low, mid,
   high}, quoted, gap_cents, gap_pct, effective_rate_cents }`.
 - Review cache is valid while `review_for_updated_at = estimates.updated_at`.
-- Legacy: sent/approved estimates are untouched and show "Hours not recorded";
-  existing drafts must meet the send rules before sending.
+- Legacy: sent, approved, declined and expired estimates are never rewritten
+  and show "Hours not recorded" when they have none. Existing drafts open with
+  the TASK-194 "Before you can send" checklist listing each missing item
+  (labor lines without hours, unconfirmed direct costs) with a link to the
+  field; the owner fills them in on the normal edit form.
 - Migration ownership: TASK-191 adds migration 208 (all columns above except
   the line type CHECK); TASK-192 adds migration 209 (CHECK gains 'equipment';
   reversal converts equipment rows to materials first).
@@ -212,7 +226,31 @@ Baseline is computed by one pure function in `packages/domain`
 gap_pct, effective_rate_cents, complete, missing[] }`), used by the panel, the
 send route and the review.
 
+Creation paths and coverage:
+
+Every estimate is created by `createEstimate`
+(`apps/web/lib/estimates/create-estimate.ts`) and sent by the send route, so
+the rules live there. Each path must still pass its own hours, sources and
+costs correctly, so each gets its own coverage test (create through the
+path's real entry point, then assert stored line hours, sources, costs and the
+baseline result):
+
+| # | Path | Entry point | Hours come from |
+| --- | --- | --- | --- |
+| 1 | Prepare Quote | `api/v1/visits/[id]/prepare-quote` + Apply | task ranges and sources |
+| 2 | New estimate, itemized | `app/app/estimates/new` (`useEstimateForm`) | price book or typed |
+| 3 | New estimate, flat price | same | estimate-level range |
+| 4 | New estimate, sq ft painting (incl. room-by-room) | same, `sqftPaintingToSpec` / engine spec | production rate or AI (TASK-193) |
+| 5 | AI draft (incl. the interview, which ends in an AI draft) | `api/v1/estimates/ai-draft` then the form | price-book hours of the chosen services, source price_book |
+| 6 | T&M briefing | `TmBriefingFlow` / `api/v1/estimates/ai-tm-briefing` | extracted labor_hours_min/max, source ai_allowance |
+| 7 | Booking-request and assessment-materials prefills | prefilled `app/app/estimates/new` | as path 2 |
+| 8 | Quick estimate wizard | `app/app/estimates/quick/QuickEstimateWizard.tsx` (creates, then sends) | entered in the wizard |
+| 9 | Fix now from a visit | `app/app/visits/[id]/FixNowEstimateButton.tsx` | entered before send |
+| 10 | Direct API | `POST /api/v1/estimates` | request body |
+| 11 | Good/Better/Best | multi-option form | not supported: test asserts "Baseline not available" and no combined baseline |
+
 Acceptance Criteria:
+- [ ] One coverage test per path 1-11 above passes.
 - [ ] `computeHourlyBaseline` reproduces the Fixture A example to the cent.
 - [ ] A draft with one labor line missing hours saves, shows "Hours
       incomplete", and Send returns 422 naming that line.
@@ -232,6 +270,10 @@ Acceptance Criteria:
 - [ ] The quoted price and line items are never changed by any baseline code.
 - [ ] Existing estimates without hours display "Hours not recorded" and
       totals identical to before.
+- [ ] An existing draft with no hours shows the "Before you can send"
+      checklist; after filling the listed items it can be sent.
+- [ ] A Good/Better/Best quote shows "Baseline not available for option quotes
+      yet", never a combined baseline, and is not blocked by the new send rules.
 - [ ] Unit + integration tests pass; `pnpm gate:fast` green.
 
 Testing:
@@ -240,6 +282,7 @@ Testing:
 | Unit | computeHourlyBaseline (example, low/mid/high, incomplete, handling, flat range, equipment, other_direct, floor) | +12 |
 | Unit | send-rule evaluator (missing hours, missing costs, below floor, ack) | +6 |
 | Integration | PATCH hours persist null vs value; send 422s; ack path; snapshot frozen | +5 |
+| Integration | One coverage test per creation path (table above) | +11 |
 | E2E | Prepare Quote -> confirm costs -> panel -> send | +1 |
 
 Rollback:
@@ -247,9 +290,12 @@ Revert the PRs; the migration is additive (drop columns to reverse). Sent
 estimates keep their prices because baseline code never writes price.
 
 Effort:
-189: 0.5 d. 190: 0.5 d. 191: 2 d. 192: 0.5 d. 193: 1.5 d. 194: 2 d. 195: 1 d.
+189: 0.5 d. 190: 0.5 d. 191: 3 d (incl. per-path hours and coverage tests).
+192: 0.5 d. 193: 1.5 d. 194: 2 d. 195: 1 d.
 
 Out of Scope:
+- Per-option baseline for Good/Better/Best (TASK-183).
+- Change orders (TASK-208).
 - Hours driving price (separate roadmap decision).
 - Per-job actual time and estimated-vs-actual comparison (PI-007, Phase 4;
   this work stores what it needs).

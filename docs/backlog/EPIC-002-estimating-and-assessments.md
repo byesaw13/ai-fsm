@@ -98,12 +98,25 @@ Scope:
   buy-list seed, invoice prefill and reports.
 - Set the estimate's subtotal/tax/total from the chosen option on approval,
   with an explicit, tested amendment to the estimate immutability trigger.
+- Per-option hourly baseline (added 2026-10-26, owner decision, TASK-188):
+  each option has its own hours, direct costs and baseline (low/mid/high, gap,
+  effective rate against the cost floor), computed only from lines with no
+  option plus that option's lines. Never a combined baseline across options.
+  The TASK-188 send rules apply per option: every option must have complete
+  hours and confirmed direct costs before the quote can be sent; the cost-floor
+  acknowledgment is per option. Until this ships, option quotes are marked
+  "Baseline not available for option quotes yet" and skip the new send rules
+  (TASK-188, TASK-194).
 
 Acceptance Criteria:
 - [ ] Approving Better leaves the job, final invoice, work orders and buy list
       with only Better's work.
 - [ ] The approved estimate's total equals the chosen option's total.
 - [ ] Standard estimates are unchanged.
+- [ ] Each option shows its own baseline; no combined baseline appears
+      anywhere.
+- [ ] A quote with one option missing hours cannot be sent and the checklist
+      names that option.
 
 Notes:
 Split from TASK-181 on 2026-10-24 (owner decision). Revisit when the owner

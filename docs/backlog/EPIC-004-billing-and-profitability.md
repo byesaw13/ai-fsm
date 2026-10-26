@@ -5,6 +5,10 @@ of what each job actually earned.
 
 ## Active tasks
 
+# TASK-208: Hourly baseline on change orders
+
+See [TASK-208-change-order-baseline.md](./TASK-208-change-order-baseline.md). Same reference-only baseline and send rules as TASK-188, applied to change orders. After TASK-188.
+
 # TASK-196: Convert to invoice copies only the right lines, and lines add up
 
 See [TASK-196-invoice-convert-integrity.md](./TASK-196-invoice-convert-integrity.md). High. No hidden or unchosen-option lines on the invoice; risk and manual travel get lines so lines sum to the total.

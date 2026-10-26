@@ -39,6 +39,7 @@
   { "id": "TASK-206", "title": "Quote cleanup and stale sent quotes", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Small quote errors fixed, and old quotes still marked sent get closed out with your OK." },
 
   { "id": "TASK-102", "title": "Save quick materials onto the job", "branch": "job", "status": "backlog", "phase": "Phase 3", "fit": "Materials gathered outside a quote still have to land on the job." },
+  { "id": "TASK-208", "title": "Change orders checked against your hourly rate", "branch": "job", "status": "backlog", "phase": "Phase 3", "fit": "Added work on a job should get the same hours check as the original quote." },
 
   { "id": "ask-moved", "title": "Text when the day moves", "branch": "visit", "status": "asked", "phase": "Phase 1", "fit": "The website says a schedule change comes from you. A moved visit does not text the customer. No task owns it yet." },
   { "id": "TASK-140", "title": "Mileage claim versus GPS", "branch": "visit", "status": "progress", "phase": "Phase 1", "fit": "Miles are part of the day at the house, checked when the day is done." },

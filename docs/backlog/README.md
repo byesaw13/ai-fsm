@@ -103,7 +103,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-208**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-209**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -190,6 +190,7 @@ closed in tests; owner-flow AC still open.
 | TASK-205 | [Materials generator finishes within the tunnel limit](TASK-205-materials-generator-timeout.md) | 002 | Proposed |
 | TASK-206 | [Estimate API cleanup and stale sent estimates](TASK-206-estimate-api-cleanup.md) | 002 | Proposed |
 | TASK-207 | [Record password changes in the audit log](TASK-207-password-change-audit.md) | 005 | Proposed |
+| TASK-208 | [Hourly baseline on change orders](TASK-208-change-order-baseline.md) | 004 | Proposed |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |

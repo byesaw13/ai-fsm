@@ -32,11 +32,21 @@ Scope:
   incomplete; when complete and the effective rate is below the cost floor,
   require an acknowledgment (stored as cost_floor_ack_at/by); write
   baseline_snapshot in the draft-to-sent transaction. Warnings never block.
+- "Before you can send" checklist on every draft that is not ready: one row per
+  missing item (each labor line without hours, flat quote without a range,
+  materials or equipment line without an amount, unconfirmed direct costs),
+  each linking to its field. Shown on open, not only after a failed Send.
+  Existing drafts created before this work get the same checklist.
+- Good/Better/Best quotes: the panel shows "Baseline not available for option
+  quotes yet (TASK-183)"; no combined baseline; the new send rules are skipped
+  for them.
 
 Acceptance Criteria:
 - [ ] The TASK-188 acceptance criteria for send rules, warnings, threshold,
-      handling and freeze all pass.
+      handling, freeze, existing drafts and option quotes all pass.
 - [ ] The panel is hidden from tech users.
+- [ ] An existing draft with two labor lines missing hours shows two checklist
+      rows; each link opens the matching field.
 
 Effort:
 2 days.
