@@ -65,6 +65,12 @@ function nextSort(rows: { sort_order: number }[]): number {
   return rows.reduce((max, row) => Math.max(max, row.sort_order), -1) + 1;
 }
 
+/** The quote form's engine already saves these labels as lines. */
+function describedAs(lines: { description: string }[], description: string): boolean {
+  const wanted = description.toLowerCase();
+  return lines.some((line) => line.description.trim().toLowerCase() === wanted);
+}
+
 function adjustmentLine(description: string, cents: number, sortOrder: number): InvoiceDraftLine {
   return {
     estimate_line_item_id: null,
@@ -81,6 +87,8 @@ function adjustmentLine(description: string, cents: number, sortOrder: number): 
  * Hidden lines become one "Included work" line. Their own text is not copied.
  * A snapshot replaces stored travel lines, so those are omitted here.
  * Without a snapshot, a travel surcharge that is not already a line is added.
+ * The quote form's engine already writes "Risk adjustment" and "Travel surcharge"
+ * lines, and also leaves the surcharge fields set. Those fields are not added again.
  */
 export function invoiceLinesFor(
   estimate: {
@@ -109,18 +117,38 @@ export function invoiceLinesFor(
     const total = hidden.reduce((sum, line) => sum + line.total_cents, 0);
     drafted.push(adjustmentLine("Included work", total, nextSort(drafted)));
   }
-  if (estimate.risk_adjustment_cents > 0) {
+  if (estimate.risk_adjustment_cents > 0 && !describedAs(source, "Risk adjustment")) {
     drafted.push(adjustmentLine("Risk adjustment", estimate.risk_adjustment_cents, nextSort(drafted)));
   }
-  if (estimate.travel_surcharge_cents > 0 && estimate.travel_snapshot_id == null) {
+  if (
+    estimate.travel_surcharge_cents > 0
+    && estimate.travel_snapshot_id == null
+    && !describedAs(source, "Travel surcharge")
+  ) {
     drafted.push(adjustmentLine("Travel", estimate.travel_surcharge_cents, nextSort(drafted)));
   }
   return drafted;
 }
 
-/** Standard invoices keep stored money. Multi-option invoices follow the drafted lines. */
+/**
+ * Standard invoices keep stored money when the drafted lines already equal
+ * that subtotal. When the lines already include engine adjustments, their sum
+ * is the approved total and becomes the invoice subtotal. Multi-option
+ * invoices follow the drafted lines.
+ */
 export function invoiceMoneyFor(input: InvoiceMoneyInput): InvoiceMoney {
+  const draftedSum = input.drafted_lines.reduce((sum, line) => sum + line.total_cents, 0);
   if (input.presentation_mode !== "multi_option") {
+    if (draftedSum === input.subtotal_cents) {
+      return {
+        subtotal_cents: input.subtotal_cents,
+        tax_cents: input.tax_cents,
+        total_cents: input.total_cents,
+      };
+    }
+    if (draftedSum === input.total_cents) {
+      return { subtotal_cents: draftedSum, tax_cents: 0, total_cents: draftedSum };
+    }
     return {
       subtotal_cents: input.subtotal_cents,
       tax_cents: input.tax_cents,
@@ -128,8 +156,7 @@ export function invoiceMoneyFor(input: InvoiceMoneyInput): InvoiceMoney {
     };
   }
 
-  const subtotal = input.drafted_lines.reduce((sum, line) => sum + line.total_cents, 0)
-    + (input.snapshot_travel_cents ?? 0);
+  const subtotal = draftedSum + (input.snapshot_travel_cents ?? 0);
   const option = input.option;
   let tax = 0;
   if (option && option.subtotal_cents > 0) {

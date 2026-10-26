@@ -100,6 +100,22 @@ describe("invoiceLinesFor", () => {
     expect(drafted.reduce((sum, row) => sum + row.total_cents, 0)).toBe(10_000);
   });
 
+  it("does not append risk or travel that the quote form already saved as lines", () => {
+    // computeAndPersist writes the form's adjustments as lines and leaves the
+    // surcharge fields set. The approved total is labor + risk + travel once.
+    const lines = [
+      line({ id: "labor", description: "Labor", total_cents: 10_000, sort_order: 0 }),
+      line({ id: "risk", description: "Risk adjustment", total_cents: 4_000, sort_order: 1 }),
+      line({ id: "travel", description: "Travel surcharge", total_cents: 2_500, sort_order: 2 }),
+    ];
+    const drafted = invoiceLinesFor(
+      { risk_adjustment_cents: 4_000, travel_surcharge_cents: 2_500, travel_snapshot_id: null },
+      lines,
+    );
+    expect(drafted.map((row) => row.description)).toEqual(["Labor", "Risk adjustment", "Travel surcharge"]);
+    expect(drafted.reduce((sum, row) => sum + row.total_cents, 0)).toBe(16_500);
+  });
+
   it("keeps a stored travel line when there is no snapshot to replace it", () => {
     const lines = [
       line({ id: "hinge", description: "Fix hinge", total_cents: 10_000 }),
@@ -119,6 +135,17 @@ describe("invoiceLinesFor", () => {
 
 describe("invoiceMoneyFor", () => {
   const stored = { subtotal_cents: 12_500, tax_cents: 0, total_cents: 12_500 };
+
+  it("uses the line sum as the subtotal when those lines already include the adjustments", () => {
+    expect(invoiceMoneyFor({
+      presentation_mode: "standard",
+      subtotal_cents: 10_000,
+      tax_cents: 1_031,
+      total_cents: 16_500,
+      option: null,
+      drafted_lines: [{ total_cents: 10_000 }, { total_cents: 4_000 }, { total_cents: 2_500 }],
+    })).toEqual({ subtotal_cents: 16_500, tax_cents: 0, total_cents: 16_500 });
+  });
 
   it("keeps the stored subtotal, tax and total on a standard estimate", () => {
     expect(invoiceMoneyFor({
