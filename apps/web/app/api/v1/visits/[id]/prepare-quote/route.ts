@@ -4,8 +4,8 @@
  * Builds a draft estimate from the visit's saved assessment, or returns the
  * visit's open draft if one exists (one open draft per visit, migration 204).
  * The model lists the work; quantities, starting hours and prices are set in
- * code. If the model is unavailable the draft still opens with the rooms and
- * measurements and a visible notice.
+ * code. If the model is unavailable no draft is created and the owner is told
+ * why (out of credit, key missing, busy).
  */
 import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
@@ -16,7 +16,6 @@ import { loadAssessmentSummary } from "@/lib/estimates/assessment-summary-loader
 import { createEstimate, createEstimateSchema } from "@/lib/estimates/create-estimate";
 import {
   extractPreparedScope,
-  fallbackPreparedScope,
   preparedScopeInternalNote,
   preparedScopeToLineItems,
   toPreparedScope,
@@ -24,6 +23,7 @@ import {
 import { resolveLaborRateCents } from "@/lib/estimates/tm-briefing";
 import { loadPricingSettings } from "@/lib/pricing/settings";
 import { loadPreparationInputs } from "@/lib/estimates/preparation-inputs";
+import { describeAiFailure } from "@/lib/estimates/ai-failure";
 
 export const dynamic = "force-dynamic";
 
@@ -83,18 +83,20 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     if (!context) return errorResponse(session, 404, "NOT_FOUND", "Visit not found");
 
     const source = { visitId, assessmentUpdatedAt: context.assessment_updated_at, wallPaintRate: context.wallPaintRate };
-    let ai: "ok" | "unavailable" = "ok";
+    // No AI, no draft: an empty draft would take the visit's one draft slot.
     let scope;
+    let failure: unknown = null;
     try {
       const output = await extractPreparedScope(summary, context.priceBook);
       scope = output ? toPreparedScope(output, summary, context.priceBook, source) : null;
     } catch (err) {
-      logger.warn("prepare-quote: AI preparation failed", { visitId, error: (err as Error).message });
+      failure = err;
       scope = null;
     }
     if (!scope) {
-      ai = "unavailable";
-      scope = fallbackPreparedScope(summary, source);
+      const reason = describeAiFailure(failure);
+      logger.warn("prepare-quote: AI preparation failed", { visitId, code: reason.code, error: (failure as Error | null)?.message });
+      return errorResponse(session, 503, reason.code, `${reason.message} No quote was created.`);
     }
 
     const { labor_rate_cents } = resolveLaborRateCents(context.property_state, context.settings);
@@ -115,7 +117,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         preparedScope: scope,
         lineGroupKeys: groupKeys,
       });
-      return NextResponse.json({ id, resumed: false, ai }, { status: 201 });
+      return NextResponse.json({ id, resumed: false }, { status: 201 });
     } catch (err) {
       // Another request created the draft first (one open draft per visit).
       if ((err as { code?: string }).code === "23505") {

@@ -1,5 +1,11 @@
 import type { AssessmentSummary, PreparedMaterialList, PreparedScope } from "@ai-fsm/domain";
-import type { GenerateMaterialsInput, MaterialsResult, SavedMaterial } from "@/lib/estimates/materials-generator";
+import {
+  MaterialsGenerationError,
+  type GenerateMaterialsInput,
+  type MaterialsResult,
+  type SavedMaterial,
+} from "@/lib/estimates/materials-generator";
+import { describeAiFailure } from "@/lib/estimates/ai-failure";
 
 /**
  * Itemized materials per work area (TASK-187). Each group's included tasks go
@@ -74,7 +80,10 @@ export async function itemizeGroups(
   const failed: ItemizeResult["failed"] = [];
   results.forEach((r, i) => {
     if (r.status === "fulfilled") materials[r.value[0]] = r.value[1];
-    else failed.push({ group_key: keys[i], message: (r.reason as Error)?.message ?? "Materials could not be listed" });
+    else {
+      const message = r.reason instanceof MaterialsGenerationError ? r.reason.message : describeAiFailure(r.reason).message;
+      failed.push({ group_key: keys[i], message });
+    }
   });
   return { scope: { ...scope, materials }, failed };
 }

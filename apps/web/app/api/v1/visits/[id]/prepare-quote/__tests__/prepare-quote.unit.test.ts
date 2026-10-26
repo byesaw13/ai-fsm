@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 import { buildAssessmentSummary } from "@ai-fsm/domain";
 
 const mockSession = {
@@ -91,6 +92,7 @@ function queueNoDraftThenContext() {
 }
 
 beforeEach(() => {
+  vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
   mockQuery.mockReset();
   mockLoadSummary.mockReset().mockResolvedValue(SUMMARY);
   mockExtract.mockReset().mockResolvedValue(OUTPUT);
@@ -119,7 +121,7 @@ describe("POST /visits/[id]/prepare-quote", () => {
     queueNoDraftThenContext();
     const res = await POST(post());
     expect(res.status).toBe(201);
-    expect(await res.json()).toEqual({ id: "E-NEW", resumed: false, ai: "ok" });
+    expect(await res.json()).toEqual({ id: "E-NEW", resumed: false });
 
     const [, input, extra] = mockCreate.mock.calls[0];
     expect(input).toMatchObject({ client_id: CONTEXT_ROW.client_id, job_id: CONTEXT_ROW.job_id, pricing_mode: "hourly_internal" });
@@ -134,23 +136,35 @@ describe("POST /visits/[id]/prepare-quote", () => {
     expect(extra.preparedScope.source.assessment_updated_at).toBe("2026-10-23 12:00:00+00");
   });
 
-  it("still creates a draft with rooms and a notice when the model fails", async () => {
+  it("creates no draft and says why when the model fails", async () => {
     queueNoDraftThenContext();
     mockExtract.mockRejectedValueOnce(new Error("overloaded"));
     const res = await POST(post());
-    expect(res.status).toBe(201);
-    expect((await res.json()).ai).toBe("unavailable");
-    const [, input, extra] = mockCreate.mock.calls[0];
-    expect(input.line_items).toEqual([]);
-    expect(extra.preparedScope.groups).toEqual([{ key: "room_bathroom", label: "Bathroom" }]);
-    expect(extra.preparedScope.questions[0].text).toMatch(/AI preparation was unavailable/);
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatchObject({ code: "AI_UNAVAILABLE", message: expect.stringMatching(/No quote was created/) });
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it("treats no API key the same as a failure", async () => {
+  it("names an out-of-credit account plainly", async () => {
+    queueNoDraftThenContext();
+    mockExtract.mockRejectedValueOnce(
+      new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." } }, undefined, new Headers()),
+    );
+    const res = await POST(post());
+    expect(res.status).toBe(503);
+    const { error } = await res.json();
+    expect(error.code).toBe("AI_OUT_OF_CREDIT");
+    expect(error.message).toMatch(/out of credit.*No quote was created/);
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("treats no API key as not set up", async () => {
     queueNoDraftThenContext();
     mockExtract.mockResolvedValueOnce(null);
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
     const res = await POST(post());
-    expect((await res.json()).ai).toBe("unavailable");
+    expect((await res.json()).error.code).toBe("AI_NOT_CONFIGURED");
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it("returns the draft another request created first", async () => {

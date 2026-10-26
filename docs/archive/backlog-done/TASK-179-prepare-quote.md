@@ -65,7 +65,8 @@ Scope:
   work as today.
 - After the estimate is sent, the section is read-only. Estimates without a
   prepared scope show no section and behave as today.
-- With the AI unavailable, the draft still opens with rooms and quantities.
+- With the AI unavailable, no draft is created and the owner is told why
+  (changed 2026-10-26, see the note at the end).
 - Typed notes work with phone keyboard dictation; custom audio capture is not
   required.
 
@@ -105,3 +106,8 @@ Data change (additive, reversible migration): `estimates.source_visit_id`,
 for draft estimates, and a nullable group key on `estimate_line_items` marking
 lines produced by Apply to quote. Owner decisions 2026-10-23: existing estimate
 page; one draft per visit.
+
+Owner decision 2026-10-26: when the AI cannot run (account out of credit, key
+missing, busy), Prepare Quote creates no draft and says why. The earlier empty
+fallback draft took the visit's one draft slot and showed a blank panel. Revise
+and Itemize materials use the same plain reasons.

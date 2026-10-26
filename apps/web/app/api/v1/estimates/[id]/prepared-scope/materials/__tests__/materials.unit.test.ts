@@ -87,7 +87,8 @@ describe("POST /estimates/[id]/prepared-scope/materials", () => {
   });
 
   it("503 with the edits saved when every area fails", async () => {
-    mockGenerate.mockRejectedValue(new Error("AI estimating isn't configured yet."));
+    const { MaterialsGenerationError } = await import("@/lib/estimates/materials-generator");
+    mockGenerate.mockRejectedValue(new MaterialsGenerationError("AI estimating isn't configured yet.", "AI_NOT_CONFIGURED", 503));
     const res = await POST(post({ prepared_scope: SCOPE, group_keys: ["bath"] }));
     expect(res.status).toBe(503);
     expect((await res.json()).error.message).toMatch(/Your edits are saved/);

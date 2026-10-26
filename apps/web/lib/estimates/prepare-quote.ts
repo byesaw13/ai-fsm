@@ -281,26 +281,6 @@ export function toPreparedScope(
   };
 }
 
-/** Used when the model is unavailable: one group per room, no tasks, a visible notice. */
-export function fallbackPreparedScope(summary: AssessmentSummary, source: PreparationSource): PreparedScope {
-  return {
-    version: 1,
-    source: { visit_id: source.visitId, assessment_id: summary.assessmentId, assessment_updated_at: source.assessmentUpdatedAt },
-    groups: summary.rooms.map((r, i) => ({ key: slug(`room_${r.name || i + 1}`, `room_${i + 1}`), label: r.name || `Area ${i + 1}` })),
-    tasks: [],
-    questions: [
-      {
-        id: "q1",
-        task_ids: [],
-        text: "AI preparation was unavailable, so no work was listed. Add the work for each room; the measurements are kept.",
-        answer: null,
-      },
-    ],
-    alternatives: [],
-    exclusions: [],
-  };
-}
-
 function fmtHours(n: number): string {
   return String(Math.round(n * 4) / 4);
 }
