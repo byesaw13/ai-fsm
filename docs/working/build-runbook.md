@@ -22,7 +22,7 @@ docs-only commit when there is no PR).
 Last step           : A1 (TASK-197) verified on production at 2026-10-26
                       22:06 UTC. Squash 1a8cc54c (#722). Health ok, /login
                       HTTP/2 200, no redirect to 0.0.0.0:3000.
-In-flight PR        : A2 (TASK-196), PR number recorded after it opens
+In-flight PR        : #723 — A2 (TASK-196)
 Next step           : A2 (TASK-196)
 Blocked on          : nothing
 Last known-good     : 1a8cc54c (branch deploy-good/1a8cc54c); previous ddd2a31b
@@ -516,7 +516,7 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 One line per state change: date, step, state, PR, evidence.
 
 - 2026-10-26 · S0.4 · Merged by owner (#721, c0544597). G0 active: owner comment on #721 at 21:29 UTC.
-- 2026-10-26 · A2 · In progress · chosen option plus shared lines; hidden lines fold; lines sum to the invoice subtotal
+- 2026-10-26 · A2 · In progress · #723 · chosen option plus shared lines; hidden lines fold; lines sum to the invoice subtotal
 - 2026-10-26 · A1 · Verified · health ok and /login HTTP/2 200 at 22:06 UTC; known-good deploy-good/1a8cc54c
 - 2026-10-26 · A1 · Deployed · 1a8cc54c · web recreated and healthy ~22:05 UTC. No migration, so no backup. Worker image left as it was (web-only change).
 - 2026-10-26 · A1 · Merged · #722 · squash 1a8cc54c at 21:57 UTC
