@@ -98,77 +98,110 @@ adjustment stays 0% unless the owner approves a supported change.
 - Row-level security like every account table; owner/admin write, everyone in
   the account reads.
 
-### 2. Backfill (owner decision 5A)
+### 2. Backfill (owner decision 5A, corrected 2026-10-26)
 
 - Each of the 327 receipt lines becomes a `receipt` observation keyed to its
-  receipt line.
-- Each catalog item gets one `catalog_summary` observation (last price and
-  last purchase date), always Low confidence.
-- The owner re-exports 24 months from Pro Xtra and imports it. Once real CSV
-  rows exist for an item, its summary stops counting toward price and
-  confidence and stays on record.
+  receipt and parse revision.
+- Each catalog item gets one `catalog_summary` observation (its last price
+  and last purchase date), always Low confidence.
+- Summaries are never counted as purchases: they are excluded from purchase
+  counts and averages at all times.
+- A summary is superseded for an item only by a `receipt`, `supplier_csv` or
+  `manual_check` observation of the same variant (same store family and SKU)
+  dated on or after the summary's last purchase date. An older real
+  observation does not displace a more recent summary; both stay, and price
+  selection compares them by date and applicability (section 5).
+- The owner's 24-month Pro Xtra re-export restores row-level history after
+  deploy. It is an input, not a blocker: implementation and tests use fixture
+  CSVs.
 - The backfill is safe to run more than once.
 
-### 3. Imports without duplicates (owner decisions 4A, D11-1, D11-2; eng review D2, D5)
+### 3. Imports without duplicates (owner decisions 4A, D11-1, D11-2; eng E2, E5, E7, E8, E10; corrected 2026-10-26)
 
-- One import path (eng D2): Home Depot and Lowe's purchase CSVs go through the
-  existing store purchase import (`apps/web/lib/expenses/import/`), which
-  creates one expense per store trip with its store and transaction ID and
-  its line items. The ledger reads expense line items from both CSV trips and
-  photographed receipts. `/api/v1/materials/import` and `hd-import.ts` are
-  removed, and the catalog's import button points to the store purchase
-  import.
-- Trip matching (eng D5): a CSV trip and a photographed receipt are linked
-  automatically only when they share a transaction ID. Every other look-alike
-  (same store and date with the same, tax-adjusted or near total, or more
-  than one possible receipt) is a review candidate: both are kept, nothing is
-  merged, and the import screen lists them as "Possible match, review". The
-  owner can confirm several at once ("Confirm selected"), which is still an
-  explicit confirmation. This changes `duplicate-match.ts`, which today
-  auto-matches by store, date and amount.
+**One import path, two modes (eng E2).** Home Depot and Lowe's purchase CSVs
+go through the existing store purchase import (`apps/web/lib/expenses/import/`).
+`/api/v1/materials/import` and `hd-import.ts` are removed; the catalog's
+import button points here. The owner picks a mode for each file:
 
-- Importer extensions (eng D10-2): parse Store Number, and save every CSV
-  row as an expense line item with its store and transaction ID, so the
-  ledger has durable source lines.
-- Keys (eng D10-1): CSV rows are keyed by transaction ID, SKU, quantity, net
-  unit price and an occurrence number inside the transaction, so identical
-  lines in one trip both count and re-importing the same transaction adds
-  nothing. A row without a transaction ID cannot be told apart from a genuine
-  repeat purchase, so it becomes a review candidate instead of a guaranteed
-  count.
-- Staging (eng D7): a CSV trip with a possible match is held in the import:
-  not an expense, not in job cost, no price observations, until the owner
-  confirms "same trip" (it attaches to the receipt's expense) or "different
-  trip" (it becomes its own expense). Everything else imports normally.
-- Receipt lines get new IDs every time a receipt is re-parsed
-  (`apps/web/lib/expenses/line-items.ts`, delete and re-insert), so they are
-  keyed by content: receipt, line text, SKU, quantity, price and position.
-- Parse revisions (eng D10-8): each re-parse is a numbered revision of that
-  receipt; the current revision's observations are active and earlier ones
-  superseded; restoring an earlier revision makes it current again;
-  concurrent re-parses of one receipt are serialized by a lock.
-- Cross-source: a Paperless receipt and a Pro Xtra row are counted once only
-  when they share a transaction or order number. Rows that merely look alike
-  (same date, store, SKU, quantity and price, but no shared transaction
-  identity) become review candidates for the owner; they are never merged
-  automatically, because two distinct purchases can look identical. Until the
-  owner confirms, both are kept and the pair is marked "possible duplicate".
-- OCR accuracy (D11-8, eng D10-4): receipt extraction keeps return and
-  discount lines as signed adjustments (today
-  `normalizeParsedReceiptLineItems` turns quantity <= 0 into 1 and negative
-  prices into 0, losing them). Net unit prices already include line
-  discounts, so those are never subtracted again. Before a receipt counts as
-  unreconciled, the check accounts for tax, receipt-level discounts, coupons
-  and returns (line totals minus discounts and returns, plus tax, against the
-  receipt total). A
-  receipt whose mismatch remains unexplained after that has its observations
-  capped at Low until the owner reconciles it.
-- Good rows import; every skipped row is listed with its line number and
-  reason (bad date, bad price, return, $0 line, duplicate). Returns and $0
-  lines are never price observations.
-- Limits: 5 MB, 20,000 rows. Each item's cache is recomputed once per import.
-- The import report (rows read, imported, duplicates, rejected) is saved to
-  the audit log.
+- **Price history only.** Adds `supplier_csv` price observations and nothing
+  else: no expenses, no job links, no staging, no effect on job cost or
+  expense totals. This is the mode for the 24-month history re-export.
+- **Book purchases.** Creates one expense per store trip with its line items,
+  as today, plus price observations. Used for recent purchases not yet
+  booked.
+
+Both modes write the same observation keys, so a transaction imported first
+as history and later as a booked purchase never doubles the price evidence.
+
+**Importer extensions (eng E10).** Parse Store Number. Book mode saves every
+CSV row as an expense line item with its store and transaction ID; history
+mode stores each row as the observation's source reference (file fingerprint,
+row number, store, transaction ID).
+
+**Keys (eng E10).** A transaction's identity is supplier family + store
+number + transaction ID. Rows are keyed by that identity, SKU, quantity, net
+unit price and an occurrence number inside the transaction, so identical
+lines in one trip both count and re-importing the same transaction adds
+nothing. A row without a transaction ID cannot be told apart from a genuine
+repeat purchase, so it is a review candidate, not a guaranteed count.
+
+**Trip matching (eng E5, corrected).** A CSV trip and a photographed receipt
+are linked automatically only when they have the same supplier family, the
+same store (when both are known), the same date and the same transaction ID.
+A shared transaction number with a different supplier, store, date or total
+is a "conflicting transaction ID" review candidate, never a link. Every other
+look-alike (same store and date with the same, tax-adjusted or near total, or
+more than one possible receipt) is a review candidate. Nothing is merged
+until the owner confirms; "Confirm selected" confirms several at once and is
+still an explicit confirmation. This changes `duplicate-match.ts`, which
+today auto-matches by store, date and amount.
+
+**Staging and recovery (eng E7, corrected).** In book mode, a trip with a
+possible match is held as a pending import record:
+
+- Pending records are stored in the database and survive reloads, deploys
+  and closing the screen.
+- They are not expenses, not in job cost, and produce no price observations.
+- The import screen and the expenses page show the pending count and total
+  value ("4 trips pending review, $612.40").
+- Re-importing a file whose trips are already pending updates nothing and
+  creates no second pending record (same transaction key).
+- Confirming "same trip" (attach to the receipt's expense) or "different
+  trip" (book as its own expense) runs in one database transaction: expense
+  and line items, job link, price observations, and marking the record
+  resolved all succeed together or none do. A failed confirmation leaves the
+  pending record exactly as it was. The owner can also dismiss a pending trip
+  with a reason ("not a business purchase").
+- History mode never stages: it books nothing, so there is nothing to
+  double-count.
+
+**Receipts.** Receipt lines get new IDs every time a receipt is re-parsed
+(`apps/web/lib/expenses/line-items.ts`, delete and re-insert), so they are
+keyed by content: receipt, parse revision, line text, SKU, quantity, price
+and position. Each re-parse is a numbered revision (eng E10); the current
+revision's observations are active and earlier ones superseded; restoring an
+earlier revision makes it current again; concurrent re-parses of one receipt
+are serialized by a lock.
+
+**Receipt reconciliation (D11-8, eng E10).** Extraction keeps return and
+discount lines as signed adjustments (today `normalizeParsedReceiptLineItems`
+turns quantity <= 0 into 1 and negative prices into 0, losing them). Net unit
+prices already include line discounts, so those are never subtracted again.
+Before a receipt counts as unreconciled, the check accounts for tax,
+receipt-level discounts, coupons and returns (line totals minus discounts and
+returns, plus tax, against the receipt total). A receipt whose mismatch
+remains unexplained has its observations capped at Low until the owner
+reconciles it.
+
+**Sale purchases (eng E8).** Discounted rows (the CSV discount flag or a
+receipt markdown) are recorded and marked "sale" (section 5).
+
+**Reporting.** Good rows import; every skipped row is listed with its line
+number and reason (bad date, bad price, return, $0 line, duplicate,
+conflicting transaction ID). Returns and $0 lines are never price
+observations. Limits: 5 MB, 20,000 rows; each item's cache is recomputed once
+per import. The import report (mode, rows read, imported, already imported,
+pending, rejected) is saved to the audit log.
 
 ### 4. Package sizes and units (owner decision 6A)
 
@@ -210,12 +243,20 @@ Starting defaults, editable in Settings:
 | Label | Rule |
 | --- | --- |
 | High | Receipt, CSV row or verified-today check within 90 days, for the matching product and package, at the line's supplier and a known matching location. A written supplier quote for the exact item, quantity and location while it is valid (its stated expiry, or the quote-validity default when none is stated). |
-| Medium | The same real evidence 91 to 365 days old, or matching product with a supplier or location mismatch (the mismatch reason is shown). |
+| Medium | The same real evidence 91 to 365 days old. |
 | Low | Real evidence older than 365 days; an expired supplier quote (shown as expired); a catalog summary. |
 | Unverified | An AI allowance; a price with no supporting evidence; evidence whose origin cannot be established. |
 
+- Mismatches only lower confidence (corrected 2026-10-26). The label is
+  first set from the evidence type and age (table above); a supplier or
+  location mismatch then lowers it one level (High to Medium, Medium to Low)
+  and shows the reason. It never raises a label: Low stays Low and Unverified
+  stays Unverified, whatever the mismatch.
 - A receipt date alone does not establish a match; product, package and
   supplier/location must match. An unknown location never counts as a match.
+- Catalog summaries in price selection: a summary is used for the price only
+  when no real observation of the same variant is at least as recent; it is
+  always Low and never counts toward purchase counts or averages.
 - The label always shows its reason, for example "Medium: purchased 140 days
   ago" or "Medium: bought at Lowe's, quote uses Home Depot".
 - The assessment is frozen with the sent quote.
@@ -238,14 +279,23 @@ One paint-quantity function (eng D4, D9): paint gallons are computed today in
 three places with different rules (`painting.ts:274` `wallPaintGallons`,
 `painting.ts:298` inside `computeRoomPainting`, and the estimate engine's
 `computePaintMaterials`). The pilot replaces them with one `paintQuantity`
-function in `production-takeoff/`. The rule (eng D9): sum area x coats per
-paint group (exact product, tint, sheen, application) across rooms and
-surfaces, divide by the product's coverage, apply the waste allowance once,
-and round up once per group to whole packages. The estimate engine's
+function in `production-takeoff/`. The rule (eng E9, corrected): for each
+paint group (exact product, tint, sheen, application), add up each surface's
+area x coats / that surface's coverage, apply the waste allowance once, and
+round up once per group to whole packages. Coverage is per surface where it
+differs (for example textured or bare-drywall surfaces), taken from the
+product and the surface, not one number for the whole group. The estimate engine's
 per-surface rounding without waste is retired; its tests move to the new
-numbers and every changed result is listed in the PR. Coverage
-comes from the chosen product, defaulting to 350 sq ft/gal labeled
-"default". Prepare Quote stops pricing paint with the constant
+numbers and every changed result is listed in the PR.
+
+- Finish-paint coverage comes from the chosen product, defaulting to 350 sq
+  ft/gal labeled "default".
+- Primer never uses the wall-paint default. Its coverage comes from the
+  chosen primer product, or the primer default (250 sq ft/gal, labeled
+  "default") for the substrate; with neither, the line asks for it.
+- Waste: the owner can set an explicit 0% waste. A blank waste field means
+  "use the default" and says so; 0% is a real value, never treated as
+  blank. Prepare Quote stops pricing paint with the constant
 `PAINT_CENTS_PER_GALLON` (`prepare-quote.ts:212`) and uses the chosen catalog
 product and its ledger price; with no product chosen the line says "Choose a
 paint product".
@@ -254,15 +304,47 @@ Five families, deterministic, in `packages/domain/src/production-takeoff/`,
 reusing the paint coverage logic in `packages/domain/src/painting.ts`. Built
 as a **paint pilot first** (D9): the ledger, imports, package sizes,
 confidence and interior paint and primer end to end; the other four families
-follow once the pilot shows product and package identity is manageable
-(measured by how many items the owner had to link or size by hand per quote).
+follow once the pilot meets the success criteria below.
+
+**Pilot success criteria (corrected 2026-10-26; starting thresholds for the
+owner to confirm).** Every manual action on a pilot quote (formula quantity
+override, product link, package-size save, coverage edit) is logged with the
+quote. Measured over the first 5 quotes that use the pilot:
+
+- Manual corrections: on average, at most 2 formula quantity overrides per
+  quote.
+- Mapping reuse: on quotes 3 to 5, at least 70% of paint lines resolve to a
+  product already linked and sized on an earlier quote, with no new link or
+  size needed.
+- Effort: by quote 5, at most 3 link or package-size actions per quote, and
+  the owner reports resolution took no more than 10 minutes on that quote.
+- No paint line on a sent quote has a wrong package or quantity found after
+  sending (owner-reported).
+
+If the criteria are not met, TASK-216 waits and the cause (identity, package
+data or formula) is fixed first.
+
+**Pilot (TASK-214):**
 
 1. Interior paint and primer: walls (exists), ceilings, trim (linear feet),
-   doors (count, sides), primer (coverage by substrate).
-2. Drywall patching: compound and tape or mesh by patch count and size.
+   doors (count and sides), primer (coverage by substrate and primer
+   product).
+
+**Follow-up families (TASK-216), after the pilot criteria are met:**
+
+2. Drywall patching, by patch: each patch has a size class (up to 4 in, 4 to
+   12 in, over 12 in), a count, and whether texture matching is needed.
+   Compound by patch area and coats per size class; mesh patches or tape by
+   count and perimeter; patches over 12 in need backing and new board (sheets
+   by area, rounded up); texture matching is a question for the owner, never
+   assumed. Defaults labeled until checked against jobs.
 3. Caulk: tubes by linear feet and bead size.
-4. Trim and baseboard: linear feet to stick lengths (8, 12, 16 ft) with waste.
-5. Paint supplies: tape, plastic, roller covers by room count.
+4. Trim and baseboard: sticks per run at the chosen stick length (8, 12, 16
+   ft), with waste.
+5. Paint supplies, by measured drivers, not room count: masking tape by
+   linear feet of edges to mask, plastic or drop cloth by square feet to
+   cover, roller covers and trays per paint group (and per area per cover
+   where stated). Missing drivers become questions.
 
 - Each formula shows its inputs, the waste allowance and the result.
 - Waste percentages are editable defaults, labeled "default, not yet checked
@@ -299,6 +381,13 @@ follow once the pilot shows product and package identity is manageable
   material runs, unlinked time), with the excluded hours shown. Unlinked time
   is never attributed to a job automatically. A job with no linked time says
   so.
+- Matching scope (corrected 2026-10-26): estimated and actual hours are
+  compared only for the same categories. Estimated work hours are compared
+  with linked `job_work` hours. Estimated travel hours are shown, but their
+  actual is "not available" while travel is not linked to jobs, and they are
+  left out of the difference. The headline difference never mixes scopes and
+  is labeled as work hours only; a difference whose scopes do not match is
+  never presented as production performance.
 - This is a comparison only; learning from it (PI-007) stays in Phase 4.
 
 ## Missing-data messages (eng screen review)
@@ -320,12 +409,14 @@ Every missing-data message in the send checklist and on formula lines:
 ```
  Quote line (paint)                         Import (expenses > Import purchases)
  +--------------------------------------+   +------------------------------------------+
- | Living room walls, 2 coats           |   | Preview: trips, new, already imported,   |
- | 2.6 gal -> [Choose a paint product]  |   | returns skipped, rejected (line, reason) |
- |   or 3 x 1 gal  Behr Ultra Eggshell  |   | Possible match, review  [Confirm sel.]   |
- |   High: receipt, HD Londonderry, 12d |   | Import N trips                           |
- | Package size needed: [1 gal] [Save]  |   +------------------------------------------+
- +--------------------------------------+
+ | Living room walls, 2 coats           |   | Mode: (o) Price history only             |
+ | 2.6 gal -> [Choose a paint product]  |   |       ( ) Book purchases                 |
+ |   or 3 x 1 gal  Behr Ultra Eggshell  |   | Preview: rows, new, already imported,    |
+ |   High: receipt, HD Londonderry, 12d |   | returns skipped, rejected (line, reason) |
+ | Package size needed: [1 gal] [Save]  |   | Pending review: 4 trips, $612.40         |
+ +--------------------------------------+   |  [Same trip] [Different trip] [Dismiss]  |
+                                            |  [Confirm selected]                      |
+                                            +------------------------------------------+
  Send checklist: blocking items first, each with [fix] link; review notes after.
 ```
 
@@ -371,31 +462,46 @@ assistant assists, and the owner approves every price.
 | --- | --- | --- | --- |
 | TASK-209 | Parent: estimating assistant, Phase 3 slice | approval | n/a |
 | TASK-210 | Price observation ledger, catalog cache recompute, supplier normalization, backfill (5A) | TASK-190 | 2 d / 2 h |
-| TASK-211 | One import path through the store purchase import: Store Number parsing, CSV rows saved as expense line items, transaction-scoped keys, staging of possible matches, transaction-ID-only trip matching with "Confirm selected", sale flag kept, reject report, receipt parse revisions and signed return/discount lines; retire `/materials/import` (4A, eng D2, D5, D7, D8, D10) | TASK-210 | 3 d / 3 h |
+| TASK-211 | One import path through the store purchase import with two modes (price history only; book purchases); Store Number parsing; transaction identity = supplier family + store + transaction ID; CSV rows saved as expense line items (book) or source references (history); persistent pending records with count and value, safe re-import and atomic confirmation; "Confirm selected"; sale flag kept; reject report; receipt parse revisions and signed return/discount lines; retire `/materials/import` (4A, eng E2, E5, E7, E8, E10) | TASK-210 | 4 d / 4 h |
 | TASK-212 | Package sizes and units, parser, inline "Package size needed" plus catalog filter (6A, eng D6) | TASK-210 | 1.5 d / 1.5 h |
 | TASK-213 | Confidence with reasons, frozen at send; verified today; supplier quotes (7A) | TASK-210, TASK-194 | 2 d / 2 h |
-| TASK-214 | Paint pilot: one `paintQuantity` function, Prepare Quote paint priced from the chosen product (eng D4), interior paint and primer formulas end to end, owner-chosen packages, grouping by exact product/tint/sheen/application, formula authority over generator quantities | TASK-212, TASK-213, TASK-190 | 3 d / 0.5 d |
-| TASK-215 | Estimated vs explicitly linked actual hours, with "possibly related" time shown separately | TASK-191 | 1 d / 1 h |
-| TASK-216 | Remaining formula families: drywall patching, caulk, trim/baseboard (sticks per run), paint supplies | TASK-214 pilot result | 4 d / 1 d |
+| TASK-214 | Paint pilot: one `paintQuantity` function with per-surface coverage, primer coverage never from the wall-paint default, explicit 0% waste; Prepare Quote paint priced from the chosen product (eng E4); interior paint and primer end to end; owner-chosen packages; grouping by exact product/tint/sheen/application; formula authority over generator quantities; logging of manual actions for the pilot success criteria | TASK-212, TASK-213, TASK-190 | 3.5 d / 0.5 d |
+| TASK-215 | Estimated vs explicitly linked actual hours for matching categories only, with "possibly related" time and excluded categories shown separately | TASK-191 | 1 d / 1 h |
+| TASK-216 | Remaining formula families: drywall patching by patch size class, caulk, trim/baseboard (sticks per run), paint supplies by measured drivers | TASK-214 pilot criteria met | 4 d / 1 d |
 
 Order: 210 first (everything reads the ledger), then 211 and 212 in parallel,
-then 213, then the 214 paint pilot; 216 starts after the owner reviews the
-pilot's identity cleanup effort; 215 is independent once TASK-191 ships.
+then 213, then the 214 paint pilot; 216 starts only after the pilot success
+criteria (section 7) are met; 215 is independent once TASK-191 ships. None of
+these waits on the owner's Pro Xtra re-export: implementation and tests use
+fixture CSVs, and the real export is imported in price-history mode after
+deploy to restore history.
 
 ## Acceptance criteria (parent)
 
-1. Importing the same Pro Xtra export twice leaves every price, count,
-   average and confidence unchanged, and the second report lists every row
-   with a transaction ID as already imported. Rows without a transaction ID
-   are listed as review candidates, never counted twice automatically.
+1. Importing the same Pro Xtra export twice leaves every observation, price,
+   count and average unchanged, and confidence unchanged when evaluated at
+   the same evaluation date (confidence may age with time; tests fix the
+   clock). The second report lists every row with a transaction ID as already
+   imported. Rows without a transaction ID are listed as review candidates,
+   never counted twice automatically.
 1a. Two identical lines in one transaction both count.
-1b. A CSV trip with a possible receipt match adds nothing to expenses, job
-   cost or prices until the owner confirms same or different trip.
+1b. Price-history mode creates price observations and no expenses, job links
+   or pending records; job cost and expense totals are unchanged.
+1c. A transaction imported in history mode and later in book mode gains
+   expenses but no duplicate price observations.
+1d. In book mode, a CSV trip with a possible receipt match is a persistent
+   pending record that adds nothing to expenses, job cost or prices until
+   confirmed; the pending count and value are shown; re-importing the file
+   creates no second pending record; a confirmation that fails partway
+   leaves the pending record unchanged and nothing booked.
+1e. Two records with the same transaction number but a different supplier,
+   store, date or total are never linked; they are listed as "conflicting
+   transaction ID".
 2. Re-parsing a receipt creates a new parse revision whose observations
    replace the previous revision's; no duplicates, even though line IDs
    change; restoring an earlier revision brings its observations back.
-2a. A receipt and a Pro Xtra row with the same transaction number count
-   once; look-alike rows without shared transaction identity are both kept
+2a. A receipt and a Pro Xtra row with the same supplier family, store, date
+   and transaction ID count once; look-alike rows without shared transaction identity are both kept
    and listed as review candidates, never merged automatically.
 2b. A receipt that balances once tax, discounts and returns are applied is
    reconciled; only an unexplained mismatch caps its observations at Low.
@@ -404,8 +510,14 @@ pilot's identity cleanup effort; 215 is independent once TASK-191 ships.
    exists in the window; it shows as "also bought on sale".
 4. Every price on a materials line shows its label and reason, for example
    "High: receipt, Home Depot Londonderry, 12 days ago".
-5. A catalog summary never shows above Low; an AI allowance never shows above
-   Unverified; an unknown location never counts as a match.
+5. A catalog summary never shows above Low and is never counted as a
+   purchase; an AI allowance never shows above Unverified; an unknown
+   location never counts as a match.
+5a. A supplier or location mismatch lowers High to Medium and Medium to Low,
+   and never raises a label: 400-day-old evidence with a mismatch stays Low;
+   an AI allowance with a mismatch stays Unverified.
+5b. A CSV row dated before an item's catalog summary does not displace the
+   summary; one dated on or after it does.
 6. "Verified today" without an observed price and source is refused.
 7. A supplier quote past its expiry shows "Low: quote expired" and stays in
    history.
@@ -421,12 +533,22 @@ pilot's identity cleanup effort; 215 is independent once TASK-191 ships.
    (not one 18 ft total).
 9a. Formula-covered lines use the formula quantity, never the generator's,
    and waste is applied once.
+9b. Two surfaces in one paint group with different coverages (350 and 250 sq
+   ft/gal) are computed per surface before waste and rounding. Primer with no
+   primer product and no primer default asks for coverage instead of using
+   350. An explicit 0% waste gives no waste; a blank waste field uses the
+   labeled default.
 10. Sent quotes keep their confidence labels and reasons when prices change
     later.
-11. The job page compares estimated hours with explicitly linked
-    person-hours only; unlinked time on visit days appears separately as
-    "possibly related"; travel and material runs are named as not counted.
+11. The job page compares estimated work hours with explicitly linked
+    `job_work` person-hours only; estimated travel hours are shown with
+    actual "not available" and left out of the difference; unlinked time on
+    visit days appears separately as "possibly related"; the difference is
+    labeled as work hours only.
 12. No new recurring service fee (paid feed or subscription) is added.
+13. The pilot success criteria (section 7) are measured from logged manual
+    actions over the first 5 pilot quotes, and TASK-216 does not start until
+    they are met.
 
 ## Test plan
 
@@ -446,15 +568,18 @@ Regression tests required (existing behavior changes):
 
 | Layer | What | Count |
 | --- | --- | --- |
-| Unit | Confidence rules (each row of the table, mismatches, unknown location, expired quote) | +14 |
-| Unit | Dedupe keys (re-import, overlap, same-day identical purchases, returns, $0) | +8 |
+| Unit | Confidence rules (each row of the table, mismatch lowers only, never raises Low or Unverified, unknown location, expired quote, summary vs newer/older real evidence) at a fixed evaluation date | +18 |
+| Unit | Dedupe keys (re-import, overlap, identical lines in one transaction, same transaction ID at another store, history then book mode, returns, $0) | +11 |
 | Unit | Package-size parser (gal, qt, oz, ft, sticks, unknown) | +10 |
-| Unit | Paint pilot formulas (normal, zero, missing, waste once, product/tint/sheen/application grouping, round-up) | +12 |
+| Unit | Paint pilot formulas (normal, zero, missing, waste once, explicit 0% waste, per-surface coverage, primer coverage never wall default, product/tint/sheen/application grouping, round-up) | +16 |
 | Unit | Remaining four families incl. trim sticks per run (TASK-216) | +16 |
 | Unit | Receipt content fingerprint and supersede; cross-source match and ambiguity flag; unreconciled receipt capped at Low | +8 |
-| Integration | Import twice, receipt re-parse, backfill run twice, cache recompute in the same transaction | +6 |
+| Integration | Import twice (fixed clock), history-only mode books nothing, pending records persist and re-import safely, atomic confirmation with a forced failure, receipt re-parse, backfill run twice, cache recompute in the same transaction | +10 |
 | Integration | Verified today refusal, quote expiry, frozen labels at send | +4 |
 | E2E | Assessment, Prepare Quote, formula materials with labels, send | +1 |
+
+All import tests use fixture CSVs (Home Depot and Lowe's formats, including a
+24-month synthetic file); none depend on the owner's real export.
 
 ## Not in scope (Phase 4 or later)
 
@@ -501,7 +626,9 @@ Regression tests required (existing behavior changes):
 | Pro Xtra import | Same or overlapping export again | Dedupe key | Yes | Rows counted as duplicates |
 | Pro Xtra import | Return or $0 line | Skipped, listed | Yes | Reason "return" or "$0" |
 | Receipt re-parse | New line IDs | Content fingerprint, supersede | Yes | No change in counts |
-| Receipt + CSV | Same purchase twice | Linked only by shared transaction ID; look-alike CSV trips staged out of expenses, job cost and prices until confirmed | Yes | "Possible match, review" |
+| Receipt + CSV | Same purchase twice | Linked only by same supplier, store, date and transaction ID; look-alikes and conflicting IDs staged as persistent pending records out of expenses, job cost and prices until confirmed | Yes | "Possible match, review" / "Conflicting transaction ID" |
+| History import | Owner imports 24 months | Price-history mode books nothing | Yes | Observations only; expenses unchanged |
+| Pending confirmation | Fails partway | One transaction; pending record unchanged | Yes | Error; pending still listed |
 | Store purchase import | Sale purchase | Recorded as sale, not default price while a regular price exists | Yes | "Also bought on sale for $X" |
 | Receipt parse | Re-parse or concurrent re-parse | Numbered revisions, lock per receipt | Yes | Nothing (current revision shown) |
 | Formula line | Measurement changed | Recalculate, clear cost confirmation and acknowledgment | Yes | "Costs need confirming again" |
@@ -558,6 +685,7 @@ TASK-191.
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | not run | n/a |
 
 - **CROSS-MODEL:** Codex's eng pass found that the chosen import path lacked Store Number parsing and expense line items, that receipt parsing drops returns, that paint math differs between the engine and Prepare Quote, and that a sale-price safeguard would be lost; all verified in code and folded in (E7 to E10).
+- **CORRECTION PASS (owner, 2026-10-26):** price-history-only import mode; transaction identity includes supplier and store; persistent pending records with count/value, safe re-import and atomic confirmation; mismatches only lower confidence; summaries superseded only by same-or-newer real evidence and never counted as purchases; per-surface coverage, primer coverage never from wall default, explicit 0% waste; drywall and supplies formulas specified by measured drivers; hours compared only within matching scope; measurable pilot success criteria; re-import tests at a fixed evaluation date; fixtures instead of the real export.
 - **VERDICT:** CEO + ENG CLEARED at plan level. Implementation still waits for the owner's approval of this document and the ROADMAP text, and for PR #720.
 
 NO UNRESOLVED DECISIONS
