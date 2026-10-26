@@ -103,7 +103,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-188**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-208**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -170,6 +170,26 @@ closed in tests; owner-flow AC still open.
 | TASK-180 | [Price, profitability and proposal from the same draft](../archive/backlog-done/TASK-180-price-profit-proposal.md) | 002 | Done |
 | TASK-181 | [Record the customer's chosen option on approval (guard)](../archive/backlog-done/TASK-181-option-choice-guard.md) | 002 | Done |
 | TASK-183 | Chosen option flows into totals, job and invoices | 002 | Deferred |
+| TASK-188 | [Hourly baseline on every estimate (parent)](TASK-188-hourly-baseline-every-estimate.md) | 002 | Proposed |
+| TASK-189 | [Write the hourly baseline formula down first](TASK-189-baseline-formula-doc.md) | 002 | Proposed |
+| TASK-190 | [Book materials as materials cost when an estimate is created](TASK-190-materials-cost-split-at-create.md) | 002 | Proposed |
+| TASK-191 | [Person-hours on every estimate](TASK-191-hours-on-every-estimate.md) | 002 | Proposed |
+| TASK-192 | [Equipment line type](TASK-192-equipment-line-type.md) | 002 | Proposed |
+| TASK-193 | [Editable production rates with calibration](TASK-193-production-rates-settings.md) | 002 | Proposed |
+| TASK-194 | [Baseline panel, send rules and freeze at send](TASK-194-baseline-panel-send-rules.md) | 002 | Proposed |
+| TASK-195 | [Rewrite the estimate review around the baseline](TASK-195-review-rewrite.md) | 002 | Proposed |
+| TASK-196 | [Convert to invoice copies only the right lines, and lines add up](TASK-196-invoice-convert-integrity.md) | 004 | Proposed |
+| TASK-197 | [AI line suggestions cannot set their own price](TASK-197-item-suggester-price-cap.md) | 002 | Proposed |
+| TASK-198 | [Keep the deposit rule when it works out to $0 at create](TASK-198-deposit-rule-kept-at-create.md) | 004 | Proposed |
+| TASK-199 | [Painting edit prices lines with the account's rates](TASK-199-painting-edit-account-rates.md) | 002 | Proposed |
+| TASK-200 | [Multi-option estimates keep correct totals and line types](TASK-200-multi-option-create-edit.md) | 002 | Proposed |
+| TASK-201 | [Room-by-room engine path is atomic and keeps adjustments](TASK-201-engine-path-atomic.md) | 002 | Proposed |
+| TASK-202 | [Prepared quote edge cases](TASK-202-prepared-quote-edge-cases.md) | 002 | Proposed |
+| TASK-203 | [Portal approval matches the email and owner approval paths](TASK-203-portal-approval-parity.md) | 002 | Proposed |
+| TASK-204 | [Harden the estimating AI calls](TASK-204-ai-call-hardening.md) | 002 | Proposed |
+| TASK-205 | [Materials generator finishes within the tunnel limit](TASK-205-materials-generator-timeout.md) | 002 | Proposed |
+| TASK-206 | [Estimate API cleanup and stale sent estimates](TASK-206-estimate-api-cleanup.md) | 002 | Proposed |
+| TASK-207 | [Record password changes in the audit log](TASK-207-password-change-audit.md) | 005 | Proposed |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |

@@ -5,6 +5,14 @@ of what each job actually earned.
 
 ## Active tasks
 
+# TASK-196: Convert to invoice copies only the right lines, and lines add up
+
+See [TASK-196-invoice-convert-integrity.md](./TASK-196-invoice-convert-integrity.md). High. No hidden or unchosen-option lines on the invoice; risk and manual travel get lines so lines sum to the total.
+
+# TASK-198: Keep the deposit rule when it works out to $0 at create
+
+See [TASK-198-deposit-rule-kept-at-create.md](./TASK-198-deposit-rule-kept-at-create.md). Medium. Store the owner's deposit rule, not the $0 result, so a materials deposit appears once materials are added.
+
 # TASK-157: Invoice work summary + itemized receipts link
 
 See [TASK-157-invoice-work-summary-itemized-receipts.md](./TASK-157-invoice-work-summary-itemized-receipts.md). Room-by-room work summary from done tasks; per-item billable receipts; public itemized receipts page that matches billed materials.
