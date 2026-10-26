@@ -20,10 +20,10 @@ import {
   preparedScopeInternalNote,
   preparedScopeToLineItems,
   toPreparedScope,
-  type PriceBookHours,
 } from "@/lib/estimates/prepare-quote";
 import { resolveLaborRateCents } from "@/lib/estimates/tm-briefing";
 import { loadPricingSettings } from "@/lib/pricing/settings";
+import { loadPreparationInputs } from "@/lib/estimates/preparation-inputs";
 
 export const dynamic = "force-dynamic";
 
@@ -77,18 +77,12 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       );
       if (!rows[0]) return null;
       const settings = await loadPricingSettings(client, session.accountId);
-      const { rows: priceBook } = await client.query<PriceBookHours>(
-        `SELECT code, name,
-                labor_hours_low::float AS labor_hours_low,
-                labor_hours_typical::float AS labor_hours_typical,
-                labor_hours_high::float AS labor_hours_high
-         FROM price_book WHERE is_active = true ORDER BY code`,
-      );
-      return { ...rows[0], settings, priceBook };
+      const { priceBook, wallPaintRate } = await loadPreparationInputs(client);
+      return { ...rows[0], settings, priceBook, wallPaintRate };
     });
     if (!context) return errorResponse(session, 404, "NOT_FOUND", "Visit not found");
 
-    const source = { visitId, assessmentUpdatedAt: context.assessment_updated_at };
+    const source = { visitId, assessmentUpdatedAt: context.assessment_updated_at, wallPaintRate: context.wallPaintRate };
     let ai: "ok" | "unavailable" = "ok";
     let scope;
     try {

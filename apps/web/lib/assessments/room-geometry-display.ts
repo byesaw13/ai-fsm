@@ -1,4 +1,4 @@
-import type { AssessmentRoomGeometry } from "@ai-fsm/domain";
+import { TALL_WALL_FT, type AssessmentRoomGeometry } from "@ai-fsm/domain";
 
 function fmt(n: number): string {
   const rounded = Math.round(n * 10) / 10;
@@ -26,6 +26,14 @@ export function roomGeometryLines(g: AssessmentRoomGeometry): string[] {
     const assumed = g.opening_deduction_sqft.basis === "assumed" ? " (standard sizes assumed)" : "";
     lines.push(`Walls ${fmt(gross)} gross − ${fmt(deduction)} openings = ${fmt(g.net_wall_sqft.value)} sq ft${assumed}`);
   }
+
+  const scope: string[] = [];
+  if (g.partial_walls) scope.push("listed walls only; count just the doors and windows in them");
+  if (g.skip_area_sqft > 0) scope.push(`${fmt(g.skip_area_sqft)} sq ft not painted is in the deduction`);
+  if (g.max_wall_height_ft !== null && g.max_wall_height_ft > TALL_WALL_FT) {
+    scope.push(`tall walls (up to ${fmt(g.max_wall_height_ft)} ft)`);
+  }
+  if (scope.length > 0 && gross !== null) lines.push(scope.join(" · "));
 
   if (g.baseboard_lf.value !== null) {
     const skipped = g.baseboard_lf.basis === "assumed" ? " (doorways skipped)" : "";

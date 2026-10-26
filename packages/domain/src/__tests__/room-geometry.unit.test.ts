@@ -181,3 +181,69 @@ describe("job description openings", () => {
     expect(text).not.toMatch(/door|window/);
   });
 });
+
+// TASK-184: partial walls, unpainted areas and vaulted ceilings, from a real
+// assessment that priced every wall at full height.
+describe("computeAssessmentRoomGeometry — partial walls, skip areas, vaulted (TASK-184)", () => {
+  it("prices only the listed walls, each at the wall height", () => {
+    const foyer = computeAssessmentRoomGeometry(
+      room({ length_ft: 18, width_ft: 10, height_ft: 18, door_count: 1, window_count: 0, wall_lengths: [{ label: "Stair wall", length_ft: 13 }] }),
+    );
+    expect(foyer.gross_wall_sqft.value).toBe(234);
+    expect(foyer.net_wall_sqft.value).toBe(214);
+    expect(foyer.partial_walls).toBe(true);
+    expect(foyer.baseboard_lf.value).toBe(10);
+  });
+
+  it("deducts built-ins and cabinets by their own size", () => {
+    const office = computeAssessmentRoomGeometry(
+      room({
+        length_ft: 14, width_ft: 13.6, height_ft: 9, door_count: 1, window_count: 2,
+        skip_areas: [{ label: "Built-in", width_ft: 13.6, height_ft: 9 }, { label: "Cabinet", width_ft: 5.3, height_ft: 9 }],
+      }),
+    );
+    expect(office.gross_wall_sqft.value).toBeCloseTo(496.8);
+    expect(office.skip_area_sqft).toBeCloseTo(170.1);
+    expect(office.net_wall_sqft.value).toBeCloseTo(276.7);
+  });
+
+  it("adds a gable triangle on both end walls of a vaulted room", () => {
+    const living = computeAssessmentRoomGeometry(
+      room({
+        length_ft: 18, width_ft: 18, height_ft: 10, peak_height_ft: 18, door_count: 0, window_count: 2,
+        skip_areas: [{ label: "Opening to kitchen", width_ft: 12.8, height_ft: 9 }, { label: "Entertainment center", width_ft: 18, height_ft: 8 }],
+      }),
+    );
+    // 72 ft x 10 ft walls + 2 x (18 x 8 / 2) gables
+    expect(living.gross_wall_sqft.value).toBe(864);
+    expect(living.net_wall_sqft.value).toBeCloseTo(864 - 115.2 - 144 - 30);
+    expect(living.max_wall_height_ft).toBe(18);
+  });
+
+  it("ignores a peak at or below the wall height", () => {
+    const g = computeAssessmentRoomGeometry(room({ length_ft: 10, width_ft: 10, height_ft: 8, peak_height_ft: 8 }));
+    expect(g.gross_wall_sqft.value).toBe(320);
+    expect(g.max_wall_height_ft).toBe(8);
+  });
+
+  it("keeps the new fields through normalization and drops blank rows", () => {
+    const r = normalizeAssessmentRoom({
+      name: "Living",
+      peak_height_ft: "18",
+      wall_lengths: [{ label: "A", length_ft: 7 }, { label: "", length_ft: 0 }],
+      skip_areas: [{ label: "Built-in", width_ft: 18, height_ft: 8 }, { label: "half", width_ft: 3 }],
+    });
+    expect(r.peak_height_ft).toBe(18);
+    expect(r.wall_lengths).toEqual([{ label: "A", length_ft: 7 }]);
+    expect(r.skip_areas).toEqual([{ label: "Built-in", width_ft: 18, height_ft: 8 }]);
+    expect(normalizeAssessmentRoom({ name: "Old" })).not.toHaveProperty("wall_lengths");
+  });
+
+  it("describes listed walls and unpainted areas in the job description", () => {
+    const text = buildAssessmentJobDescription({
+      rooms: [room({ name: "Kitchen", wall_lengths: [{ label: "Wall with door", length_ft: 7 }], skip_areas: [{ label: "Cabinets", width_ft: 10, height_ft: 9 }] })],
+    });
+    expect(text).toMatch(/paint only Wall with door 7 ft/);
+    expect(text).toMatch(/not painted: Cabinets 10 x 9 ft/);
+  });
+});

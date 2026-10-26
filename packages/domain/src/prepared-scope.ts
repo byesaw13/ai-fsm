@@ -17,7 +17,7 @@ import { computeAssessmentRoomGeometry, type QuantityBasis } from "./painting";
 export type ScopeTaskKind = "observed" | "requested" | "suggested";
 
 /** Where a starting hour range came from. */
-export type HoursSource = "price_book" | "production_rate" | "ai_allowance" | "owner";
+export type HoursSource = "price_book" | "production_rate" | "ai_allowance" | "owner" | "revision";
 
 /** Which room quantity a task uses, or a plain count of items. */
 export type QuantityKey =
@@ -117,6 +117,55 @@ export interface PreparedScope {
   pricing?: PreparedPricing;
   /** The customer notes Apply last wrote; Apply only replaces notes that are blank or still this text. */
   proposal_notes?: string | null;
+  /** Revisions the owner kept, newest last (TASK-186). */
+  revisions?: PreparedRevision[];
+  /** Itemized materials by group key (TASK-187). A listed group's materials come from its lines, not task allowances. */
+  materials?: Record<string, PreparedMaterialList>;
+}
+
+/** Where a material line's price came from. */
+export type MaterialPriceSource = "your_price" | "ai_estimate" | "owner";
+
+export interface PreparedMaterialLine {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  /** Cost per unit in cents; null means not priced. */
+  unit_cost_cents: number | null;
+  source: MaterialPriceSource;
+  /** The saved material it was priced from, if any. */
+  price_book_id: string | null;
+  notes: string;
+}
+
+export interface PreparedMaterialList {
+  /** The included tasks the list was made for; a different set means it may be out of date. */
+  task_ids: string[];
+  lines: PreparedMaterialLine[];
+  /** Items the customer supplies, left off the list. */
+  customer_supplied: string[];
+  assumptions: string[];
+}
+
+/** Cost of one material line, or null when it has no price. */
+export function materialLineCents(line: PreparedMaterialLine): number | null {
+  return line.unit_cost_cents === null ? null : Math.round(line.unit_cost_cents * line.quantity);
+}
+
+/** The group's included tasks no longer match the ones its list was made for. */
+export function materialListStale(scope: PreparedScope, groupKey: string): boolean {
+  const list = scope.materials?.[groupKey];
+  if (!list) return false;
+  const now = scope.tasks.filter((t) => t.group_key === groupKey && t.confirmed).map((t) => t.id).sort();
+  const then = [...list.task_ids].sort();
+  return now.length !== then.length || now.some((id, i) => id !== then[i]);
+}
+
+export interface PreparedRevision {
+  at: string;
+  instruction: string;
+  summary: string;
 }
 
 const UNITS: Record<QuantityKey, PreparedQuantity["unit"]> = {
@@ -167,7 +216,7 @@ export function pickStartingHours(candidates: {
   production_rate?: HoursCandidate | null;
   ai_allowance?: HoursCandidate | null;
 }): { low: number; high: number; source: HoursSource } | null {
-  const order: Array<[Exclude<HoursSource, "owner">, HoursCandidate | null | undefined]> = [
+  const order: Array<[Exclude<HoursSource, "owner" | "revision">, HoursCandidate | null | undefined]> = [
     ["price_book", candidates.price_book],
     ["production_rate", candidates.production_rate],
     ["ai_allowance", candidates.ai_allowance],
@@ -180,6 +229,36 @@ export function pickStartingHours(candidates: {
     }
   }
   return null;
+}
+
+/** Walls above this height are tall work: ladders or planks, slower going. */
+export const TALL_WALL_FT = 10;
+
+/** The owner's wall painting pace (production rate 5012 and its vaulted modifier). */
+export interface WallPaintRate {
+  /** Wall square feet per 8-hour day, two finish coats, standard prep. */
+  sqft_per_day: number;
+  /** Production change for tall walls, e.g. -0.15 = 15% slower. */
+  tall_wall_modifier_pct: number;
+}
+
+/**
+ * Hour range for painting a wall area at the owner's pace (TASK-184): the
+ * area over the daily rate, slowed for tall walls, plus or minus 15%, in
+ * quarter hours. Null when the area or the rate is missing.
+ */
+export function wallPaintHours(
+  sqft: number | null,
+  maxWallHeightFt: number | null,
+  rate: WallPaintRate | null,
+): HoursCandidate | null {
+  if (!rate || rate.sqft_per_day <= 0 || sqft === null || sqft <= 0) return null;
+  const tall = maxWallHeightFt !== null && maxWallHeightFt > TALL_WALL_FT;
+  const perDay = rate.sqft_per_day * (1 + (tall ? rate.tall_wall_modifier_pct : 0));
+  if (perDay <= 0) return null;
+  const hours = (sqft / perDay) * 8;
+  const quarter = (n: number) => Math.max(0.25, Math.round(n * 4) / 4);
+  return { low: quarter(hours * 0.85), high: quarter(hours * 1.15) };
 }
 
 export interface PreparedGroupSummary {
@@ -197,8 +276,10 @@ export interface PreparedScopeSummary {
   materials_cents: number;
   /** Confirmed tasks with no hour range yet. */
   tasks_without_hours: number;
-  /** Confirmed tasks with no materials price yet (null, not zero). */
+  /** Confirmed tasks with no materials price yet (null, not zero), outside itemized groups. */
   tasks_without_materials_price: number;
+  /** Itemized material lines with no price yet (TASK-187). */
+  material_lines_without_price?: number;
   unconfirmed_suggestions: number;
 }
 
@@ -213,13 +294,24 @@ export function summarizePreparedScope(scope: PreparedScope): PreparedScopeSumma
       groups.set(key, { key, label: labels.get(key) ?? key, hours_low: 0, hours_high: 0, materials_cents: 0 });
     }
   }
+  const itemized = scope.materials ?? {};
   for (const t of confirmed) {
     const g = groups.get(t.group_key)!;
     if (t.hours_low !== null && t.hours_high !== null) {
       g.hours_low += t.hours_low;
       g.hours_high += t.hours_high;
     }
-    if (t.materials_cents !== null) g.materials_cents += t.materials_cents;
+    if (t.materials_cents !== null && !itemized[t.group_key]) g.materials_cents += t.materials_cents;
+  }
+  let unpricedLines = 0;
+  for (const [key, list] of Object.entries(itemized)) {
+    const g = groups.get(key);
+    if (!g) continue;
+    for (const line of list.lines) {
+      const cents = materialLineCents(line);
+      if (cents === null) unpricedLines += 1;
+      else g.materials_cents += cents;
+    }
   }
   const list = [...groups.values()];
   return {
@@ -228,7 +320,8 @@ export function summarizePreparedScope(scope: PreparedScope): PreparedScopeSumma
     hours_high: list.reduce((s, g) => s + g.hours_high, 0),
     materials_cents: list.reduce((s, g) => s + g.materials_cents, 0),
     tasks_without_hours: confirmed.filter((t) => t.hours_low === null || t.hours_high === null).length,
-    tasks_without_materials_price: confirmed.filter((t) => t.materials_cents === null).length,
+    tasks_without_materials_price: confirmed.filter((t) => t.materials_cents === null && !itemized[t.group_key]).length,
+    material_lines_without_price: unpricedLines,
     unconfirmed_suggestions: scope.tasks.filter((t) => t.kind === "suggested" && !t.confirmed).length,
   };
 }
@@ -273,7 +366,7 @@ export const preparedScopeSchema = z.object({
           .nullable(),
         hours_low: hoursSchema,
         hours_high: hoursSchema,
-        hours_source: z.enum(["price_book", "production_rate", "ai_allowance", "owner"]).nullable(),
+        hours_source: z.enum(["price_book", "production_rate", "ai_allowance", "owner", "revision"]).nullable(),
         materials_cents: z.number().int().min(0).nullable(),
         price_book_code: z.string().max(40).nullable().optional(),
       }),
@@ -296,6 +389,34 @@ export const preparedScopeSchema = z.object({
     })
     .optional(),
   proposal_notes: z.string().max(20_000).nullable().optional(),
+  revisions: z
+    .array(z.object({ at: z.string(), instruction: z.string().max(2000), summary: z.string().max(2000) }))
+    .max(50)
+    .optional(),
+  materials: z
+    .record(
+      z.string().max(60),
+      z.object({
+        task_ids: z.array(z.string()).max(200),
+        lines: z
+          .array(
+            z.object({
+              id: z.string().min(1).max(60),
+              name: z.string().min(1).max(200),
+              quantity: z.number().min(0).max(100_000),
+              unit: z.string().max(40),
+              unit_cost_cents: z.number().int().min(0).max(10_000_000).nullable(),
+              source: z.enum(["your_price", "ai_estimate", "owner"]),
+              price_book_id: z.string().nullable(),
+              notes: z.string().max(500),
+            }),
+          )
+          .max(100),
+        customer_supplied: z.array(z.string().max(200)).max(50),
+        assumptions: z.array(z.string().max(500)).max(50),
+      }),
+    )
+    .optional(),
 });
 
 /** Read a stored prepared scope. Null when absent or not a valid version-1 scope. */

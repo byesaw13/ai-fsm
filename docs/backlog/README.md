@@ -103,7 +103,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-184**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-188**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),

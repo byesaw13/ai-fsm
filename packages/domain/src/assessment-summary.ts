@@ -21,6 +21,9 @@ export interface AssessmentSummaryRoom {
   door_count?: number;
   window_count?: number;
   openings?: AssessmentRoomOpening[];
+  peak_height_ft?: number;
+  wall_lengths?: AssessmentRoomWall[];
+  skip_areas?: AssessmentRoomSkipArea[];
 }
 
 /**
@@ -43,11 +46,28 @@ export interface AssessmentRoom {
   openings?: AssessmentRoomOpening[];
   /** Owner-entered net wall area that replaces the calculated one. */
   wall_sqft_override?: number;
+  /** Vaulted ceiling: height at the peak. `height_ft` is then the wall height at the low side (TASK-184). */
+  peak_height_ft?: number;
+  /** Only these walls get painted, each at `height_ft`. Absent = every wall. */
+  wall_lengths?: AssessmentRoomWall[];
+  /** Wall areas not painted: built-ins, cabinets to the ceiling, wide openings. */
+  skip_areas?: AssessmentRoomSkipArea[];
 }
 
 export interface AssessmentRoomOpening {
   label: string;
   width_in: number;
+}
+
+export interface AssessmentRoomWall {
+  label: string;
+  length_ft: number;
+}
+
+export interface AssessmentRoomSkipArea {
+  label: string;
+  width_ft: number;
+  height_ft: number;
 }
 
 function toFiniteNumber(value: unknown): number | null {
@@ -70,6 +90,35 @@ function toOpenings(value: unknown): AssessmentRoomOpening[] | undefined {
     return [{ label: typeof o.label === "string" ? o.label : "", width_in: width }];
   });
   return openings.length > 0 ? openings : undefined;
+}
+
+function label(o: Record<string, unknown>): string {
+  return typeof o.label === "string" ? o.label : "";
+}
+
+function toWalls(value: unknown): AssessmentRoomWall[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const walls = value.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const o = raw as Record<string, unknown>;
+    const length = toFiniteNumber(o.length_ft);
+    return length !== null && length > 0 ? [{ label: label(o), length_ft: length }] : [];
+  });
+  return walls.length > 0 ? walls : undefined;
+}
+
+function toSkipAreas(value: unknown): AssessmentRoomSkipArea[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const areas = value.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const o = raw as Record<string, unknown>;
+    const width = toFiniteNumber(o.width_ft);
+    const height = toFiniteNumber(o.height_ft);
+    return width !== null && width > 0 && height !== null && height > 0
+      ? [{ label: label(o), width_ft: width, height_ft: height }]
+      : [];
+  });
+  return areas.length > 0 ? areas : undefined;
 }
 
 /**
@@ -96,6 +145,12 @@ export function normalizeAssessmentRoom(raw: unknown): AssessmentRoom {
   if (openings) room.openings = openings;
   const override = toFiniteNumber(r.wall_sqft_override);
   if (override !== null && override >= 0) room.wall_sqft_override = override;
+  const peak = toFiniteNumber(r.peak_height_ft);
+  if (peak !== null && peak > 0) room.peak_height_ft = peak;
+  const walls = toWalls(r.wall_lengths);
+  if (walls) room.wall_lengths = walls;
+  const skips = toSkipAreas(r.skip_areas);
+  if (skips) room.skip_areas = skips;
   return room;
 }
 
@@ -182,6 +237,18 @@ function describeOpenings(room: AssessmentSummaryRoom): string | null {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
+function describePaintedWalls(room: AssessmentSummaryRoom): string | null {
+  const parts: string[] = [];
+  if (room.peak_height_ft) parts.push(`vaulted, ${formatDimension(room.peak_height_ft)} ft at the peak`);
+  if (room.wall_lengths?.length) {
+    parts.push(`paint only ${room.wall_lengths.map((w) => `${clean(w.label) || "wall"} ${formatDimension(w.length_ft)} ft`).join(", ")}`);
+  }
+  for (const a of room.skip_areas ?? []) {
+    parts.push(`not painted: ${clean(a.label) || "area"} ${formatDimension(a.width_ft)} x ${formatDimension(a.height_ft)} ft`);
+  }
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
 function describeRoom(room: AssessmentSummaryRoom): string | null {
   const name = clean(room.name);
   const notes = clean(room.notes);
@@ -197,6 +264,8 @@ function describeRoom(room: AssessmentSummaryRoom): string | null {
   }
   const openings = describeOpenings(room);
   if (openings) parts.push(openings);
+  const painted = describePaintedWalls(room);
+  if (painted) parts.push(painted);
   if (notes) parts.push(notes);
 
   if (!name && parts.length === 0) return null;

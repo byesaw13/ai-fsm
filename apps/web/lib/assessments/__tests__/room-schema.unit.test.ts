@@ -30,4 +30,17 @@ describe("assessmentRoomSchema", () => {
       assessmentRoomSchema.safeParse({ id: "x", name: "X", openings: [{ label: "", width_in: 0 }] }).success,
     ).toBe(false);
   });
+
+  it("keeps the vaulted peak, listed walls and unpainted areas (TASK-184)", () => {
+    const living = {
+      id: "l",
+      name: "Living room",
+      height_ft: 10,
+      peak_height_ft: 18,
+      wall_lengths: [{ label: "Stair wall", length_ft: 13 }],
+      skip_areas: [{ label: "Entertainment center", width_ft: 18, height_ft: 8 }],
+    };
+    expect(assessmentRoomSchema.parse(living)).toEqual(living);
+    expect(assessmentRoomSchema.safeParse({ id: "x", name: "X", skip_areas: [{ label: "", width_ft: 3, height_ft: 0 }] }).success).toBe(false);
+  });
 });

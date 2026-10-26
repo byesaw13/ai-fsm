@@ -13,6 +13,16 @@ export const assessmentRoomOpeningFields = {
     .max(20)
     .optional(),
   wall_sqft_override: z.number().min(0).max(100_000).optional(),
+  // TASK-184: vaulted peak, walls to paint, and areas left unpainted.
+  peak_height_ft: z.number().positive().max(100).optional(),
+  wall_lengths: z
+    .array(z.object({ label: z.string().max(60), length_ft: z.number().positive().max(1_000) }))
+    .max(20)
+    .optional(),
+  skip_areas: z
+    .array(z.object({ label: z.string().max(60), width_ft: z.number().positive().max(1_000), height_ft: z.number().positive().max(100) }))
+    .max(20)
+    .optional(),
 };
 
 /** What the assessment API accepts for one room. */

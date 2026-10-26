@@ -8,6 +8,10 @@ import {
   computeAssessmentRoomGeometry,
   pickStartingHours,
   summarizePreparedScope,
+  wallPaintGallons,
+  wallPaintHours,
+  PAINT_CENTS_PER_GALLON,
+  type WallPaintRate,
   type AssessmentRoom,
   type AssessmentSummary,
   type PreparedQuestion,
@@ -39,32 +43,36 @@ const QUANTITY_KEYS = [
   "count",
 ] as const;
 
+/** One task as the model writes it, in a preparation or a revision. */
+export const preparationTaskSchema = z.object({
+  room_id: z.string().nullable(),
+  description: z.string(),
+  kind: z.enum(["observed", "requested", "suggested"]),
+  group_key: z.string(),
+  quantity_key: z.enum(QUANTITY_KEYS).nullable(),
+  count: z.number().nullable(),
+  count_unit: z.enum(["each", "lf", "sqft"]).nullable(),
+  hours_low: z.number().nullable(),
+  hours_high: z.number().nullable(),
+  materials_cents: z.number().nullable(),
+  customer_supplied: z.boolean(),
+  is_alternative: z.boolean(),
+  price_book_code: z.string().nullable(),
+  work_type: z.enum(["wall_paint", "other"]),
+  paint_grade: z.enum(["economy", "standard", "premium", "designer"]).nullable(),
+});
+
 /** What the model returns. Rooms are referenced by the ids it was given. */
 export const preparationOutputSchema = z.object({
   groups: z.array(z.object({ key: z.string(), label: z.string() })),
-  tasks: z.array(
-    z.object({
-      room_id: z.string().nullable(),
-      description: z.string(),
-      kind: z.enum(["observed", "requested", "suggested"]),
-      group_key: z.string(),
-      quantity_key: z.enum(QUANTITY_KEYS).nullable(),
-      count: z.number().nullable(),
-      count_unit: z.enum(["each", "lf", "sqft"]).nullable(),
-      hours_low: z.number().nullable(),
-      hours_high: z.number().nullable(),
-      materials_cents: z.number().nullable(),
-      customer_supplied: z.boolean(),
-      is_alternative: z.boolean(),
-      price_book_code: z.string().nullable(),
-    }),
-  ),
+  tasks: z.array(preparationTaskSchema),
   questions: z.array(z.object({ text: z.string(), task_indexes: z.array(z.number()) })),
   alternatives: z.array(z.object({ label: z.string(), task_indexes: z.array(z.number()), note: z.string().nullable() })),
   exclusions: z.array(z.string()),
 });
 
 export type PreparationOutput = z.infer<typeof preparationOutputSchema>;
+export type PreparationTask = z.infer<typeof preparationTaskSchema>;
 
 export interface PriceBookHours {
   code: string;
@@ -77,6 +85,8 @@ export interface PriceBookHours {
 export interface PreparationSource {
   visitId: string;
   assessmentUpdatedAt: string | null;
+  /** The owner's wall painting pace; null leaves wall painting to the price book or the model. */
+  wallPaintRate?: WallPaintRate | null;
 }
 
 const SYSTEM_PROMPT = `You prepare a draft quote for Dovetails Services LLC, a residential handyman and home maintenance business in southern New Hampshire. You read the owner's room-by-room site assessment and list the work.
@@ -89,6 +99,8 @@ Rules:
 - hours_low and hours_high: your honest labor allowance for one person doing that task, in hours. Include setup, protection and cleanup. Do not count drying time as worked hours. Use null only if you cannot estimate at all.
 - materials_cents: a rough materials allowance in cents for supplies Dovetails buys. If the customer supplies the item, set customer_supplied true and materials_cents 0. Use null when the price depends on a product choice not yet made.
 - price_book_code: the catalog code when one clearly fits the task, else null.
+- work_type "wall_paint" for painting wall surfaces of a room (quantity_key net_wall_sqft); the application then sets hours from the owner's painting pace and paint from the area. Patching, wallpaper removal, trim, ceilings, cabinets and shelving are "other". Give one wall_paint task per room; the room's measured walls already leave out unpainted walls and areas.
+- paint_grade for wall_paint tasks: "premium" when the owner asks for high quality paint, "standard" otherwise; null for other work.
 - questions: only what changes price or scope and is not already answered in the notes. Attach each to the tasks it affects by index. Do not ask about room size for tasks that do not need it.
 - When the owner wants options shown (for example two flooring types), list each option as its own task. Mark the recommended or first option is_alternative false and every other option is_alternative true, so the quote charges for one. Every other task is is_alternative false.
 - alternatives: real options the customer might choose between (for example blending a patch versus repainting the whole wall). exclusions: conditions the quote does not cover, such as concealed damage.`;
@@ -101,9 +113,14 @@ function roomLines(rooms: AssessmentRoom[]): string {
       if (r.door_count !== undefined) openings.push(`${r.door_count} door(s)`);
       if (r.window_count !== undefined) openings.push(`${r.window_count} window(s)`);
       for (const o of r.openings ?? []) openings.push(`${o.label || "opening"} ${o.width_in} in wide`);
+      const walls: string[] = [];
+      if (r.peak_height_ft) walls.push(`vaulted, ${r.peak_height_ft} ft at the peak`);
+      for (const w of r.wall_lengths ?? []) walls.push(`paint only ${w.label || "wall"} ${w.length_ft} ft long`);
+      for (const a of r.skip_areas ?? []) walls.push(`not painted: ${a.label || "area"} ${a.width_ft} x ${a.height_ft} ft`);
       return [
         `- room_id ${r.id}: ${r.name || "Unnamed area"}`,
         openings.length ? `  openings: ${openings.join(", ")}` : null,
+        walls.length ? `  walls: ${walls.join("; ")}` : null,
         facts.length ? `  measured: ${facts.join("; ")}` : "  measured: no dimensions",
         r.notes ? `  notes: ${r.notes}` : null,
       ]
@@ -140,6 +157,80 @@ function nonNegative(n: number | null): number | null {
   return typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+export interface TaskBuildContext {
+  roomsById: Map<string, AssessmentRoom>;
+  byCode: Map<string, PriceBookHours>;
+  /** Group key → label; new group keys are added here. */
+  groups: Map<string, string>;
+  wallPaintRate?: WallPaintRate | null;
+}
+
+export function taskBuildContext(
+  summary: AssessmentSummary,
+  priceBook: PriceBookHours[],
+  groups: Map<string, string>,
+  wallPaintRate?: WallPaintRate | null,
+): TaskBuildContext {
+  return {
+    roomsById: new Map(summary.rooms.map((r) => [r.id, r])),
+    byCode: new Map(priceBook.map((p) => [p.code, p])),
+    groups,
+    wallPaintRate,
+  };
+}
+
+/**
+ * One model task as a prepared task (quantity not yet bound). Unknown rooms
+ * become whole-job work, suggestions and non-default options start
+ * unconfirmed, wall painting is paced and its paint computed from the area,
+ * and price-book hours win over the model's allowance. Pure.
+ */
+export function buildPreparedTask(t: PreparationTask, id: string, ctx: TaskBuildContext): PreparedTask {
+  const groupKey = slug(t.group_key, "general");
+  if (!ctx.groups.has(groupKey)) ctx.groups.set(groupKey, groupKey.replace(/_/g, " "));
+  const pb = t.price_book_code ? ctx.byCode.get(t.price_book_code) : undefined;
+  const roomId = t.room_id && ctx.roomsById.has(t.room_id) ? t.room_id : null;
+  const geometry = roomId ? computeAssessmentRoomGeometry(ctx.roomsById.get(roomId)!) : null;
+  // Wall painting is priced from the net wall area when the room has one (TASK-184).
+  const wallPaint = t.work_type === "wall_paint" && geometry !== null;
+  const quantityKey =
+    wallPaint && geometry.net_wall_sqft.value !== null ? ("net_wall_sqft" as const) : t.quantity_key;
+  const wallSqft =
+    wallPaint && (quantityKey === "net_wall_sqft" || quantityKey === "gross_wall_sqft")
+      ? geometry[quantityKey].value
+      : null;
+  const isCount = quantityKey === "count";
+  const paced = wallPaintHours(wallSqft, geometry?.max_wall_height_ft ?? null, ctx.wallPaintRate ?? null);
+  // A paced area beats the price book's flat per-room hours.
+  const hours = pickStartingHours({
+    price_book: pb && !paced ? { low: pb.labor_hours_low ?? pb.labor_hours_typical, high: pb.labor_hours_high ?? pb.labor_hours_typical } : null,
+    production_rate: paced,
+    ai_allowance: { low: nonNegative(t.hours_low), high: nonNegative(t.hours_high) },
+  });
+  let materials = t.customer_supplied ? 0 : nonNegative(t.materials_cents);
+  if (wallSqft !== null && !t.customer_supplied) {
+    materials = wallPaintGallons(wallSqft) * PAINT_CENTS_PER_GALLON[t.paint_grade ?? "standard"];
+  }
+  return {
+    id,
+    room_id: roomId,
+    description: t.description.trim().slice(0, 500),
+    kind: t.kind,
+    // Suggestions and the non-default side of an option wait for the owner.
+    confirmed: t.kind !== "suggested" && !t.is_alternative,
+    group_key: groupKey,
+    quantity_key: quantityKey,
+    count: isCount && typeof t.count === "number" && t.count > 0 ? t.count : null,
+    ...(isCount && t.count_unit ? { count_unit: t.count_unit } : {}),
+    quantity: null,
+    hours_low: hours?.low ?? null,
+    hours_high: hours?.high ?? null,
+    hours_source: hours?.source ?? null,
+    materials_cents: materials === null ? null : Math.round(materials),
+    price_book_code: pb ? pb.code : null,
+  };
+}
+
 /**
  * Turn the model's output into a prepared scope. Unknown rooms become
  * whole-job tasks, suggestions start unconfirmed, price-book hours win over
@@ -151,45 +242,16 @@ export function toPreparedScope(
   priceBook: PriceBookHours[],
   source: PreparationSource,
 ): PreparedScope {
-  const roomIds = new Set(summary.rooms.map((r) => r.id));
-  const byCode = new Map(priceBook.map((p) => [p.code, p]));
   const groups = new Map<string, string>();
   for (const g of output.groups) {
     const key = slug(g.key, "group");
     if (!groups.has(key)) groups.set(key, g.label.trim() || key);
   }
 
+  const ctx = taskBuildContext(summary, priceBook, groups, source.wallPaintRate);
   const tasks: PreparedTask[] = output.tasks
     .filter((t) => t.description.trim())
-    .map((t, i) => {
-      const groupKey = slug(t.group_key, "general");
-      if (!groups.has(groupKey)) groups.set(groupKey, groupKey.replace(/_/g, " "));
-      const pb = t.price_book_code ? byCode.get(t.price_book_code) : undefined;
-      const hours = pickStartingHours({
-        price_book: pb ? { low: pb.labor_hours_low ?? pb.labor_hours_typical, high: pb.labor_hours_high ?? pb.labor_hours_typical } : null,
-        ai_allowance: { low: nonNegative(t.hours_low), high: nonNegative(t.hours_high) },
-      });
-      const isCount = t.quantity_key === "count";
-      const materials = t.customer_supplied ? 0 : nonNegative(t.materials_cents);
-      return {
-        id: `t${i + 1}`,
-        room_id: t.room_id && roomIds.has(t.room_id) ? t.room_id : null,
-        description: t.description.trim().slice(0, 500),
-        kind: t.kind,
-        // Suggestions and the non-default side of an option wait for the owner.
-        confirmed: t.kind !== "suggested" && !t.is_alternative,
-        group_key: groupKey,
-        quantity_key: t.quantity_key,
-        count: isCount && typeof t.count === "number" && t.count > 0 ? t.count : null,
-        ...(isCount && t.count_unit ? { count_unit: t.count_unit } : {}),
-        quantity: null,
-        hours_low: hours?.low ?? null,
-        hours_high: hours?.high ?? null,
-        hours_source: hours?.source ?? null,
-        materials_cents: materials === null ? null : Math.round(materials),
-        price_book_code: pb ? pb.code : null,
-      };
-    });
+    .map((t, i) => buildPreparedTask(t, `t${i + 1}`, ctx));
 
   const idAt = (index: number) => tasks[index]?.id;
   const questions: PreparedQuestion[] = output.questions
@@ -350,6 +412,38 @@ export async function extractPreparedScope(
 }
 
 /**
+ * Owner edits to itemized materials (TASK-187): quantity and unit price of
+ * stored lines, and removing lines. Lines and lists only come from the server;
+ * a changed price is labeled the owner's.
+ */
+function mergeMaterialEdits(
+  stored: PreparedScope["materials"],
+  incoming: PreparedScope["materials"],
+): PreparedScope["materials"] {
+  if (!stored) return stored;
+  if (!incoming) return stored;
+  const out: NonNullable<PreparedScope["materials"]> = {};
+  for (const [key, list] of Object.entries(stored)) {
+    const edited = incoming[key];
+    if (!edited) {
+      out[key] = list;
+      continue;
+    }
+    const byId = new Map(edited.lines.map((l) => [l.id, l]));
+    out[key] = {
+      ...list,
+      lines: list.lines.flatMap((l) => {
+        const e = byId.get(l.id);
+        if (!e) return [];
+        const priceChanged = e.unit_cost_cents !== l.unit_cost_cents;
+        return [{ ...l, quantity: e.quantity, unit_cost_cents: e.unit_cost_cents, source: priceChanged ? "owner" : l.source }];
+      }),
+    };
+  }
+  return out;
+}
+
+/**
  * Merge the owner's edits into the stored scope. Only hours, materials,
  * confirmation and answers can change; rooms, quantities, source and task text
  * come from the stored copy, and unknown task or question ids are ignored.
@@ -377,6 +471,7 @@ export function applyScopeEdits(stored: PreparedScope, incoming: PreparedScope):
       };
     }),
     pricing: incoming.pricing ?? stored.pricing,
+    materials: mergeMaterialEdits(stored.materials, incoming.materials),
     // Server-managed: only Apply sets it.
     proposal_notes: stored.proposal_notes ?? null,
     questions: stored.questions.map((q) => {
