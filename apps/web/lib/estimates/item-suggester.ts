@@ -27,13 +27,33 @@ export interface PriceBookEntry {
   quote_trigger: boolean;
 }
 
+export interface SuggestionPrice {
+  cents: number | null;
+  source: "default" | "minimum" | "none";
+}
+
+/** Price book only. The model's number is never an input. */
+export function priceForSuggestion(pb: {
+  default_price_cents: number | null;
+  price_min_cents: number | null;
+}): SuggestionPrice {
+  if (pb.default_price_cents != null) {
+    return { cents: pb.default_price_cents, source: "default" };
+  }
+  if (pb.price_min_cents != null) {
+    return { cents: pb.price_min_cents, source: "minimum" };
+  }
+  return { cents: null, source: "none" };
+}
+
 export interface SuggestedItem {
   code: string;
   price_book_id: string;
   name: string;
   description: string | null;
   quantity: number;
-  unit_price_cents: number;
+  unit_price_cents: number | null;
+  price_source: SuggestionPrice["source"];
   reason: string;
   labor_hours_typical: number | null;
   legal_flag: "gray" | "restricted" | null;
@@ -49,7 +69,7 @@ const SYSTEM_PROMPT = `You are an estimating assistant for Dovetails Services LL
 - Only suggest services that appear in the catalog — never invent codes or names
 - Choose the most specific match available; avoid catch-all specialty (9000-series) codes unless nothing else fits
 - Set quantity to 1 unless the description clearly implies multiple units (e.g. "3 TVs" → quantity 3)
-- Set unit_price_cents to the price_min_cents of the matching item as the starting point
+- Do not set a price. The app prices each suggestion from the price book
 - Include upsell services only when directly implied (e.g. touch-up painting always follows a drywall patch)
 - Prefer core and standard tier items over specialty unless the scope clearly calls for specialty work
 - Limit to 8 suggestions maximum — quality over quantity
@@ -93,18 +113,12 @@ const SUGGEST_TOOL: Anthropic.Tool = {
               minimum: 1,
               description: "Number of units — use 1 unless the description clearly implies more",
             },
-            unit_price_cents: {
-              type: "integer",
-              minimum: 0,
-              description:
-                "Starting unit price in cents — use the catalog price_min_cents value",
-            },
             reason: {
               type: "string",
               description: "One sentence explaining why this service matches the description",
             },
           },
-          required: ["code", "quantity", "unit_price_cents", "reason"],
+          required: ["code", "quantity", "reason"],
           additionalProperties: false,
         },
       },
@@ -197,30 +211,32 @@ export async function suggestLineItems(
     );
     if (!toolUse) return [];
 
-    const raw = (toolUse.input as { items: Array<{ code: string; quantity: number; unit_price_cents: number; reason: string }> }).items ?? [];
+    const raw = (toolUse.input as { items: Array<{ code: string; quantity: number; reason: string }> }).items ?? [];
 
-     return raw
-       .filter((s) => byCode.has(s.code))
-       .map((s) => {
-         const pb = byCode.get(s.code)!;
-         const legalFlag: "gray" | "restricted" | null =
-           pb.legal_status_ma === "restricted"
-             ? "restricted"
-             : pb.legal_status_ma === "gray"
-               ? "gray"
-               : null;
-         return {
-           code: s.code,
-           price_book_id: pb.id,
-           name: pb.name,
-           description: pb.description,
-           unit_price_cents: pb.default_price_cents ?? Math.max(pb.price_min_cents, s.unit_price_cents),
-           quantity: Math.max(1, Math.round(s.quantity)),
-           reason: s.reason,
-           labor_hours_typical: pb.labor_hours_typical ?? null,
-           legal_flag: legalFlag,
-         };
-       });
+    return raw
+      .filter((s) => byCode.has(s.code))
+      .map((s) => {
+        const pb = byCode.get(s.code)!;
+        const price = priceForSuggestion(pb);
+        const legalFlag: "gray" | "restricted" | null =
+          pb.legal_status_ma === "restricted"
+            ? "restricted"
+            : pb.legal_status_ma === "gray"
+              ? "gray"
+              : null;
+        return {
+          code: s.code,
+          price_book_id: pb.id,
+          name: pb.name,
+          description: pb.description,
+          unit_price_cents: price.cents,
+          price_source: price.source,
+          quantity: Math.max(1, Math.round(s.quantity)),
+          reason: s.reason,
+          labor_hours_typical: pb.labor_hours_typical ?? null,
+          legal_flag: legalFlag,
+        };
+      });
   } catch (err) {
     console.error("[suggestLineItems] Claude API error:", err);
     return [];

@@ -1,7 +1,7 @@
 # TASK-197: AI line suggestions never set a price
 
 Status:
-Proposed
+In progress
 
 Epic:
 EPIC-002 Estimating & Assessments

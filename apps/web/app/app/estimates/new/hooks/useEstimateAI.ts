@@ -17,7 +17,8 @@ export interface EditableSuggestion {
   name: string;
   description: string | null;
   quantity: number;
-  unit_price_cents: number;
+  unit_price_cents: number | null;
+  price_source: "default" | "minimum" | "none";
   reason: string;
   accepted: boolean;
   labor_hours_typical: number | null;
@@ -67,6 +68,10 @@ interface UseEstimateAIParams {
     shoppingList: ShoppingList | null;
     specifiedMaterials: SpecifiedMaterial[];
   }) => void;
+}
+
+function suggestionUnitPrice(cents: number | null): string {
+  return cents == null ? "" : (cents / 100).toFixed(2);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +184,8 @@ export function useEstimateAI({
       }
       const raw = (json.suggestions ?? []) as Array<{
         code: string; price_book_id: string; name: string; description: string | null;
-        quantity: number; unit_price_cents: number; reason: string;
+        quantity: number; unit_price_cents: number | null;
+        price_source: "default" | "minimum" | "none"; reason: string;
         labor_hours_typical: number | null; legal_flag: "gray" | "restricted" | null;
       }>;
       setSuggestions(raw.map((s) => ({ ...s, accepted: true })));
@@ -196,7 +202,7 @@ export function useEstimateAI({
     onAddLineItems([{
       description: `${s.code} — ${s.name}`,
       quantity: s.quantity.toString(),
-      unit_price: (s.unit_price_cents / 100).toFixed(2),
+      unit_price: suggestionUnitPrice(s.unit_price_cents),
     }]);
     setSuggestions((prev) => prev.filter((_, i) => i !== index));
   }
@@ -211,7 +217,7 @@ export function useEstimateAI({
     onAddLineItems(toAdd.map((s) => ({
       description: `${s.code} — ${s.name}`,
       quantity: s.quantity.toString(),
-      unit_price: (s.unit_price_cents / 100).toFixed(2),
+      unit_price: suggestionUnitPrice(s.unit_price_cents),
       price_book_id: s.price_book_id,
     })));
     setSuggestions([]);

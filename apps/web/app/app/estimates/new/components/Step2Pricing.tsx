@@ -622,8 +622,12 @@ export function Step2Pricing({
                                 {s.reason}
                               </div>
                               <div style={{ display: "flex", gap: "var(--space-1)", marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
-                                <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                                  {formatCents(s.quantity * s.unit_price_cents)}
+                                <span style={{
+                                  fontSize: "var(--text-sm)",
+                                  color: s.unit_price_cents == null ? "#92400e" : "var(--fg-muted)",
+                                  fontWeight: s.unit_price_cents == null ? 600 : 400,
+                                }}>
+                                  {s.unit_price_cents == null ? "Price needed" : formatCents(s.quantity * s.unit_price_cents)}
                                 </span>
                                 {s.labor_hours_typical !== null && (
                                   <span style={{

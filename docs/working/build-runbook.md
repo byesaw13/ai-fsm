@@ -19,14 +19,15 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : S0.3 PR #720 merged by the owner (ddd2a31b) and deployed;
-                      verified 2026-10-26 19:39 UTC
-In-flight PR        : #721 (docs; main merged in, retargeted to main) — S0.4
-Next step           : S0.4 merge #721; then A1 (TASK-197)
-Blocked on          : nothing for S0.4; G0 activation comment still absent
+Last step           : S0.4 PR #721 merged by the owner (c0544597) at
+                      2026-10-26 21:25 UTC. G0 is active (owner comment on
+                      #721 at 21:29 UTC).
+In-flight PR        : A1 (TASK-197) branch task/197-ai-suggestion-price
+Next step           : A1 (TASK-197)
+Blocked on          : nothing
 Last known-good     : ddd2a31b (branch deploy-good/ddd2a31b); previous 7a68ace6
                       (branch deploy-good/7a68ace6)
-Notes               : no product code written yet
+Notes               : A1 in progress. Implemented is recorded only after CI is green.
 ```
 
 ## Owner approvals
@@ -41,7 +42,7 @@ this one, as an approval.
 
 | Gate | What | Status | Evidence |
 | --- | --- | --- | --- |
-| G0 | Agent may merge to `main` and deploy to production after every gate in this runbook passes | **Not active.** Owner approved in session twice on 2026-10-26; activates when the confirming PR comment exists. | Session 2026-10-26, question "How far may the AI go on its own for each task, once the CI checks pass?"; options were "Merge, you deploy", "Merge and deploy", "PRs only, you merge"; owner selected **"Merge and deploy"**. Later the same day, after the runbook revision listed G1, the PR-comment confirmation of G0 and G5 as the three steps, owner in session: "i approve all 3". Activation: owner comments on PR #721: `I approve autonomous merge and deploy as described in docs/working/build-runbook.md`. Check with `gh pr view 721 --json comments`. |
+| G0 | Agent may merge to `main` and deploy to production after every gate in this runbook passes | **Active** 2026-10-26 | Owner comment on PR #721 at 2026-10-26 21:29 UTC, from `byesaw13`: `I approve autonomous merge and deploy as described in docs/working/build-runbook.md`. Session history: owner selected **"Merge and deploy"**, then "i approve all 3". |
 | G0b | Estimating assistant design, roadmap change, provisional pilot criteria (PR #721) | Approved 2026-10-26 | Owner in session: "I approve the Phase 3 estimating-assistant design and proposed roadmap changes in PR #721, including the provisional pilot criteria." |
 | G1 | Hourly baseline formula document `docs/working/hourly-baseline.md` (PR #720) | Approved 2026-10-26 | Owner in session: "i approve all 3", answering a list whose first item was "Approve the formula document in #720 (G1)". |
 | G5 | Emergency recovery procedure in this runbook | Approved 2026-10-26 | Owner in session: "i approve all 3", answering a list whose third item was approving the emergency recovery procedure (G5). |
@@ -97,7 +98,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | --- | --- | --- | --- | --- | --- |
 | S0.1 | Runbook | 2026-10-26 (PR #721) | | n/a | n/a |
 | S0.3 | Merge #720 | n/a | 2026-10-26 (owner, ddd2a31b) | 2026-10-26 | 2026-10-26 (health ok, /login 200) |
-| S0.4 | Merge #721 | n/a | | n/a | n/a |
+| S0.4 | Merge #721 | n/a | 2026-10-26 (owner, c0544597) | n/a | n/a |
 | A1 | TASK-197 | | | | |
 | A2 | TASK-196 | | | | |
 | B0 | TASK-189 | doc in #720 | 2026-10-26 (#720) | n/a | n/a |
@@ -514,6 +515,8 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 
 One line per state change: date, step, state, PR, evidence.
 
+- 2026-10-26 · S0.4 · Merged by owner (#721, c0544597). G0 active: owner comment on #721 at 21:29 UTC.
+- 2026-10-26 · A1 · In progress · task/197-ai-suggestion-price · price book price only; model price ignored
 - 2026-10-26 · S0.3 · Merged by owner (#720, ddd2a31b); deployed 19:39 UTC; verified /api/health ok, /login 200, /app/map 307 to relative /login; last known-good branches deploy-good/7a68ace6 and deploy-good/ddd2a31b
 - 2026-10-26 · S0.2 · G1 and G5 approved in session; G0 approved in session, awaiting PR comment to activate
 - 2026-10-26 · S0.1 · Implemented · PR #721 · runbook written, then revised after an independent review (authority gated on PR comment, recovery gated on G5, database checklist, worktree isolation, four-state status, attribution by actual contributor)
