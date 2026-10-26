@@ -7,6 +7,7 @@ import { loadPricingRules } from "@/lib/pricing/settings";
 import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "./deposit-policy";
 import { computeConditionTier } from "./guardrails";
 import { defaultMaterialPrice, splitInternalCosts } from "./cost-split";
+import { explicitMaterialDepositCents } from "./itemized-preserve";
 
 export interface LineItemInput {
   description: string;
@@ -349,7 +350,14 @@ export async function updateEstimateById(
     const taxRate = patch.tax_rate ?? 0;
     const tax_cents = Math.round((subtotal_cents * taxRate) / 100);
     const total_cents = subtotal_cents + tax_cents;
-    let currentMaterialBasis = new_internal_material ?? 0;
+    const materialsLineCount = itemsToInsert.filter(
+      (item) => item.line_item_type === "materials",
+    ).length;
+    // Internal cost is not a second copy of the materials the customer is paying for.
+    let currentMaterialBasis = explicitMaterialDepositCents({
+      materialsLineCount,
+      aggregateCents: has_painting_fields ? new_internal_material : null,
+    });
     if (itemsToInsert.length === 0 && currentMaterialBasis === 0) {
       const materialRows = await client.query<{ total: string }>(
         `SELECT COALESCE(SUM(total_cents), 0)::text AS total

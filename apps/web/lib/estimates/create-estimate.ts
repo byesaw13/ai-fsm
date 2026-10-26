@@ -12,6 +12,7 @@ import {
   type PreparedScope,
 } from "@ai-fsm/domain";
 import { defaultMaterialPrice, linePriceMissing, splitInternalCosts } from "@/lib/estimates/cost-split";
+import { explicitMaterialDepositCents } from "@/lib/estimates/itemized-preserve";
 import { logger } from "@/lib/logger";
 import { reviewEstimateGuardrails, computeConditionTier } from "@/lib/estimates/guardrails";
 import { computeAndPersist } from "@/lib/estimates/compute";
@@ -283,9 +284,18 @@ export async function createEstimate(
   subtotal_cents += travel_surcharge_cents + risk_adjustment_cents;
   const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
   const total_cents = subtotal_cents + tax_cents;
+  const materialsLineCount = line_items.filter(
+    (line) => line.line_item_type === "materials",
+  ).length;
   const materialBasisCents = is_painting
     ? material_cost_cents ?? 0
-    : estimateMaterialsDepositBasis(line_items, material_cost_cents ?? 0);
+    : estimateMaterialsDepositBasis(
+        line_items,
+        explicitMaterialDepositCents({
+          materialsLineCount,
+          aggregateCents: material_cost_cents ?? 0,
+        }),
+      );
   const depositPolicy = calculateDepositPolicy({
     deposit_required,
     deposit_type,
@@ -533,6 +543,9 @@ export async function createEstimate(
         accountId: session.accountId,
         spec: engine_spec as unknown as EstimateSpec,
         rules: pricingRules,
+        // The new-estimate form always sends a general spec. Replacing the
+        // rows would turn materials back into labor and drop their cost.
+        preserveItemizedLines: !is_painting && !is_multi_option && flat_rate_cents === undefined,
       });
     } catch (engErr) {
       logger.error("Engine compute failed after insert", engErr, { estimateId: estimate });

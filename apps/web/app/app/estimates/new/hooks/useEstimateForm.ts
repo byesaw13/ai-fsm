@@ -704,6 +704,7 @@ export function useEstimateForm({
             description: `Materials — ${item.service.name}`,
             quantity: 1,
             unit_price_cents: scopeResults[item.instanceId].materialTotalCents,
+            unit_cost_cents: scopeResults[item.instanceId].materialTotalCents,
             line_item_type: "materials" as const,
             visible_to_customer: true,
             sort_order: priceBookLineItems.length + manualItems.length + i,
