@@ -22,7 +22,7 @@
   { "id": "TASK-047", "title": "Work item library", "branch": "quote", "status": "deferred", "phase": "Phase 4", "fit": "A library of common work would feed quotes. Production intelligence is deferred." },
   { "id": "TASK-188", "title": "Hourly baseline on every quote", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Every quote is checked against your hourly rate, whichever screen built it. Your price stays yours." },
   { "id": "TASK-189", "title": "Baseline formula written down first", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "You approve the math on paper before any code, so nothing is counted twice." },
-  { "id": "TASK-190", "title": "Materials cost separate from price", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "What materials cost you and what the customer pays are kept apart, so cost checks use real costs." },
+  { "id": "TASK-190", "title": "Materials cost separate from price", "branch": "quote", "status": "progress", "phase": "Phase 3", "fit": "What materials cost you and what the customer pays are kept apart, so cost checks use real costs." },
   { "id": "TASK-191", "title": "Person-hours on every quote", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Hours, with where they came from, are what the baseline is built on. Missing stays missing, never zero." },
   { "id": "TASK-192", "title": "Equipment line type", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Rentals and equipment-use charges show and cost separately, without handling on top." },
   { "id": "TASK-193", "title": "Production rates you can edit and calibrate", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Your pace numbers live in Settings. Until checked against real jobs, they are labeled uncalibrated." },
@@ -73,7 +73,6 @@
   { "id": "TASK-136", "title": "Finishing the job drafts the bill", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "When the work is done, the next record is the bill." },
   { "id": "TASK-155", "title": "Send the bill through Square", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "Card or bank payment goes out from the bill, and the link stays." },
   { "id": "TASK-156", "title": "Square fees on the payment", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "The fee belongs on the payment, so the job knows what it kept." },
-  { "id": "TASK-196", "title": "Invoice copies only the right lines", "branch": "bill", "status": "progress", "phase": "Phase 3", "fit": "The bill shows only what the customer approved, and its lines add up to its total." },
   { "id": "TASK-198", "title": "Deposit rule kept from the start", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "A materials deposit chosen before materials are listed still shows up once they are." },
 
   { "id": "TASK-168", "title": "Vault lines save reliably", "branch": "history", "status": "progress", "phase": "Phase 2", "fit": "Paint, models, and filters from a job have to land on the house record." },

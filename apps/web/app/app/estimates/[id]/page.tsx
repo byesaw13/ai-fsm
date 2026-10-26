@@ -284,6 +284,7 @@ export default async function EstimateDetailPage({
             description: item.description,
             quantity: item.quantity,
             unit_price_cents: item.unit_price_cents,
+            unit_cost_cents: item.unit_cost_cents,
             sort_order: item.sort_order,
             line_item_type: item.line_item_type,
             visible_to_customer: item.visible_to_customer,
@@ -301,6 +302,8 @@ export default async function EstimateDetailPage({
               description: li.description,
               quantity: li.quantity,
               unit_price_cents: li.unit_price_cents,
+              unit_cost_cents: li.unit_cost_cents,
+              line_item_type: li.line_item_type,
             })),
           }))}
           initialSqFt={estimate.sq_ft}

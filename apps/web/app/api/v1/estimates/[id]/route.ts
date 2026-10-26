@@ -15,6 +15,7 @@ import {
 } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
 import { getPathId } from "@/lib/route-utils";
+import { linePriceMissing } from "@/lib/estimates/cost-split";
 
 export const dynamic = "force-dynamic";
 
@@ -50,13 +51,23 @@ export const GET = withAuth(async (request: NextRequest, session) => {
 const lineItemInputSchema = z.object({
   description: z.string().min(1),
   quantity: z.number().positive(),
-  unit_price_cents: z.number().int().nonnegative(),
+  unit_price_cents: z.number().int().nonnegative().optional(),
+  unit_cost_cents: z.number().int().nonnegative().nullable().optional(),
+  hours_high: z.number().nonnegative().nullable().optional(),
   line_item_type: z.enum(["labor", "materials", "handling_fee", "adjustment"]).default("labor"),
   visible_to_customer: z.boolean().default(true),
   adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
   sort_order: z.number().int().default(0),
   price_book_id: z.string().uuid().nullable().optional(),
   prepared_group_key: z.string().max(60).nullable().optional(),
+}).superRefine((item, ctx) => {
+  if (linePriceMissing(item)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Enter a price, or a cost on a materials line",
+      path: ["unit_price_cents"],
+    });
+  }
 });
 
 const estimateOptionInputSchema = z.object({

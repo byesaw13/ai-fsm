@@ -277,6 +277,8 @@ export function useEstimateAI({
         description: `Materials — ${mat.name} (${mat.units_to_order} ${mat.unit_label}${mat.units_to_order !== 1 ? "s" : ""})`,
         quantity: "1",
         unit_price: (totalCents / 100).toFixed(2),
+        line_item_type: "materials",
+        unit_cost_cents: totalCents,
       });
     }
 

@@ -1,10 +1,24 @@
 import { formatDollars } from "../format";
 import type { EstimateRow, LineItemRow, OptionWithItems } from "../detail-data";
 import { lineNeedsPriceReview } from "@/lib/estimates/review-health";
+import { markupLabel } from "@/lib/estimates/cost-split";
 
 /** Postgres numerics arrive as "1.00" — render whole quantities without decimals. */
 function fmtQty(q: number | string): string {
   return Number(q).toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+function MarkupNote({ item }: { item: Pick<LineItemRow, "unit_price_cents" | "unit_cost_cents"> }) {
+  const label = markupLabel({
+    unit_price_cents: item.unit_price_cents,
+    unit_cost_cents: item.unit_cost_cents,
+  });
+  if (!label) return null;
+  return (
+    <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+      {label}
+    </span>
+  );
 }
 
 interface Props {
@@ -61,6 +75,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                       <td>
                         {item.description}
                         {lineNeedsPriceReview(item) && <ReviewMark />}
+                        <MarkupNote item={item} />
                       </td>
                       <td>{fmtQty(item.quantity)}</td>
                       <td>{formatDollars(item.unit_price_cents)}</td>
@@ -110,6 +125,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                     <span style={{ fontWeight: 500, fontSize: "var(--text-sm)", flex: 1 }}>
                       {item.description}
                       {lineNeedsPriceReview(item) && <ReviewMark />}
+                      <MarkupNote item={item} />
                     </span>
                     <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>{formatDollars(item.total_cents)}</span>
                   </div>
@@ -192,6 +208,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                       <td>
                         {item.description}
                         {lineNeedsPriceReview(item) && <ReviewMark />}
+                        <MarkupNote item={item} />
                       </td>
                       <td>{fmtQty(item.quantity)}</td>
                       <td>{formatDollars(item.unit_price_cents)}</td>

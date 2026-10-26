@@ -5,7 +5,7 @@ import { computeEstimate, buildPricingRules, ENGINE_VERSION, type BusinessPricin
 import { formatCents } from "@/lib/estimates/pricing";
 import { calculateDepositPolicy } from "@/lib/estimates/deposit-policy";
 import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
-import { parseCents, lineTotal, mapPrepLevel, type LineItemRow, type OptionTier } from "@/lib/estimates/form-helpers";
+import { parseCents, lineTotal, handlingPriceCents, mapPrepLevel, type LineItemRow, type OptionTier } from "@/lib/estimates/form-helpers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -125,7 +125,7 @@ export function useEstimatePricing({
     row.description.toLowerCase().includes("material")
   );
   const materialSubtotalCents =
-    materialLineItems.reduce((sum, row) => sum + lineTotal(row), 0) + scopeMaterialsTotalCents;
+    materialLineItems.reduce((sum, row) => sum + handlingPriceCents(row), 0) + scopeMaterialsTotalCents;
   const materialHandlingCents = Math.round(materialSubtotalCents * 0.15);
 
   const genericSubtotalCents =

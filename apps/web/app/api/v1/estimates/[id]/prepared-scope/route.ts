@@ -86,7 +86,7 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
 
       // Lines the owner added by hand stay exactly as they are, after the prepared ones.
       const { rows: handLines } = await client.query<LineItemInput & { sort_order: number }>(
-        `SELECT description, quantity::float AS quantity, unit_price_cents, line_item_type,
+        `SELECT description, quantity::float AS quantity, unit_price_cents, unit_cost_cents, line_item_type,
                 visible_to_customer, adjustment_type, sort_order, price_book_id
          FROM estimate_line_items
          WHERE estimate_id = $1 AND option_id IS NULL AND prepared_group_key IS NULL
@@ -98,6 +98,7 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
           description: li.description,
           quantity: li.quantity,
           unit_price_cents: li.unit_price_cents,
+          unit_cost_cents: li.unit_cost_cents ?? null,
           line_item_type: li.line_item_type,
           visible_to_customer: li.visible_to_customer,
           sort_order: i,

@@ -6,11 +6,16 @@ import { laborCostCentsFromHours } from "@/lib/pricing/labor-hours";
 import { loadPricingRules } from "@/lib/pricing/settings";
 import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "./deposit-policy";
 import { computeConditionTier } from "./guardrails";
+import { defaultMaterialPrice, splitInternalCosts } from "./cost-split";
 
 export interface LineItemInput {
   description: string;
   quantity: number;
-  unit_price_cents: number;
+  /** Missing on a materials line that only has a cost. Normalized before totals. */
+  unit_price_cents?: number | null;
+  unit_cost_cents?: number | null;
+  /** Labor cost uses this when the caller has it. The column arrives in TASK-191. */
+  hours_high?: number | null;
   line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
   visible_to_customer: boolean;
   adjustment_type?: string | null;
@@ -101,7 +106,7 @@ export async function getEstimateById(client: PoolClient, id: string, accountId:
   if (estimateResult.rowCount === 0) return null;
 
   const lineItemsResult = await client.query(
-    `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents,
+    `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, unit_cost_cents,
             total_cents, line_item_type, visible_to_customer, adjustment_type, sort_order, created_at
      FROM estimate_line_items
      WHERE estimate_id = $1
@@ -290,7 +295,7 @@ export async function updateEstimateById(
 
   if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined || has_painting_fields || has_guardrail_amounts || has_deposit_policy_fields) {
     let subtotal_cents: number;
-    let itemsToInsert = patch.line_items ?? [];
+    let itemsToInsert = (patch.line_items ?? []).map((item) => defaultMaterialPrice(item));
     let new_internal_labor: number | null = null;
     let new_internal_material: number | null = null;
 
@@ -320,8 +325,16 @@ export async function updateEstimateById(
         subtotal_cents = patch.flat_rate_cents;
         itemsToInsert = [];
       } else if (patch.line_items !== undefined) {
-        subtotal_cents = calcTotals(patch.line_items).subtotal_cents;
-        itemsToInsert = patch.line_items;
+        const normalized = patch.line_items.map((item) => defaultMaterialPrice(item));
+        subtotal_cents = calcTotals(normalized).subtotal_cents;
+        itemsToInsert = normalized;
+        const { rules } = await loadPricingRules(client, session.accountId);
+        const split = splitInternalCosts(normalized, {
+          billingCents: rules.laborBillingCentsPerHour,
+          costCents: rules.laborCostCentsPerHour,
+        });
+        new_internal_labor = split.laborCostCents;
+        new_internal_material = split.materialCostCents;
       } else {
         subtotal_cents =
           est.subtotal_cents -
@@ -375,13 +388,14 @@ export async function updateEstimateById(
           `INSERT INTO estimate_line_items
              (estimate_id, description, quantity, unit_price_cents, total_cents,
               line_item_type, visible_to_customer, adjustment_type, sort_order,
-              price_book_id, prepared_group_key)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+              price_book_id, prepared_group_key, unit_cost_cents)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
           [
             id, item.description, item.quantity, item.unit_price_cents,
             lineItemTotal(item), item.line_item_type, item.visible_to_customer,
             item.adjustment_type ?? null, item.sort_order ?? i,
             item.price_book_id ?? null, item.prepared_group_key ?? null,
+            item.unit_cost_cents ?? null,
           ]
         );
       }
@@ -401,7 +415,8 @@ export async function updateEstimateById(
 
     for (let oi = 0; oi < patch.options.length; oi++) {
       const option = patch.options[oi];
-      const optionSubtotal = calcTotals(option.line_items).subtotal_cents;
+      const optionLines = option.line_items.map((item) => defaultMaterialPrice(item));
+      const optionSubtotal = calcTotals(optionLines).subtotal_cents;
       const optionTax = Math.round((optionSubtotal * taxRate) / 100);
       const optionTotal = optionSubtotal + optionTax;
 
@@ -414,17 +429,18 @@ export async function updateEstimateById(
       );
       const optionId = optionResult.rows[0].id;
 
-      for (let li = 0; li < option.line_items.length; li++) {
-        const item = option.line_items[li];
+      for (let li = 0; li < optionLines.length; li++) {
+        const item = optionLines[li];
         await client.query(
           `INSERT INTO estimate_line_items
              (estimate_id, option_id, description, quantity, unit_price_cents, total_cents,
-              line_item_type, visible_to_customer, adjustment_type, sort_order)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              line_item_type, visible_to_customer, adjustment_type, sort_order, unit_cost_cents)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
           [
             id, optionId, item.description, item.quantity, item.unit_price_cents,
             lineItemTotal(item), item.line_item_type, item.visible_to_customer,
             item.adjustment_type ?? null, item.sort_order ?? li,
+            item.unit_cost_cents ?? null,
           ]
         );
       }
@@ -432,7 +448,7 @@ export async function updateEstimateById(
 
     if (patch.options.length > 0) {
       const maxOptionTotal = Math.max(...patch.options.map((o) => {
-        const sub = calcTotals(o.line_items).subtotal_cents;
+        const sub = calcTotals(o.line_items.map((item) => defaultMaterialPrice(item))).subtotal_cents;
         const tax = Math.round((sub * taxRate) / 100);
         return sub + tax;
       }));
@@ -446,7 +462,7 @@ export async function updateEstimateById(
       });
       const deposit_cents = depositPolicy.deposit_cents;
       const balance_cents = depositPolicy.balance_cents;
-      const firstSub = calcTotals(patch.options[0].line_items).subtotal_cents;
+      const firstSub = calcTotals(patch.options[0].line_items.map((item) => defaultMaterialPrice(item))).subtotal_cents;
       setClauses.push(`subtotal_cents = $${idx++}`); params.push(firstSub);
       setClauses.push(`tax_cents = $${idx++}`); params.push(Math.round((firstSub * taxRate) / 100));
       setClauses.push(`total_cents = $${idx++}`); params.push(maxOptionTotal);
