@@ -317,8 +317,13 @@ Out of Scope:
 - Per-option baseline for Good/Better/Best (TASK-183).
 - Change orders (TASK-208).
 - Hours driving price (separate roadmap decision).
-- Per-job actual time and estimated-vs-actual comparison (PI-007, Phase 4;
-  this work stores what it needs).
+- Estimated-vs-actual hours comparison: corrected 2026-10-26. Actual
+  per-person job hours already exist (TASK-151: `activity_entries` type
+  `job_work` on the job, its visits and work orders; 14 of 18 invoiced jobs
+  have them, ~9% of job_work time is unlinked, travel time is never linked).
+  The comparison is proposed as TASK-215 (Phase 3, estimating assistant
+  slice); learning from actuals stays PI-007, Phase 4. This work stores the
+  estimated hours it needs.
 - Estimate revisions as a feature (sent quotes are already immutable; a
   revision is a new estimate).
 - Moving AI calls to newer models.
