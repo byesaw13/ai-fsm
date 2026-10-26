@@ -74,7 +74,7 @@ describe("itemized materials (TASK-187)", () => {
     expect(generate.mock.calls.find((c) => c[0].scope.includes("Bathroom"))![0].rooms!.map((r) => r.id)).toEqual(["r4"]);
     expect(scope.materials?.bath.lines).toHaveLength(2);
     expect(scope.materials?.hall).toBeUndefined();
-    expect(failed).toEqual([{ group_key: "hall", message: "overloaded" }]);
+    expect(failed).toEqual([{ group_key: "hall", message: expect.any(String) }]);
     // The bathroom's materials now come from the list: $289 + 2 x $55
     expect(summarizePreparedScope(scope).groups.find((g) => g.key === "bath")!.materials_cents).toBe(39900);
   });

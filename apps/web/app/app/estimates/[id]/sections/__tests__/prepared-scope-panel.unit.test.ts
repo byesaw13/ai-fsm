@@ -53,3 +53,16 @@ describe("PreparedScopePanel work areas (TASK-185)", () => {
     expect(html).toMatch(/data-testid="work-area-total">\$795\.00/);
   });
 });
+
+describe("PreparedScopePanel with no work listed", () => {
+  it("says so and names the rooms, not a blank table", () => {
+    const empty: PreparedScope = { ...SCOPE, tasks: [], questions: [] };
+    const html = renderToStaticMarkup(
+      createElement(PreparedScopePanel, {
+        estimateId: "e1", initialScope: empty, roomNames: {}, laborRateCents: 8500, laborCostCents: 5000, editable: true, showInternal: false,
+      }),
+    );
+    expect(html).toContain('data-testid="prepared-scope-empty"');
+    expect(html).toContain("for Kitchen, Hall");
+  });
+});

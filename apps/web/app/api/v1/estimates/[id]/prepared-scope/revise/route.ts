@@ -18,6 +18,7 @@ import { withEstimateContext } from "@/lib/estimates/db";
 import { loadAssessmentSummary } from "@/lib/estimates/assessment-summary-loader";
 import { applyScopeEdits } from "@/lib/estimates/prepare-quote";
 import { loadPreparationInputs } from "@/lib/estimates/preparation-inputs";
+import { describeAiFailure } from "@/lib/estimates/ai-failure";
 import {
   MAX_REVISION_INSTRUCTION,
   applyRevision,
@@ -104,14 +105,17 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     }
 
     let output;
+    let failure: unknown = null;
     try {
       output = await extractRevision(merged, summary, instruction);
     } catch (err) {
-      logger.warn("revise-quote: AI revision failed", { estimateId: id, error: (err as Error).message });
+      failure = err;
       output = null;
     }
     if (!output) {
-      return errorResponse(session, 503, "AI_UNAVAILABLE", "The revision could not be prepared. Your edits and answers are saved.");
+      const reason = describeAiFailure(failure);
+      logger.warn("revise-quote: AI revision failed", { estimateId: id, code: reason.code, error: (failure as Error | null)?.message });
+      return errorResponse(session, 503, reason.code, `${reason.message} Your edits and answers are saved.`);
     }
     const proposal = applyRevision(merged, output, { summary, ...inputs });
     return NextResponse.json({

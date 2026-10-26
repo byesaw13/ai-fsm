@@ -4,7 +4,6 @@ import {
   applyScopeEdits,
   buildPreparationPrompt,
   buildProposalNotes,
-  fallbackPreparedScope,
   preparedScopeInternalNote,
   preparedScopeToLineItems,
   toPreparedScope,
@@ -201,7 +200,8 @@ describe("preparedScopeToLineItems", () => {
   });
 
   it("adds no labor line for a group still missing hours", () => {
-    const empty = fallbackPreparedScope(SUMMARY, SOURCE);
+    const scope = toPreparedScope(OUTPUT, SUMMARY, [], SOURCE);
+    const empty = { ...scope, tasks: scope.tasks.map((t) => ({ ...t, hours_low: null, hours_high: null, materials_cents: null })) };
     expect(preparedScopeToLineItems(empty, TEST_RATE_CENTS)).toEqual({ lineItems: [], groupKeys: [] });
   });
 });
@@ -211,15 +211,6 @@ describe("preparedScopeInternalNote", () => {
     const note = preparedScopeInternalNote(toPreparedScope(OUTPUT, SUMMARY, [], SOURCE), TEST_RATE_CENTS);
     expect(note).toContain("T&M estimate $4,025–$5,640: 32–51 h at $85/h plus $1,305 materials.");
     expect(note).toContain("1 open question(s).");
-  });
-});
-
-describe("fallbackPreparedScope", () => {
-  it("keeps one group per room and says the work list is missing", () => {
-    const s = fallbackPreparedScope(SUMMARY, SOURCE);
-    expect(s.groups.map((g) => g.label)).toEqual(["Room 1", "Room 2", "Room 3", "Bathroom"]);
-    expect(s.tasks).toEqual([]);
-    expect(s.questions[0].text).toMatch(/AI preparation was unavailable/);
   });
 });
 

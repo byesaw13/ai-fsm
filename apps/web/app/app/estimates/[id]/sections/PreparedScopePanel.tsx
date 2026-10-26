@@ -270,6 +270,13 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
           <span style={{ textAlign: "right" }}>Materials</span>
           <span style={{ textAlign: "right" }}>Total</span>
         </div>
+        {areas.rows.length === 0 && (
+          <p style={{ margin: "var(--space-2) 0" }} data-testid="prepared-scope-empty">
+            No work is listed on this draft
+            {scope.groups.length > 0 ? ` for ${scope.groups.map((g) => g.label).join(", ")}` : ""}. It was prepared
+            without the AI. Delete this draft and press Prepare Quote on the assessment again once the AI is available.
+          </p>
+        )}
         {areas.rows.map((area) => {
           const tasks = scope.tasks.filter((t) => t.group_key === area.key);
           const open = openAreas.has(area.key);
