@@ -20,8 +20,26 @@
   { "id": "TASK-153", "title": "Change orders reach the bill, prior invoices credited", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Extra work needs a customer yes on the quote side, then the bill has to include it." },
   { "id": "TASK-099", "title": "Reconcile estimate calibration", "branch": "quote", "status": "deferred", "phase": "Phase 3", "fit": "Deferred with the cancelled estimating scaffold. The quote is still where it would land." },
   { "id": "TASK-047", "title": "Work item library", "branch": "quote", "status": "deferred", "phase": "Phase 4", "fit": "A library of common work would feed quotes. Production intelligence is deferred." },
+  { "id": "TASK-188", "title": "Hourly baseline on every quote", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Every quote is checked against your hourly rate, whichever screen built it. Your price stays yours." },
+  { "id": "TASK-189", "title": "Baseline formula written down first", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "You approve the math on paper before any code, so nothing is counted twice." },
+  { "id": "TASK-190", "title": "Materials cost separate from price", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "What materials cost you and what the customer pays are kept apart, so cost checks use real costs." },
+  { "id": "TASK-191", "title": "Person-hours on every quote", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Hours, with where they came from, are what the baseline is built on. Missing stays missing, never zero." },
+  { "id": "TASK-192", "title": "Equipment line type", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Rentals and equipment-use charges show and cost separately, without handling on top." },
+  { "id": "TASK-193", "title": "Production rates you can edit and calibrate", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Your pace numbers live in Settings. Until checked against real jobs, they are labeled uncalibrated." },
+  { "id": "TASK-194", "title": "Baseline panel and send checks", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "See the quote against your hourly rate, and cannot send with hours or costs missing." },
+  { "id": "TASK-195", "title": "Review that reads the real quote", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "The review sees your lines, hours and rates instead of asking for square footage, and runs only when you ask." },
+  { "id": "TASK-197", "title": "AI suggestions cannot set their own price", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "A suggested line uses your price book price, never a number the AI made up." },
+  { "id": "TASK-199", "title": "Painting edit uses your rates", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "The painting calculator's lines and total use the same rates." },
+  { "id": "TASK-200", "title": "Good/Better/Best totals and line types", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Option quotes list at a real total and keep their materials lines as materials." },
+  { "id": "TASK-201", "title": "Room-by-room pricing saves all or nothing", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "A failed calculation never leaves a quote with the wrong total." },
+  { "id": "TASK-202", "title": "Prepared quote edge cases", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "A fixed price never vanishes, and the profit card matches the quote lines." },
+  { "id": "TASK-203", "title": "Portal approval lands like the email path", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "When a customer approves on the portal you get told, and a double click does not show them an error." },
+  { "id": "TASK-204", "title": "Safer AI calls on quotes", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "AI answers are checked before use, costly ones are owner-only, and each call's cost is recorded." },
+  { "id": "TASK-205", "title": "Materials list never times out", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "A big materials list finishes instead of showing 'Network error'." },
+  { "id": "TASK-206", "title": "Quote cleanup and stale sent quotes", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Small quote errors fixed, and old quotes still marked sent get closed out with your OK." },
 
   { "id": "TASK-102", "title": "Save quick materials onto the job", "branch": "job", "status": "backlog", "phase": "Phase 3", "fit": "Materials gathered outside a quote still have to land on the job." },
+  { "id": "TASK-208", "title": "Change orders checked against your hourly rate", "branch": "job", "status": "backlog", "phase": "Phase 3", "fit": "Added work on a job should get the same hours check as the original quote." },
 
   { "id": "ask-moved", "title": "Text when the day moves", "branch": "visit", "status": "asked", "phase": "Phase 1", "fit": "The website says a schedule change comes from you. A moved visit does not text the customer. No task owns it yet." },
   { "id": "TASK-140", "title": "Mileage claim versus GPS", "branch": "visit", "status": "progress", "phase": "Phase 1", "fit": "Miles are part of the day at the house, checked when the day is done." },
@@ -48,6 +66,8 @@
   { "id": "TASK-136", "title": "Finishing the job drafts the bill", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "When the work is done, the next record is the bill." },
   { "id": "TASK-155", "title": "Send the bill through Square", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "Card or bank payment goes out from the bill, and the link stays." },
   { "id": "TASK-156", "title": "Square fees on the payment", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "The fee belongs on the payment, so the job knows what it kept." },
+  { "id": "TASK-196", "title": "Invoice copies only the right lines", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "The bill shows only what the customer approved, and its lines add up to its total." },
+  { "id": "TASK-198", "title": "Deposit rule kept from the start", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "A materials deposit chosen before materials are listed still shows up once they are." },
 
   { "id": "TASK-168", "title": "Vault lines save reliably", "branch": "history", "status": "progress", "phase": "Phase 2", "fit": "Paint, models, and filters from a job have to land on the house record." },
   { "id": "TASK-175", "title": "Home vault categories", "branch": "history", "status": "progress", "phase": "Phase 2", "fit": "The house record is grouped the way the website describes it." },
@@ -71,5 +91,6 @@
   { "id": "TASK-122", "title": "Backups include uploads and the env file", "branch": "floor", "status": "progress", "phase": "Cross-cutting", "fit": "A backup that skips files or secrets is not a backup." },
   { "id": "TASK-055", "title": "Operational intelligence", "branch": "floor", "status": "backlog", "phase": "Phase 4", "fit": "Profit figures driving automation. It stays under the floor so it is not mistaken for a step of a job." },
   { "id": "TASK-036", "title": "A gatekeeper on pull requests", "branch": "floor", "status": "deferred", "phase": "Cross-cutting", "fit": "Out of scope until it is proven in daily use." },
-  { "id": "TASK-048", "title": "Confidence engine", "branch": "floor", "status": "deferred", "phase": "Phase 4", "fit": "A scorer for production intelligence. Deferred." }
+  { "id": "TASK-048", "title": "Confidence engine", "branch": "floor", "status": "deferred", "phase": "Phase 4", "fit": "A scorer for production intelligence. Deferred." },
+  { "id": "TASK-207", "title": "Password changes are recorded", "branch": "floor", "status": "backlog", "phase": "Cross-cutting", "fit": "You can tell when a password was changed. Plumbing, not a job step." }
 ]

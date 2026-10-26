@@ -7,6 +7,10 @@ workflow.
 
 ## Active tasks
 
+# TASK-207: Record password changes in the audit log
+
+See [TASK-207-password-change-audit.md](./TASK-207-password-change-audit.md). Low. Who changed whose password and when; never the secret.
+
 # TASK-122: Backup hardening — uploads + encrypted .env alongside the DB dump
 
 Status:

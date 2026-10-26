@@ -5,6 +5,25 @@ re-keying, and keeping estimate structure consistent across jobs.
 
 ## Active tasks
 
+## Hourly baseline and estimate audit (TASK-188 to TASK-206)
+
+Owner decisions 2026-10-26: every estimate is compared with the company's
+hourly rate as a reference only (the owner's price is never changed); hours
+are person-hours with a recorded source; incomplete is a draft state, never a
+way past the send rules. Audit findings from the same day are filed as
+separate tasks by severity.
+
+- [TASK-188: Hourly baseline on every estimate (parent)](TASK-188-hourly-baseline-every-estimate.md) — children TASK-189 to TASK-195, in order.
+- [TASK-197: AI line suggestions cannot set their own price](TASK-197-item-suggester-price-cap.md) — High.
+- [TASK-199: Painting edit prices lines with the account's rates](TASK-199-painting-edit-account-rates.md) — Medium, latent.
+- [TASK-200: Multi-option estimates keep correct totals and line types](TASK-200-multi-option-create-edit.md) — Medium, latent.
+- [TASK-201: Room-by-room engine path is atomic and keeps adjustments](TASK-201-engine-path-atomic.md) — Medium, latent.
+- [TASK-202: Prepared quote edge cases](TASK-202-prepared-quote-edge-cases.md) — Medium.
+- [TASK-203: Portal approval matches the email and owner approval paths](TASK-203-portal-approval-parity.md) — Medium.
+- [TASK-204: Harden the estimating AI calls](TASK-204-ai-call-hardening.md) — Medium.
+- [TASK-205: Materials generator finishes within the tunnel limit](TASK-205-materials-generator-timeout.md) — Medium.
+- [TASK-206: Estimate API cleanup and stale sent estimates](TASK-206-estimate-api-cleanup.md) — Low.
+
 ## Assessment-to-quote assistant (TASK-178 to TASK-182)
 
 The owner walks the house room by room, measures, speaks or types what the
@@ -79,12 +98,25 @@ Scope:
   buy-list seed, invoice prefill and reports.
 - Set the estimate's subtotal/tax/total from the chosen option on approval,
   with an explicit, tested amendment to the estimate immutability trigger.
+- Per-option hourly baseline (added 2026-10-26, owner decision, TASK-188):
+  each option has its own hours, direct costs and baseline (low/mid/high, gap,
+  effective rate against the cost floor), computed only from lines with no
+  option plus that option's lines. Never a combined baseline across options.
+  The TASK-188 send rules apply per option: every option must have complete
+  hours and confirmed direct costs before the quote can be sent; the cost-floor
+  acknowledgment is per option. Until this ships, option quotes are marked
+  "Baseline not available for option quotes yet" and skip the new send rules
+  (TASK-188, TASK-194).
 
 Acceptance Criteria:
 - [ ] Approving Better leaves the job, final invoice, work orders and buy list
       with only Better's work.
 - [ ] The approved estimate's total equals the chosen option's total.
 - [ ] Standard estimates are unchanged.
+- [ ] Each option shows its own baseline; no combined baseline appears
+      anywhere.
+- [ ] A quote with one option missing hours cannot be sent and the checklist
+      names that option.
 
 Notes:
 Split from TASK-181 on 2026-10-24 (owner decision). Revisit when the owner
