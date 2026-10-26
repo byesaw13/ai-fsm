@@ -123,9 +123,12 @@ go through the existing store purchase import (`apps/web/lib/expenses/import/`).
 `/api/v1/materials/import` and `hd-import.ts` are removed; the catalog's
 import button points here. The owner picks a mode for each file:
 
-- **Price history only.** Adds `supplier_csv` price observations and nothing
-  else: no expenses, no job links, no staging, no effect on job cost or
-  expense totals. This is the mode for the 24-month history re-export.
+- **Price history only.** Adds `supplier_csv` price observations and books
+  nothing: no expenses, no job links, no effect on job cost or expense
+  totals. It still applies the same duplicate safeguards as book mode (see
+  "Review records" below), because duplicate price evidence would distort
+  averages, purchase counts and confidence. This is the mode for the
+  24-month history re-export.
 - **Book purchases.** Creates one expense per store trip with its line items,
   as today, plus price observations. Used for recent purchases not yet
   booked.
@@ -170,10 +173,25 @@ possible match is held as a pending import record:
   trip" (book as its own expense) runs in one database transaction: expense
   and line items, job link, price observations, and marking the record
   resolved all succeed together or none do. A failed confirmation leaves the
-  pending record exactly as it was. The owner can also dismiss a pending trip
-  with a reason ("not a business purchase").
-- History mode never stages: it books nothing, so there is nothing to
-  double-count.
+  pending record exactly as it was.
+
+**Review records in history mode (corrected 2026-10-26).** History mode books
+nothing, but a row that is a possible duplicate (a look-alike of an existing
+observation or receipt without matching transaction identity) or has a
+conflicting transaction identity becomes a persistent review record, exactly
+as in book mode. Its observations are held out of active price evidence (not
+used for price, averages, purchase counts or confidence) until resolved.
+Confirming "same purchase" keeps the existing evidence and records the row as
+a duplicate; confirming "different purchase" makes its observations active.
+It never becomes an expense. Pending count and value cover both modes.
+
+**Dismiss with reason (both modes).** The owner can dismiss a pending record
+with a reason ("personal purchase", "not a business purchase", "test
+import"). A dismissed record is kept, never deleted; it is excluded from
+active costs and from price evidence, so a personal purchase never teaches
+business material prices; and it can be reopened, which returns it to
+pending with its history intact. Dismissing and reopening are logged with
+who and when.
 
 **Receipts.** Receipt lines get new IDs every time a receipt is re-parsed
 (`apps/web/lib/expenses/line-items.ts`, delete and re-insert), so they are
@@ -306,22 +324,33 @@ as a **paint pilot first** (D9): the ledger, imports, package sizes,
 confidence and interior paint and primer end to end; the other four families
 follow once the pilot meets the success criteria below.
 
-**Pilot success criteria (corrected 2026-10-26; starting thresholds for the
-owner to confirm).** Every manual action on a pilot quote (formula quantity
-override, product link, package-size save, coverage edit) is logged with the
-quote. Measured over the first 5 quotes that use the pilot:
+**Pilot success criteria (provisional usability targets, owner-confirmed
+2026-10-26).** Every manual action on a pilot quote is logged with the quote:
+formula quantity override (with its kind, below), product link, confirmation
+of a suggested mapping, package-size save, coverage edit. The pilot runs on
+at least 5 quotes for varied real jobs; if those do not exercise the
+important cases (walls and ceilings, trim and doors, primer, more than one
+paint group, a missing package size, a sale-only price), the pilot is
+extended until they do.
 
-- Manual corrections: on average, at most 2 formula quantity overrides per
-  quote.
-- Mapping reuse: on quotes 3 to 5, at least 70% of paint lines resolve to a
-  product already linked and sized on an earlier quote, with no new link or
-  size needed.
-- Effort: by quote 5, at most 3 link or package-size actions per quote, and
-  the owner reports resolution took no more than 10 minutes on that quote.
-- No paint line on a sent quote has a wrong package or quantity found after
-  sending (owner-reported).
+- Correctness gate: zero wrong packages or quantities, counting errors caught
+  before sending as well as after. Any wrong result fails the pilot until the
+  cause is fixed.
+- Quantity overrides: each override is recorded as either "correcting the
+  calculation" or "my preference" (for example a deliberate extra gallon).
+  Any repeated correction of the same calculation is a formula defect that
+  must be fixed, whatever the average. Deliberate preferences: at most 2 per
+  quote on average.
+- Mapping reuse: on quotes 3 onward, at least 70% of paint lines whose
+  compatible product and package mapping already existed resolve to it with
+  no new link or size. Lines for products seen for the first time are not
+  counted as reuse failures.
+- Effort: by the last pilot quote, at most 3 link, mapping-confirmation or
+  package-size actions per quote (confirming a suggested mapping counts as an
+  action), and the owner reports resolution took no more than 10 minutes on
+  that quote.
 
-If the criteria are not met, TASK-216 waits and the cause (identity, package
+If any criterion is not met, TASK-216 waits and the cause (identity, package
 data or formula) is fixed first.
 
 **Pilot (TASK-214):**
@@ -485,8 +514,14 @@ deploy to restore history.
    imported. Rows without a transaction ID are listed as review candidates,
    never counted twice automatically.
 1a. Two identical lines in one transaction both count.
-1b. Price-history mode creates price observations and no expenses, job links
-   or pending records; job cost and expense totals are unchanged.
+1b. Price-history mode creates price observations and no expenses or job
+   links; job cost and expense totals are unchanged. Possible duplicates and
+   conflicting identities in history mode become persistent review records
+   whose observations stay out of active price evidence (prices, averages,
+   purchase counts, confidence) until resolved.
+1f. A dismissed record (either mode) is kept, excluded from active costs and
+   price evidence, and can be reopened back to pending; dismiss and reopen are
+   logged.
 1c. A transaction imported in history mode and later in book mode gains
    expenses but no duplicate price observations.
 1d. In book mode, a CSV trip with a possible receipt match is a persistent
@@ -547,8 +582,10 @@ deploy to restore history.
     labeled as work hours only.
 12. No new recurring service fee (paid feed or subscription) is added.
 13. The pilot success criteria (section 7) are measured from logged manual
-    actions over the first 5 pilot quotes, and TASK-216 does not start until
-    they are met.
+    actions (overrides tagged "correcting the calculation" or "my
+    preference") over at least 5 varied real quotes, extended until the
+    important cases are covered, and TASK-216 does not start until they are
+    met, including the zero-wrong-results correctness gate.
 
 ## Test plan
 
@@ -574,7 +611,7 @@ Regression tests required (existing behavior changes):
 | Unit | Paint pilot formulas (normal, zero, missing, waste once, explicit 0% waste, per-surface coverage, primer coverage never wall default, product/tint/sheen/application grouping, round-up) | +16 |
 | Unit | Remaining four families incl. trim sticks per run (TASK-216) | +16 |
 | Unit | Receipt content fingerprint and supersede; cross-source match and ambiguity flag; unreconciled receipt capped at Low | +8 |
-| Integration | Import twice (fixed clock), history-only mode books nothing, pending records persist and re-import safely, atomic confirmation with a forced failure, receipt re-parse, backfill run twice, cache recompute in the same transaction | +10 |
+| Integration | Import twice (fixed clock), history-only mode books nothing but holds possible duplicates out of active evidence, dismiss excludes and reopen restores, pending records persist and re-import safely, atomic confirmation with a forced failure, receipt re-parse, backfill run twice, cache recompute in the same transaction | +10 |
 | Integration | Verified today refusal, quote expiry, frozen labels at send | +4 |
 | E2E | Assessment, Prepare Quote, formula materials with labels, send | +1 |
 
@@ -627,7 +664,8 @@ All import tests use fixture CSVs (Home Depot and Lowe's formats, including a
 | Pro Xtra import | Return or $0 line | Skipped, listed | Yes | Reason "return" or "$0" |
 | Receipt re-parse | New line IDs | Content fingerprint, supersede | Yes | No change in counts |
 | Receipt + CSV | Same purchase twice | Linked only by same supplier, store, date and transaction ID; look-alikes and conflicting IDs staged as persistent pending records out of expenses, job cost and prices until confirmed | Yes | "Possible match, review" / "Conflicting transaction ID" |
-| History import | Owner imports 24 months | Price-history mode books nothing | Yes | Observations only; expenses unchanged |
+| History import | Owner imports 24 months | Price-history mode books nothing; possible duplicates held as review records out of active evidence | Yes | Observations; review records with count and value |
+| Dismissed record | Personal purchase dismissed | Kept, excluded from costs and price evidence, reopenable | Yes | "Dismissed: personal purchase" with Reopen |
 | Pending confirmation | Fails partway | One transaction; pending record unchanged | Yes | Error; pending still listed |
 | Store purchase import | Sale purchase | Recorded as sale, not default price while a regular price exists | Yes | "Also bought on sale for $X" |
 | Receipt parse | Re-parse or concurrent re-parse | Numbered revisions, lock per receipt | Yes | Nothing (current revision shown) |
@@ -685,7 +723,7 @@ TASK-191.
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | not run | n/a |
 
 - **CROSS-MODEL:** Codex's eng pass found that the chosen import path lacked Store Number parsing and expense line items, that receipt parsing drops returns, that paint math differs between the engine and Prepare Quote, and that a sale-price safeguard would be lost; all verified in code and folded in (E7 to E10).
-- **CORRECTION PASS (owner, 2026-10-26):** price-history-only import mode; transaction identity includes supplier and store; persistent pending records with count/value, safe re-import and atomic confirmation; mismatches only lower confidence; summaries superseded only by same-or-newer real evidence and never counted as purchases; per-surface coverage, primer coverage never from wall default, explicit 0% waste; drywall and supplies formulas specified by measured drivers; hours compared only within matching scope; measurable pilot success criteria; re-import tests at a fixed evaluation date; fixtures instead of the real export.
+- **CORRECTION PASS (owner, 2026-10-26):** price-history-only import mode with the same duplicate review records as book mode (held out of active evidence); dismiss with reason keeps, excludes and can reopen; pilot criteria refined (override kinds, reuse only where a mapping existed, mapping confirmations count, zero wrong results including pre-send, varied jobs); transaction identity includes supplier and store; persistent pending records with count/value, safe re-import and atomic confirmation; mismatches only lower confidence; summaries superseded only by same-or-newer real evidence and never counted as purchases; per-surface coverage, primer coverage never from wall default, explicit 0% waste; drywall and supplies formulas specified by measured drivers; hours compared only within matching scope; measurable pilot success criteria; re-import tests at a fixed evaluation date; fixtures instead of the real export.
 - **VERDICT:** CEO + ENG CLEARED at plan level. Implementation still waits for the owner's approval of this document and the ROADMAP text, and for PR #720.
 
 NO UNRESOLVED DECISIONS
