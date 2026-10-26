@@ -33,7 +33,8 @@ from outcomes stay in Phase 4.
 | Quantity math | Wall paint: coverage, 10% waste, whole gallons (`packages/domain/src/painting.ts`); door hardware takeoff (TASK-103) | Two trades only |
 | Historical costs | `materials_price_book`: 1,304 items from receipts and a Pro Xtra CSV import, 1,195 with SKU, 176 bought 3+ times, 193 bought in the last 90 days | Latest price and running average only; no history, no verification, no package size (1,296 items are "each") |
 | Raw receipts | `expense_line_items`: 327 lines across 95 receipts, 288 with SKU | Kept in full |
-| Pro Xtra import | `POST /api/v1/materials/import` (`apps/web/lib/materials/hd-import.ts`) | Works (used August 2026); no duplicate protection; rows not kept |
+| Pro Xtra import (catalog-only) | `POST /api/v1/materials/import` (`apps/web/lib/materials/hd-import.ts`) | Used for the August 2026 history; reads date, SKU, description, net unit price, department, quantity; no store, no transaction ID, no duplicate protection; rows not kept. **Retired by this design (eng review D2).** |
+| Store purchase import (expenses) | `/api/v1/expenses/import/preview` and `/commit` (`apps/web/lib/expenses/import/homedepot.ts`, `lowes.ts`, `duplicate-match.ts`) | Reads Date, Transaction ID, Job Name, SKU, Description, Quantity, Net Unit Price (not Store Number, although the export has it); one expense per store trip; Lowe's supported; matches CSV trips to receipts; keeps a sale-price safeguard ("a discounted (sale) purchase never overwrites the established regular price"); writes expenses and catalog prices but **no expense line items**; preview shows new / already imported / returns skipped. Used once. **The single import path in this design, extended by TASK-211.** |
 | Preferred supplier | `account_supplier_preferences`: Home Depot, Londonderry NH | Set |
 | Actual hours | TASK-151: `activity_entries` type `job_work`, per worker, on the job, its visits and work orders, x each worker's cost rate | 14 of 18 invoiced jobs have hours; 7 have an approved estimate and hours; ~9% of job_work time is not linked to a job; travel time (90.8 h) and most material runs are never linked to a job; one worker so far |
 
@@ -85,10 +86,14 @@ adjustment stays 0% unless the owner approves a supported change.
   (`apps/web/app/api/v1/materials/[id]/route.ts`) writes price and purchase
   date directly; it becomes a `manual_check` observation and, like "verified
   today", needs the observed price and its source.
-- Product identity (D11-3): an observation belongs to a product variant, keyed
-  by supplier and SKU when there is one, or by an owner-confirmed link. Package
-  sizes of the same product are explicit variants. The generator's word-overlap
-  match (`materials-generator.ts:201`) can suggest a link but never earns High.
+- Product identity (D11-3, eng D3): the catalog row is the product variant,
+  unique per account, store family (home_depot, lowes, other) and SKU; a
+  store SKU already pins one exact package. Today's SKU match ignores the
+  store (`catalog.ts`, `lower(btrim(sku)) = lower(btrim($2))`), which changes.
+  Rows without a SKU earn High only through an owner-confirmed link, never by
+  name. The same item at two stores is two rows the owner can mark "same
+  product". The generator's word-overlap match (`materials-generator.ts:201`)
+  can suggest a link but never earns High.
 - Supplier names are normalized ("The Home Depot" and "Home Depot" are one).
 - Row-level security like every account table; owner/admin write, everyone in
   the account reads.
@@ -104,26 +109,58 @@ adjustment stays 0% unless the owner approves a supported change.
   confidence and stays on record.
 - The backfill is safe to run more than once.
 
-### 3. Imports without duplicates (owner decisions 4A, D11-1, D11-2)
+### 3. Imports without duplicates (owner decisions 4A, D11-1, D11-2; eng review D2, D5)
 
-- Pro Xtra CSV rows keep the transaction or order number when the export has
-  one. Rows are keyed by transaction number, store, SKU, quantity and net unit
-  price, or, with no transaction number, by date, store, SKU, quantity, price
-  and an occurrence number within that group. Two real identical purchases on
-  one day both count; a re-imported or overlapping export adds nothing.
+- One import path (eng D2): Home Depot and Lowe's purchase CSVs go through the
+  existing store purchase import (`apps/web/lib/expenses/import/`), which
+  creates one expense per store trip with its store and transaction ID and
+  its line items. The ledger reads expense line items from both CSV trips and
+  photographed receipts. `/api/v1/materials/import` and `hd-import.ts` are
+  removed, and the catalog's import button points to the store purchase
+  import.
+- Trip matching (eng D5): a CSV trip and a photographed receipt are linked
+  automatically only when they share a transaction ID. Every other look-alike
+  (same store and date with the same, tax-adjusted or near total, or more
+  than one possible receipt) is a review candidate: both are kept, nothing is
+  merged, and the import screen lists them as "Possible match, review". The
+  owner can confirm several at once ("Confirm selected"), which is still an
+  explicit confirmation. This changes `duplicate-match.ts`, which today
+  auto-matches by store, date and amount.
+
+- Importer extensions (eng D10-2): parse Store Number, and save every CSV
+  row as an expense line item with its store and transaction ID, so the
+  ledger has durable source lines.
+- Keys (eng D10-1): CSV rows are keyed by transaction ID, SKU, quantity, net
+  unit price and an occurrence number inside the transaction, so identical
+  lines in one trip both count and re-importing the same transaction adds
+  nothing. A row without a transaction ID cannot be told apart from a genuine
+  repeat purchase, so it becomes a review candidate instead of a guaranteed
+  count.
+- Staging (eng D7): a CSV trip with a possible match is held in the import:
+  not an expense, not in job cost, no price observations, until the owner
+  confirms "same trip" (it attaches to the receipt's expense) or "different
+  trip" (it becomes its own expense). Everything else imports normally.
 - Receipt lines get new IDs every time a receipt is re-parsed
   (`apps/web/lib/expenses/line-items.ts`, delete and re-insert), so they are
-  keyed by content: receipt, line text, SKU, quantity, price and position. A
-  re-parse supersedes that receipt's earlier observations instead of adding.
+  keyed by content: receipt, line text, SKU, quantity, price and position.
+- Parse revisions (eng D10-8): each re-parse is a numbered revision of that
+  receipt; the current revision's observations are active and earlier ones
+  superseded; restoring an earlier revision makes it current again;
+  concurrent re-parses of one receipt are serialized by a lock.
 - Cross-source: a Paperless receipt and a Pro Xtra row are counted once only
   when they share a transaction or order number. Rows that merely look alike
   (same date, store, SKU, quantity and price, but no shared transaction
   identity) become review candidates for the owner; they are never merged
   automatically, because two distinct purchases can look identical. Until the
   owner confirms, both are kept and the pair is marked "possible duplicate".
-- OCR accuracy (D11-8): before a receipt counts as unreconciled, the check
-  accounts for tax, discounts, coupons and returns on the receipt (line totals
-  minus discounts and returns, plus tax, against the receipt total). A
+- OCR accuracy (D11-8, eng D10-4): receipt extraction keeps return and
+  discount lines as signed adjustments (today
+  `normalizeParsedReceiptLineItems` turns quantity <= 0 into 1 and negative
+  prices into 0, losing them). Net unit prices already include line
+  discounts, so those are never subtracted again. Before a receipt counts as
+  unreconciled, the check accounts for tax, receipt-level discounts, coupons
+  and returns (line totals minus discounts and returns, plus tax, against the
+  receipt total). A
   receipt whose mismatch remains unexplained after that has its observations
   capped at Low until the owner reconciles it.
 - Good rows import; every skipped row is listed with its line number and
@@ -137,8 +174,14 @@ adjustment stays 0% unless the owner approves a supported change.
 
 - Materials get a package quantity and unit (for example 1 gal, 5 gal, 10.1 oz,
   50 ft, 8 ft stick) and a base unit.
-- A parser reads sizes from Home Depot descriptions; anything it cannot read
-  stays empty.
+- A parser reads sizes from product descriptions. A clear size ("5 Gal.")
+  is applied and labeled "from product description"; anything uncertain is
+  only a suggestion until the owner saves it; anything unreadable stays empty.
+- Where to fix it (eng D6): inline on the quote line ("Package size needed:
+  [1 gal] Save for this product", suggestion pre-filled, not applied until
+  saved), saved once to the catalog item for all future quotes; plus a
+  "Missing package size" filter on the materials catalog page for bulk
+  cleanup.
 - "Package size needed" applies only when a size is required to convert a
   measured quantity into packages or cost (for example 2.6 gal of paint into
   cans). Then the line shows the raw quantity, counts as a missing item in the
@@ -151,8 +194,14 @@ adjustment stays 0% unless the owner approves a supported change.
 ### 5. Price selection, and confidence with reasons (owner decisions 7A, D11-4)
 
 Price selection is separate from the label. A line's price is the newest
-applicable observation for its product, package, supplier and location; a valid
-written quote for that quantity wins. Confidence is computed for each line at
+applicable regular-price observation for its product, package, supplier and
+location; a valid written quote for that quantity wins. Sale prices (eng D8):
+discounted purchases (the CSV discount flag or a receipt markdown) are
+recorded and marked "sale", but are not chosen while a regular-price
+observation exists within the confidence window; the evidence shows "also
+bought on sale for $X on <date>" and the owner can pick it deliberately. When
+only sale purchases exist, the price is labeled "only bought on sale" and is
+at most Medium. Confidence is computed for each line at
 today's date, not stored once per catalog item, so a quote expiring or a price
 aging changes the label without any new import.
 
@@ -183,7 +232,23 @@ Starting defaults, editable in Settings:
 - A supplier quote records item, quantity, location, price, quote date and
   expiry (or the default), and the document reference when there is one.
 
-### 7. Quantity formulas, purchase sizes, waste (owner decisions 8A, D9, D10, D11-6)
+### 7. Quantity formulas, purchase sizes, waste (owner decisions 8A, D9, D10, D11-6; eng D4)
+
+One paint-quantity function (eng D4, D9): paint gallons are computed today in
+three places with different rules (`painting.ts:274` `wallPaintGallons`,
+`painting.ts:298` inside `computeRoomPainting`, and the estimate engine's
+`computePaintMaterials`). The pilot replaces them with one `paintQuantity`
+function in `production-takeoff/`. The rule (eng D9): sum area x coats per
+paint group (exact product, tint, sheen, application) across rooms and
+surfaces, divide by the product's coverage, apply the waste allowance once,
+and round up once per group to whole packages. The estimate engine's
+per-surface rounding without waste is retired; its tests move to the new
+numbers and every changed result is listed in the PR. Coverage
+comes from the chosen product, defaulting to 350 sq ft/gal labeled
+"default". Prepare Quote stops pricing paint with the constant
+`PAINT_CENTS_PER_GALLON` (`prepare-quote.ts:212`) and uses the chosen catalog
+product and its ledger price; with no product chosen the line says "Choose a
+paint product".
 
 Five families, deterministic, in `packages/domain/src/production-takeoff/`,
 reusing the paint coverage logic in `packages/domain/src/painting.ts`. Built
@@ -213,7 +278,12 @@ follow once the pilot shows product and package identity is manageable
 - Formula authority (D11-6): for formula-covered items, the formula's quantity
   replaces the materials generator's quantity on those lines and the
   generator's waste is not applied again. Items no formula covers stay
-  labeled allowances. Changing a measurement recalculates.
+  labeled allowances.
+- Recalculation (eng D10-5): formula lines store their inputs (measurement
+  references, coats, coverage, waste, product, group). Changing a measurement
+  recalculates the line and clears the cost confirmation and cost-floor
+  acknowledgment (TASK-194). An owner override of a formula quantity is kept,
+  labeled "owner override", and never recalculated silently.
 - Fasteners and flooring stay itemized allowances in this slice.
 - A missing measurement makes the formula ask for it, never assume it.
 
@@ -230,6 +300,34 @@ follow once the pilot shows product and package identity is manageable
   is never attributed to a job automatically. A job with no linked time says
   so.
 - This is a comparison only; learning from it (PI-007) stays in Phase 4.
+
+## Missing-data messages (eng screen review)
+
+Every missing-data message in the send checklist and on formula lines:
+
+- Says what is missing, why it matters and where to fix it, with a link to the
+  field: "Kitchen: ceiling size missing, needed for ceiling paint. [Enter
+  size] [No ceiling work]".
+- Offers an honest exit where one is valid ("No ceiling work", "$0
+  confirmed", "Each item, no package"), so nothing pushes the owner to enter a
+  made-up value.
+- Looks different when it blocks Send (missing quantity, unusable unit,
+  unconfirmed cost) from when it only asks for review (Low confidence).
+- Formula questions name the room and the measurement, never a field name.
+
+## Screens
+
+```
+ Quote line (paint)                         Import (expenses > Import purchases)
+ +--------------------------------------+   +------------------------------------------+
+ | Living room walls, 2 coats           |   | Preview: trips, new, already imported,   |
+ | 2.6 gal -> [Choose a paint product]  |   | returns skipped, rejected (line, reason) |
+ |   or 3 x 1 gal  Behr Ultra Eggshell  |   | Possible match, review  [Confirm sel.]   |
+ |   High: receipt, HD Londonderry, 12d |   | Import N trips                           |
+ | Package size needed: [1 gal] [Save]  |   +------------------------------------------+
+ +--------------------------------------+
+ Send checklist: blocking items first, each with [fix] link; review notes after.
+```
 
 ## Ongoing cost
 
@@ -273,10 +371,10 @@ assistant assists, and the owner approves every price.
 | --- | --- | --- | --- |
 | TASK-209 | Parent: estimating assistant, Phase 3 slice | approval | n/a |
 | TASK-210 | Price observation ledger, catalog cache recompute, supplier normalization, backfill (5A) | TASK-190 | 2 d / 2 h |
-| TASK-211 | Duplicate-safe receipt and Pro Xtra imports with reject report (4A) | TASK-210 | 1 d / 1 h |
-| TASK-212 | Package sizes and units, parser, "Package size needed" (6A) | TASK-210 | 1.5 d / 1.5 h |
+| TASK-211 | One import path through the store purchase import: Store Number parsing, CSV rows saved as expense line items, transaction-scoped keys, staging of possible matches, transaction-ID-only trip matching with "Confirm selected", sale flag kept, reject report, receipt parse revisions and signed return/discount lines; retire `/materials/import` (4A, eng D2, D5, D7, D8, D10) | TASK-210 | 3 d / 3 h |
+| TASK-212 | Package sizes and units, parser, inline "Package size needed" plus catalog filter (6A, eng D6) | TASK-210 | 1.5 d / 1.5 h |
 | TASK-213 | Confidence with reasons, frozen at send; verified today; supplier quotes (7A) | TASK-210, TASK-194 | 2 d / 2 h |
-| TASK-214 | Paint pilot: interior paint and primer formulas end to end, owner-chosen packages, grouping by exact product/tint/sheen/application, formula authority over generator quantities | TASK-212, TASK-213, TASK-190 | 3 d / 0.5 d |
+| TASK-214 | Paint pilot: one `paintQuantity` function, Prepare Quote paint priced from the chosen product (eng D4), interior paint and primer formulas end to end, owner-chosen packages, grouping by exact product/tint/sheen/application, formula authority over generator quantities | TASK-212, TASK-213, TASK-190 | 3 d / 0.5 d |
 | TASK-215 | Estimated vs explicitly linked actual hours, with "possibly related" time shown separately | TASK-191 | 1 d / 1 h |
 | TASK-216 | Remaining formula families: drywall patching, caulk, trim/baseboard (sticks per run), paint supplies | TASK-214 pilot result | 4 d / 1 d |
 
@@ -287,17 +385,23 @@ pilot's identity cleanup effort; 215 is independent once TASK-191 ships.
 ## Acceptance criteria (parent)
 
 1. Importing the same Pro Xtra export twice leaves every price, count,
-   average and confidence unchanged, and the second report lists every row as
-   a duplicate.
-2. Re-parsing a receipt supersedes its earlier observations and adds no
-   duplicates, even though its line IDs change.
+   average and confidence unchanged, and the second report lists every row
+   with a transaction ID as already imported. Rows without a transaction ID
+   are listed as review candidates, never counted twice automatically.
+1a. Two identical lines in one transaction both count.
+1b. A CSV trip with a possible receipt match adds nothing to expenses, job
+   cost or prices until the owner confirms same or different trip.
+2. Re-parsing a receipt creates a new parse revision whose observations
+   replace the previous revision's; no duplicates, even though line IDs
+   change; restoring an earlier revision brings its observations back.
 2a. A receipt and a Pro Xtra row with the same transaction number count
    once; look-alike rows without shared transaction identity are both kept
    and listed as review candidates, never merged automatically.
 2b. A receipt that balances once tax, discounts and returns are applied is
    reconciled; only an unexplained mismatch caps its observations at Low.
 2c. Editing a catalog price without an observed price and source is refused.
-3. Two identical purchases on the same day in one export are both counted.
+3. A sale purchase is never the default line price while a regular price
+   exists in the window; it shows as "also bought on sale".
 4. Every price on a materials line shows its label and reason, for example
    "High: receipt, Home Depot Londonderry, 12 days ago".
 5. A catalog summary never shows above Low; an AI allowance never shows above
@@ -325,6 +429,20 @@ pilot's identity cleanup effort; 215 is independent once TASK-191 ships.
 12. No new recurring service fee (paid feed or subscription) is added.
 
 ## Test plan
+
+Regression tests required (existing behavior changes):
+- `apps/web/lib/expenses/__tests__/duplicate-match.unit.test.ts`: store + date
+  + amount no longer auto-matches; it produces a review candidate; a shared
+  transaction ID still links.
+- Prepare Quote tests: paint priced from the chosen product and its ledger
+  price; "Choose a paint product" when none is chosen; the constant
+  `PAINT_CENTS_PER_GALLON` is no longer used for prepared quotes.
+- `painting.ts` callers: wall painting keeps its current results; the
+  estimate engine's results change to the grouped, waste-once rule, and each
+  changed fixture is listed in the PR (eng D9).
+- Store purchase import: the sale-price safeguard still holds through the
+  ledger (eng D8); a returned item and a discounted line reconcile correctly
+  (eng D10-4).
 
 | Layer | What | Count |
 | --- | --- | --- |
@@ -383,7 +501,10 @@ pilot's identity cleanup effort; 215 is independent once TASK-191 ships.
 | Pro Xtra import | Same or overlapping export again | Dedupe key | Yes | Rows counted as duplicates |
 | Pro Xtra import | Return or $0 line | Skipped, listed | Yes | Reason "return" or "$0" |
 | Receipt re-parse | New line IDs | Content fingerprint, supersede | Yes | No change in counts |
-| Receipt + CSV | Same purchase twice | Counted once only with shared transaction number; look-alikes kept as review candidates | Yes | "Possible duplicate" to confirm |
+| Receipt + CSV | Same purchase twice | Linked only by shared transaction ID; look-alike CSV trips staged out of expenses, job cost and prices until confirmed | Yes | "Possible match, review" |
+| Store purchase import | Sale purchase | Recorded as sale, not default price while a regular price exists | Yes | "Also bought on sale for $X" |
+| Receipt parse | Re-parse or concurrent re-parse | Numbered revisions, lock per receipt | Yes | Nothing (current revision shown) |
+| Formula line | Measurement changed | Recalculate, clear cost confirmation and acknowledgment | Yes | "Costs need confirming again" |
 | Receipt OCR | Lines do not add up after tax, discounts and returns | Observations capped at Low | Yes | "Low: receipt not reconciled" |
 | Catalog edit | Price without source | 422 | Yes | "Enter the observed price and source" |
 | Cache recompute | Concurrent imports | Per-item lock, same transaction | Yes | Nothing (consistent) |
@@ -394,17 +515,49 @@ pilot's identity cleanup effort; 215 is independent once TASK-191 ships.
 
 No critical gaps: every row is handled, tested and visible.
 
+## Engineering review decisions (2026-10-26)
+
+| # | Decision |
+| --- | --- |
+| E1 | Proceed with the CEO-reduced scope; simplify through reuse |
+| E2 | One import path: the store purchase import; retire `/materials/import` and `hd-import.ts` |
+| E3 | The catalog row is the product variant, unique per account, store family and SKU |
+| E4 | One `paintQuantity` function; Prepare Quote prices paint from the chosen product |
+| E5 | Only a shared transaction ID links a CSV trip to a receipt automatically; everything else is reviewed, with "Confirm selected" |
+| E6 | "Package size needed" fixed inline on the quote line, plus a catalog filter |
+| E7 | Possible-match CSV trips are staged out of expenses, job cost and prices until confirmed |
+| E8 | Sale purchases are evidence, not the default price while a regular price exists |
+| E9 | Paint rule: grouped by exact product, tint, sheen and application, waste once, round once |
+| E10 | Outside-voice fixes accepted: transaction-scoped keys, importer extensions, signed returns and discounts, recalculation inputs, receipt parse revisions |
+
+## Parallel work
+
+| Step | Modules | Depends on |
+| --- | --- | --- |
+| TASK-210 ledger | db/migrations, lib/materials | #720 (TASK-190) |
+| TASK-211 imports | lib/expenses, api/v1/expenses/import, lib/materials | TASK-210 |
+| TASK-212 package sizes | lib/materials, app/materials, estimate line UI | TASK-210 |
+| TASK-213 confidence | packages/domain, lib/materials | TASK-210, #720 (TASK-194) |
+| TASK-214 paint pilot | packages/domain (painting, production-takeoff, engine), lib/estimates | TASK-212, TASK-213 |
+| TASK-215 hours | app/jobs | #720 (TASK-191) |
+
+Lanes: TASK-210 first. Then lane A: TASK-211 (lib/expenses) and lane B:
+TASK-212 then TASK-213 (lib/materials) in parallel. Lanes A and B both touch
+`lib/materials`; keep the catalog recompute function owned by TASK-210 so
+they only call it. Then TASK-214. TASK-215 can run any time after #720's
+TASK-191.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR (HOLD SCOPE) | 11 decisions (D1-D11), 0 critical gaps |
-| Codex Review | outside voice | Independent 2nd opinion | 1 | issues_found, resolved | 10 findings: 8 accepted as fixes, 2 tensions decided by owner (D9, D10) |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | not run | required before implementation |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | not run | recommended (evidence labels, verify-today, import report, package prompt, hours) |
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR (HOLD SCOPE) | 11 decisions, 0 critical gaps |
+| Codex Review | outside voice | Independent 2nd opinion | 2 | issues_found, resolved | CEO pass: 10 findings (8 fixes, 2 owner decisions); eng pass: 8 findings (5 fixes, 3 owner decisions), all code claims verified |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 10 issues (architecture 2, code quality 1, screens 2, outside voice 5), 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | not run | focused screen review done inside eng review; full design review optional |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | not run | n/a |
 
-- **CROSS-MODEL:** Codex found four code-verified defects the first pass missed (receipt line IDs change on re-parse, catalog edit bypasses the ledger, unreconciled receipts still teach prices, word-overlap product matching); all folded in as D11.
-- **VERDICT:** CEO CLEARED for owner approval of scope and roadmap change; eng review required before implementation.
+- **CROSS-MODEL:** Codex's eng pass found that the chosen import path lacked Store Number parsing and expense line items, that receipt parsing drops returns, that paint math differs between the engine and Prepare Quote, and that a sale-price safeguard would be lost; all verified in code and folded in (E7 to E10).
+- **VERDICT:** CEO + ENG CLEARED at plan level. Implementation still waits for the owner's approval of this document and the ROADMAP text, and for PR #720.
 
 NO UNRESOLVED DECISIONS
