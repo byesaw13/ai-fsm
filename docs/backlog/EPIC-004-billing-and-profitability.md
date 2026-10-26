@@ -9,10 +9,6 @@ of what each job actually earned.
 
 See [TASK-208-change-order-baseline.md](./TASK-208-change-order-baseline.md). Same reference-only baseline and send rules as TASK-188, applied to change orders. After TASK-188.
 
-# TASK-196: Convert to invoice copies only the right lines, and lines add up
-
-See [TASK-196-invoice-convert-integrity.md](./TASK-196-invoice-convert-integrity.md). High. No hidden or unchosen-option lines on the invoice; risk and manual travel get lines so lines sum to the total.
-
 # TASK-198: Keep the deposit rule when it works out to $0 at create
 
 See [TASK-198-deposit-rule-kept-at-create.md](./TASK-198-deposit-rule-kept-at-create.md). Medium. Store the owner's deposit rule, not the $0 result, so a materials deposit appears once materials are added.
@@ -46,6 +42,7 @@ See [TASK-139-paid-invoice-closes-job.md](./TASK-139-paid-invoice-closes-job.md)
 See [TASK-136-done-invoice-from-complete.md](./TASK-136-done-invoice-from-complete.md). Parent TASK-133. Field Complete + done uses `createDraftFinalInvoiceForJob` with named labor, materials rollup, dumping line.
 
 ## Completed
+- [TASK-196: Convert to invoice copies only the right lines, and lines add up](../archive/backlog-done/TASK-196-invoice-convert-integrity.md) — Done (#723, e7b27ef9, verified 2026-10-26)
 - [TASK-154: Reopen and edit a partially paid invoice](../archive/backlog-done/TASK-154-edit-partially-paid-invoice.md) — Done (#681, 2026-09-23)
 - [TASK-127: Pricing reconciliation](../archive/backlog-done/TASK-127-pricing-reconciliation.md) — Done (validated 2026-09-09)
 

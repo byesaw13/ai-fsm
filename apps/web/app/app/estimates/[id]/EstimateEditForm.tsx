@@ -58,7 +58,7 @@ interface InitialOption {
   description: string;
   is_recommended: boolean;
   sort_order: number;
-  line_items: { description: string; quantity: number; unit_price_cents: number }[];
+  line_items: { description: string; quantity: number; unit_price_cents: number; unit_cost_cents?: number | null; line_item_type?: LineItemRow["line_item_type"] }[];
 }
 
 interface EstimateEditFormProps {
@@ -899,10 +899,12 @@ function TierEditor({
       description: opt.description,
       is_recommended: opt.is_recommended,
       line_items: opt.line_items.length > 0
-        ? opt.line_items.map((li) => ({
+        ? opt.line_items.map((li) => savedLineToRow({
             description: li.description,
-            quantity: String(li.quantity),
-            unit_price: centsToDisplayDollars(li.unit_price_cents),
+            quantity: li.quantity,
+            unit_price_cents: li.unit_price_cents,
+            unit_cost_cents: li.unit_cost_cents,
+            line_item_type: li.line_item_type,
           }))
         : [{ description: "", quantity: "1", unit_price: "0.00" }],
     }))
@@ -945,12 +947,7 @@ function TierEditor({
         sort_order: idx,
         line_items: tier.line_items
           .filter((li) => li.description.trim())
-          .map((li, liIdx) => ({
-            description: li.description.trim(),
-            quantity: parseFloat(li.quantity) || 1,
-            unit_price_cents: Math.round((parseFloat(li.unit_price) || 0) * 100),
-            sort_order: liIdx,
-          })),
+          .map((li, liIdx) => rowToLineItemPayload({ ...li, description: li.description.trim() }, liIdx)),
       }));
 
       const res = await fetch(`/api/v1/estimates/${estimateId}`, {

@@ -9,6 +9,7 @@ import { PriceBookSelector } from "@/components/PriceBookSelector";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { getMaterialsByCategory, type MaterialSuggestion } from "@ai-fsm/domain";
 import { formatCents } from "@/lib/estimates/pricing";
+import { generatorMaterialRow } from "@/lib/estimates/form-helpers";
 import { PaintingEstimatorSection } from "../../components/PaintingEstimatorSection";
 import { EstimateTierEditor } from "../../components/EstimateTierEditor";
 import { LineItemsTable } from "../../components/LineItemsTable";
@@ -785,12 +786,10 @@ export function Step2Pricing({
                         // can be reconciled against the delta at submit time.
                         const keys = matItems.map(() => crypto.randomUUID());
                         addBulkLineItems(
-                          matItems.map((m, i) => ({
-                            description: `${m.name}${m.brand ? ` (${m.brand})` : ""} — ${m.quantity} ${m.unit}`,
-                            quantity: "1",
-                            unit_price: (m.total_cost_cents / 100).toFixed(2),
-                            ai_delta_key: m.ai_quantity !== undefined ? keys[i] : undefined,
-                          }))
+                          matItems.map((m, i) => generatorMaterialRow(
+                            m,
+                            m.ai_quantity !== undefined ? keys[i] : undefined,
+                          ))
                         );
                         // Capture the AI-proposed vs. founder-edited delta for
                         // items that came from the generator (have an AI

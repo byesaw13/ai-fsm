@@ -9,6 +9,7 @@ import {
 } from "@ai-fsm/domain";
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import type { PriceBookEntry } from "@/app/app/estimates/new/hooks/useEstimatePriceBook";
+import { materialMarkupPct } from "@/lib/estimates/cost-split";
 
 // ---------------------------------------------------------------------------
 // Shared types for estimate forms (new + edit) and their hooks
@@ -21,6 +22,8 @@ export interface LineItemRow {
   price_book_id?: string;
   /** Kept from the saved line so an edit-form save does not reclassify it. */
   line_item_type?: "labor" | "materials" | "handling_fee" | "adjustment";
+  /** What this materials line cost. The customer price stays on unit_price. */
+  unit_cost_cents?: number | null;
   visible_to_customer?: boolean;
   adjustment_type?: string | null;
   /** Prepared-scope group that produced the line; Apply to quote replaces it (TASK-179). */
@@ -57,6 +60,28 @@ export function lineTotal(row: LineItemRow): number {
   return Math.round(qty * parseCents(row.unit_price));
 }
 
+/** Price that still receives the form's automatic handling. A marked-up line contributes nothing. */
+export function handlingPriceCents(row: LineItemRow): number {
+  const price = parseCents(row.unit_price);
+  if (materialMarkupPct({ unit_price_cents: price, unit_cost_cents: row.unit_cost_cents ?? null }) != null) return 0;
+  return lineTotal(row);
+}
+
+/** Materials generator hand-off: one line, price equal to cost, cost kept. */
+export function generatorMaterialRow(
+  item: { name: string; brand?: string | null; quantity: number; unit: string; total_cost_cents: number },
+  aiDeltaKey?: string,
+): LineItemRow {
+  return {
+    description: `${item.name}${item.brand ? ` (${item.brand})` : ""} — ${item.quantity} ${item.unit}`,
+    quantity: "1",
+    unit_price: (item.total_cost_cents / 100).toFixed(2),
+    line_item_type: "materials",
+    unit_cost_cents: item.total_cost_cents,
+    ...(aiDeltaKey ? { ai_delta_key: aiDeltaKey } : {}),
+  };
+}
+
 export function mapPrepLevel(level: number): PrepLevel {
   if (level <= 3) return "none";
   if (level <= 5) return "minor";
@@ -75,6 +100,7 @@ export interface SavedLineItem {
   description: string;
   quantity: number;
   unit_price_cents: number;
+  unit_cost_cents?: number | null;
   line_item_type?: LineItemRow["line_item_type"];
   visible_to_customer?: boolean;
   adjustment_type?: string | null;
@@ -88,6 +114,7 @@ export function savedLineToRow(item: SavedLineItem): LineItemRow {
     description: item.description,
     quantity: String(item.quantity),
     unit_price: (item.unit_price_cents / 100).toFixed(2),
+    ...(item.unit_cost_cents != null ? { unit_cost_cents: item.unit_cost_cents } : {}),
     ...(item.price_book_id ? { price_book_id: item.price_book_id } : {}),
     ...(item.line_item_type ? { line_item_type: item.line_item_type } : {}),
     ...(item.visible_to_customer !== undefined ? { visible_to_customer: item.visible_to_customer } : {}),
@@ -108,6 +135,7 @@ export function rowToLineItemPayload(row: LineItemRow, index: number) {
     quantity: parseFloat(row.quantity) || 1,
     unit_price_cents: parseCents(row.unit_price),
     sort_order: index,
+    ...(row.unit_cost_cents != null ? { unit_cost_cents: row.unit_cost_cents } : {}),
     ...(row.line_item_type ? { line_item_type: row.line_item_type } : {}),
     ...(row.visible_to_customer !== undefined ? { visible_to_customer: row.visible_to_customer } : {}),
     ...(row.adjustment_type ? { adjustment_type: row.adjustment_type } : {}),

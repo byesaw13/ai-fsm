@@ -1,7 +1,7 @@
 # TASK-190: Materials cost field, and materials booked as materials cost
 
 Status:
-Proposed
+In progress
 
 Epic:
 EPIC-002 Estimating & Assessments

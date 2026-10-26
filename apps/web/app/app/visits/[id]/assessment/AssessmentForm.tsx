@@ -18,6 +18,7 @@ import { writeAssessmentContext } from "@/lib/estimates/assessment-context";
 import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGenerator";
 import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
 import { buildAiMaterialsDelta } from "@/lib/estimates/materials-delta";
+import { generatorMaterialRow } from "@/lib/estimates/form-helpers";
 import { areaCaptureStatus, areaStatusLabel, assessmentAreaProgress } from "@/lib/assessments/area-status";
 import { roomGeometryLines } from "@/lib/assessments/room-geometry-display";
 import { completionToKeep } from "@/lib/assessments/completion";
@@ -948,12 +949,10 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
               // in-page MaterialsGenerator flow), so it must carry the AI-proposed vs.
               // founder-edited delta through independently (TASK T1, materials trust calibration).
               const keys = matItems.map(() => crypto.randomUUID());
-              const lineItems = matItems.map((m, i) => ({
-                description: `${m.name}${m.brand ? ` (${m.brand})` : ""} — ${m.quantity} ${m.unit}`,
-                quantity: "1",
-                unit_price: (m.total_cost_cents / 100).toFixed(2),
-                ai_delta_key: m.ai_quantity !== undefined ? keys[i] : undefined,
-              }));
+              const lineItems = matItems.map((m, i) => generatorMaterialRow(
+                m,
+                m.ai_quantity !== undefined ? keys[i] : undefined,
+              ));
               sessionStorage.setItem("estimate_prefill_materials", JSON.stringify(lineItems));
               const delta = buildAiMaterialsDelta(matItems, keys);
               if (delta.length > 0) {

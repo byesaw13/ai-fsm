@@ -2,7 +2,8 @@
 
 import { Button } from "@/components/ui";
 import { formatCents } from "@/lib/estimates/pricing";
-import { lineTotal, type LineItemRow } from "@/lib/estimates/form-helpers";
+import { lineTotal, parseCents, type LineItemRow } from "@/lib/estimates/form-helpers";
+import { markupLabel } from "@/lib/estimates/cost-split";
 
 interface LineItemsTableProps {
   items: LineItemRow[];
@@ -117,6 +118,17 @@ export function LineItemsTable({
                       disabled={disabled}
                       data-testid={`${p}line-item-price-${i}`}
                     />
+                    {markupLabel({
+                      unit_price_cents: parseCents(row.unit_price),
+                      unit_cost_cents: row.unit_cost_cents ?? null,
+                    }) && (
+                      <div className="muted" style={{ fontSize: "var(--text-xs)", marginTop: "var(--space-1)" }}>
+                        {markupLabel({
+                          unit_price_cents: parseCents(row.unit_price),
+                          unit_cost_cents: row.unit_cost_cents ?? null,
+                        })}
+                      </div>
+                    )}
                   </td>
                   <td style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", paddingLeft: "var(--space-2)" }}>
                     {row.unit_price.trim() === "" ? "Price needed" : formatCents(lineTotal(row))}

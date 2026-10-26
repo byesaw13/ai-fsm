@@ -71,6 +71,7 @@ export interface LineItemRow {
   description: string;
   quantity: number;
   unit_price_cents: number;
+  unit_cost_cents: number | null;
   total_cents: number;
   line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
   visible_to_customer: boolean;
@@ -172,7 +173,7 @@ export async function loadEstimateDetail(
     if (estimateResult.rowCount === 0) return null;
 
     const lineItemsResult = await client.query(
-      `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, total_cents, line_item_type,
+      `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, unit_cost_cents, total_cents, line_item_type,
               visible_to_customer, adjustment_type, price_book_id, prepared_group_key, sort_order, created_at
        FROM estimate_line_items
        WHERE estimate_id = $1

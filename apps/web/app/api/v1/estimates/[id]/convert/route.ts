@@ -121,7 +121,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       //    lines fold into one Included work line. Risk and a non-snapshot
       //    travel surcharge become their own lines so the lines add up.
       const lineItemsResult = await client.query(
-        `SELECT id, option_id, description, quantity, unit_price_cents, total_cents, sort_order,
+        `SELECT id, option_id, description, quantity, unit_price_cents, unit_cost_cents, total_cents, sort_order,
                 adjustment_type, visible_to_customer
          FROM estimate_line_items
          WHERE estimate_id = $1
@@ -134,6 +134,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         description: string;
         quantity: string | number;
         unit_price_cents: string | number;
+        unit_cost_cents: string | number | null;
         total_cents: string | number;
         sort_order: string | number;
         adjustment_type: string | null;
@@ -144,6 +145,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         description: item.description,
         quantity: Number(item.quantity),
         unit_price_cents: Number(item.unit_price_cents),
+        unit_cost_cents: item.unit_cost_cents == null ? null : Number(item.unit_cost_cents),
         total_cents: Number(item.total_cents),
         sort_order: Number(item.sort_order),
         adjustment_type: item.adjustment_type,
@@ -272,8 +274,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       for (const item of lineItems) {
         await client.query(
           `INSERT INTO invoice_line_items
-             (invoice_id, estimate_line_item_id, description, quantity, unit_price_cents, total_cents, sort_order)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+             (invoice_id, estimate_line_item_id, description, quantity, unit_price_cents, total_cents, sort_order,
+              unit_cost_cents)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [
             invoiceId,
             item.estimate_line_item_id,
@@ -282,6 +285,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             item.unit_price_cents,
             item.total_cents,
             item.sort_order,
+            item.unit_cost_cents,
           ]
         );
       }

@@ -4,7 +4,6 @@ import { withEstimateContext, calcTotals, lineItemTotal } from "@/lib/estimates/
 import {
   computeEstimate,
   sqftPaintingToSpec,
-  ENGINE_VERSION,
   estimateAdjustmentTypeSchema,
   estimateFinishExpectationSchema,
   estimateMinimumOverrideReasonSchema,
@@ -12,6 +11,8 @@ import {
   type EstimateSpec,
   type PreparedScope,
 } from "@ai-fsm/domain";
+import { defaultMaterialPrice, linePriceMissing, splitInternalCosts } from "@/lib/estimates/cost-split";
+import { explicitMaterialDepositCents } from "@/lib/estimates/itemized-preserve";
 import { logger } from "@/lib/logger";
 import { reviewEstimateGuardrails, computeConditionTier } from "@/lib/estimates/guardrails";
 import { computeAndPersist } from "@/lib/estimates/compute";
@@ -32,12 +33,23 @@ import type { AuthSession } from "@/lib/auth/middleware";
 const lineItemInputSchema = z.object({
   description: z.string().min(1),
   quantity: z.number().positive(),
-  unit_price_cents: z.number().int().nonnegative(),
+  unit_price_cents: z.number().int().nonnegative().optional(),
+  unit_cost_cents: z.number().int().nonnegative().nullable().optional(),
+  /** Used for labor cost when sent. Stored with the line in TASK-191. */
+  hours_high: z.number().nonnegative().nullable().optional(),
   line_item_type: z.enum(["labor", "materials", "handling_fee", "adjustment"]).default("labor"),
   visible_to_customer: z.boolean().default(true),
   adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
   sort_order: z.number().int().default(0),
   price_book_id: z.string().uuid().nullable().optional(),
+}).superRefine((item, ctx) => {
+  if (linePriceMissing(item)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Enter a price, or a cost on a materials line",
+      path: ["unit_price_cents"],
+    });
+  }
 });
 
 const estimateOptionInputSchema = z.object({
@@ -154,11 +166,11 @@ export async function createEstimate(
     terms_scope_accepted,
     terms_payment_accepted,
     terms_change_order_accepted,
-    line_items,
+    line_items: rawLineItems,
     flat_rate_cents,
     presentation_mode,
     pricing_mode,
-    options,
+    options: rawOptions,
     sq_ft,
     prep_level,
     includes_trim,
@@ -183,6 +195,12 @@ export async function createEstimate(
     scope_snapshots,
     booking_request_id,
   } = input;
+
+  const line_items = rawLineItems.map(defaultMaterialPrice);
+  const options = rawOptions?.map((option) => ({
+    ...option,
+    line_items: option.line_items.map(defaultMaterialPrice),
+  }));
 
   const is_painting = sq_ft !== undefined && prep_level !== undefined && labor_hours_estimate !== undefined;
   const is_multi_option = presentation_mode === "multi_option" && options && options.length > 0;
@@ -218,6 +236,7 @@ export async function createEstimate(
   let subtotal_cents: number;
   let computed_line_items = line_items;
   let internal_labor_cost_cents: number | null = null;
+  let internal_material_cost_cents: number | null = material_cost_cents ?? null;
   let margin_pct: number | null = null;
 
   if (is_painting) {
@@ -252,45 +271,31 @@ export async function createEstimate(
     }
   } else {
     subtotal_cents = calcTotals(line_items).subtotal_cents;
-    // Itemized / T&M: map labor vs materials so margin uses cost rates correctly
-    const engine = computeEstimate(
-      {
-        engineVersion: ENGINE_VERSION,
-        type: "general",
-        lineItems: line_items.map((item, i) => {
-          const isMaterials =
-            item.line_item_type === "materials" || item.line_item_type === "handling_fee";
-          if (isMaterials) {
-            // Materials: no labor rate conversion — cost = billed materials
-            return {
-              id: `li-${i}`,
-              description: item.description,
-              quantity: 1,
-              unit: "flat" as const,
-              unitLaborCents: 0,
-              materialCents: Math.round(item.quantity * item.unit_price_cents),
-            };
-          }
-          return {
-            id: `li-${i}`,
-            description: item.description,
-            quantity: item.quantity,
-            unit: "unit" as const,
-            unitLaborCents: item.unit_price_cents,
-          };
-        }),
-      },
-      pricingRules
-    );
-    internal_labor_cost_cents = engine.internalSummary.estimatedCostCents;
-    margin_pct = engine.internalSummary.grossMarginPct;
+    // Itemized: labor and materials cost stay apart. The engine's 15% handling
+    // line is not billed, so it is not part of this margin.
+    const split = splitInternalCosts(line_items, {
+      billingCents: pricingRules.laborBillingCentsPerHour,
+      costCents: pricingRules.laborCostCentsPerHour,
+    });
+    internal_labor_cost_cents = split.laborCostCents;
+    internal_material_cost_cents = split.materialCostCents;
+    margin_pct = split.marginPct;
   }
   subtotal_cents += travel_surcharge_cents + risk_adjustment_cents;
   const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
   const total_cents = subtotal_cents + tax_cents;
+  const materialsLineCount = line_items.filter(
+    (line) => line.line_item_type === "materials",
+  ).length;
   const materialBasisCents = is_painting
     ? material_cost_cents ?? 0
-    : estimateMaterialsDepositBasis(line_items, material_cost_cents ?? 0);
+    : estimateMaterialsDepositBasis(
+        line_items,
+        explicitMaterialDepositCents({
+          materialsLineCount,
+          aggregateCents: material_cost_cents ?? 0,
+        }),
+      );
   const depositPolicy = calculateDepositPolicy({
     deposit_required,
     deposit_type,
@@ -387,7 +392,7 @@ export async function createEstimate(
         includes_trim ?? false,
         includes_ceiling ?? false,
         internal_labor_cost_cents,
-        material_cost_cents ?? null,
+        internal_material_cost_cents,
         trip_count,
         requires_drying_or_curing,
         difficult_access,
@@ -435,8 +440,9 @@ export async function createEstimate(
           await client.query(
             `INSERT INTO estimate_line_items
                (estimate_id, option_id, description, quantity, unit_price_cents, total_cents,
-                line_item_type, visible_to_customer, adjustment_type, sort_order, price_book_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                line_item_type, visible_to_customer, adjustment_type, sort_order, price_book_id,
+                unit_cost_cents)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
             [
               estimateId,
               optionId,
@@ -449,6 +455,7 @@ export async function createEstimate(
               item.adjustment_type ?? null,
               item.sort_order ?? li,
               item.price_book_id ?? null,
+              item.unit_cost_cents ?? null,
             ]
           );
         }
@@ -462,8 +469,8 @@ export async function createEstimate(
           `INSERT INTO estimate_line_items
              (estimate_id, description, quantity, unit_price_cents, total_cents,
               line_item_type, visible_to_customer, adjustment_type, sort_order, price_book_id,
-              prepared_group_key)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+              prepared_group_key, unit_cost_cents)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
           [
             estimateId,
             item.description,
@@ -476,6 +483,7 @@ export async function createEstimate(
             item.sort_order ?? i,
             item.price_book_id ?? null,
             extra.lineGroupKeys?.[i] ?? null,
+            item.unit_cost_cents ?? null,
           ]
         );
       }
@@ -535,6 +543,9 @@ export async function createEstimate(
         accountId: session.accountId,
         spec: engine_spec as unknown as EstimateSpec,
         rules: pricingRules,
+        // The new-estimate form always sends a general spec. Replacing the
+        // rows would turn materials back into labor and drop their cost.
+        preserveItemizedLines: !is_painting && !is_multi_option && flat_rate_cents === undefined,
       });
     } catch (engErr) {
       logger.error("Engine compute failed after insert", engErr, { estimateId: estimate });

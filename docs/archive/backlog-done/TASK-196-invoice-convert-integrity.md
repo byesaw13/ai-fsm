@@ -1,7 +1,7 @@
 # TASK-196: Convert to invoice copies only the right lines, and lines add up
 
 Status:
-In progress
+Done (#723, e7b27ef9, verified 2026-10-26)
 
 Epic:
 EPIC-004 Billing & Profitability
@@ -31,9 +31,9 @@ Scope:
   invoice lines sum to the invoice subtotal.
 
 Acceptance Criteria:
-- [ ] For every converted estimate, sum(invoice lines) = invoice subtotal.
-- [ ] No line marked hidden on the estimate appears by its own text.
-- [ ] Converting Good/Better/Best with Better chosen copies only Better's lines.
+- [x] For every converted estimate, sum(invoice lines) = invoice subtotal.
+- [x] No line marked hidden on the estimate appears by its own text.
+- [x] Converting Good/Better/Best with Better chosen copies only Better's lines.
 
 Related:
 TASK-183, TASK-192 (equipment type survives convert).

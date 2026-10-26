@@ -26,7 +26,7 @@ import {
 import { useEstimatePriceBook } from "./useEstimatePriceBook";
 import { useEstimateTiers } from "./useEstimateTiers";
 import {
-  parseCents, lineTotal, mapPrepLevel,
+  parseCents, lineTotal, handlingPriceCents, mapPrepLevel,
   EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
   buildManualShoppingList,
 
@@ -704,12 +704,13 @@ export function useEstimateForm({
             description: `Materials — ${item.service.name}`,
             quantity: 1,
             unit_price_cents: scopeResults[item.instanceId].materialTotalCents,
+            unit_cost_cents: scopeResults[item.instanceId].materialTotalCents,
             line_item_type: "materials" as const,
             visible_to_customer: true,
             sort_order: priceBookLineItems.length + manualItems.length + i,
           }));
         const totalMaterialsForHandling =
-          materialLineItems.reduce((sum, row) => sum + lineTotal(row), 0) + scopeMatCents;
+          materialLineItems.reduce((sum, row) => sum + handlingPriceCents(row), 0) + scopeMatCents;
         const handlingLineItems =
           totalMaterialsForHandling > 0
             ? [{
@@ -727,6 +728,8 @@ export function useEstimateForm({
             description: row.description,
             quantity: parseFloat(row.quantity) || 1,
             unit_price_cents: parseCents(row.unit_price),
+            ...(row.line_item_type ? { line_item_type: row.line_item_type } : {}),
+            ...(row.unit_cost_cents != null ? { unit_cost_cents: row.unit_cost_cents } : {}),
             sort_order: priceBookLineItems.length + i,
             price_book_id: row.price_book_id,
             price_book_code: undefined as string | undefined,

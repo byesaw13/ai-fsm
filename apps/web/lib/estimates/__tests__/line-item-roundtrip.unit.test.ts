@@ -48,6 +48,24 @@ describe("edit form line round trip", () => {
     expect(rowToLineItemPayload(row, 0)).toMatchObject({ unit_price_cents: 9000, line_item_type: "labor", prepared_group_key: "room1" });
   });
 
+  it("keeps a materials cost when the price is edited", () => {
+    const row = {
+      ...savedLineToRow({
+        description: "Paint",
+        quantity: 1,
+        unit_price_cents: 24_000,
+        unit_cost_cents: 20_000,
+        line_item_type: "materials",
+      }),
+      unit_price: "26.00",
+    };
+    expect(rowToLineItemPayload(row, 0)).toMatchObject({
+      unit_price_cents: 2600,
+      unit_cost_cents: 20_000,
+      line_item_type: "materials",
+    });
+  });
+
   it("a new row takes the API defaults and belongs to the owner", () => {
     expect(rowToLineItemPayload({ ...EMPTY_ROW, description: "Extra" }, 1)).toEqual({
       description: "Extra",

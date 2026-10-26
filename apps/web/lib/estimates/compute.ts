@@ -9,6 +9,7 @@ import { computeEstimate, CURRENT_RULES, ENGINE_VERSION, type PricingRules } fro
 import type { EstimateSpec, EstimateResult } from "@ai-fsm/domain";
 import { getPool, query } from "@/lib/db";
 import { calculateDepositPolicy } from "@/lib/estimates/deposit-policy";
+import { missingSurchargeLines } from "@/lib/estimates/itemized-preserve";
 import { loadPricingRules } from "@/lib/pricing/settings";
 import { laborCostCentsFromHours } from "@/lib/pricing/labor-hours";
 
@@ -18,6 +19,11 @@ export interface ComputeAndPersistArgs {
   spec: EstimateSpec;
   /** When omitted, loads account pricing settings from DB. */
   rules?: PricingRules;
+  /**
+   * The itemized rows already have their type and cost. Store the engine
+   * snapshot, and do not replace those rows or the cost split.
+   */
+  preserveItemizedLines?: boolean;
 }
 
 export interface ComputeAndPersistResult {
@@ -57,6 +63,29 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
   }
 
   const result = computeEstimate(spec, rules);
+
+  if (args.preserveItemizedLines) {
+    await query(
+      `UPDATE estimates SET
+         engine_spec       = $1,
+         engine_version    = $2,
+         rules_version     = $3,
+         computed_result   = $4,
+         last_computed_at  = NOW(),
+         updated_at        = NOW()
+       WHERE id = $5 AND account_id = $6`,
+      [
+        JSON.stringify(spec),
+        ENGINE_VERSION,
+        rules.version,
+        JSON.stringify(result),
+        estimateId,
+        accountId,
+      ]
+    );
+    await appendStoredSurchargeLines(estimateId);
+    return { result };
+  }
 
   const policyRows = await query<{
     deposit_required: boolean;
@@ -116,6 +145,40 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
   await syncLineItems(estimateId, result);
 
   return { result };
+}
+
+/** Travel and risk are already in the total. Put them on the line list without touching typed rows. */
+async function appendStoredSurchargeLines(estimateId: string): Promise<void> {
+  const [estimate] = await query<{ travel_surcharge_cents: number; risk_adjustment_cents: number }>(
+    `SELECT travel_surcharge_cents, risk_adjustment_cents FROM estimates WHERE id = $1`,
+    [estimateId]
+  );
+  if (!estimate) return;
+  const existing = await query<{ description: string }>(
+    `SELECT description FROM estimate_line_items WHERE estimate_id = $1`,
+    [estimateId]
+  );
+  const missing = missingSurchargeLines(
+    existing.map((row) => row.description),
+    estimate.travel_surcharge_cents,
+    estimate.risk_adjustment_cents,
+  );
+  if (missing.length === 0) return;
+  const [maxRow] = await query<{ max_sort: number }>(
+    `SELECT COALESCE(MAX(sort_order), -1)::int AS max_sort FROM estimate_line_items WHERE estimate_id = $1`,
+    [estimateId]
+  );
+  let sort = (maxRow?.max_sort ?? -1) + 1;
+  for (const line of missing) {
+    await query(
+      `INSERT INTO estimate_line_items
+         (estimate_id, description, quantity, unit_price_cents, total_cents,
+          line_item_type, visible_to_customer, sort_order, unit_cost_cents)
+       VALUES ($1, $2, 1, $3, $3, 'adjustment', true, $4, NULL)`,
+      [estimateId, line.description, line.amountCents, sort]
+    );
+    sort += 1;
+  }
 }
 
 async function syncLineItems(estimateId: string, result: EstimateResult): Promise<void> {

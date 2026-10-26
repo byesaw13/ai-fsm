@@ -19,6 +19,7 @@ export interface ConvertSourceLine {
   sort_order: number;
   adjustment_type: string | null;
   visible_to_customer: boolean;
+  unit_cost_cents?: number | null;
 }
 
 export interface InvoiceDraftLine {
@@ -28,6 +29,7 @@ export interface InvoiceDraftLine {
   unit_price_cents: number;
   total_cents: number;
   sort_order: number;
+  unit_cost_cents: number | null;
 }
 
 export interface InvoiceMoneyInput {
@@ -79,6 +81,7 @@ function adjustmentLine(description: string, cents: number, sortOrder: number): 
     unit_price_cents: cents,
     total_cents: cents,
     sort_order: sortOrder,
+    unit_cost_cents: null,
   };
 }
 
@@ -111,6 +114,7 @@ export function invoiceLinesFor(
     unit_price_cents: line.unit_price_cents,
     total_cents: line.total_cents,
     sort_order: line.sort_order,
+    unit_cost_cents: line.unit_cost_cents ?? null,
   }));
 
   if (hidden.length > 0) {

@@ -30,6 +30,13 @@ describe("approvedLines", () => {
     expect(approvedLines(lines, "better").map((row) => row.id)).toEqual(["shared", "better"]);
   });
 
+  it("copies a materials cost onto the invoice line", () => {
+    const drafted = invoiceLinesFor(estimateBase, [
+      line({ id: "paint", description: "Paint", total_cents: 24_000, unit_cost_cents: 20_000 }),
+    ]);
+    expect(drafted[0]).toMatchObject({ estimate_line_item_id: "paint", unit_cost_cents: 20_000 });
+  });
+
   it("keeps only shared lines when nothing is selected", () => {
     const lines = [
       line({ id: "shared", description: "Trip fee", total_cents: 5_000 }),

@@ -19,15 +19,16 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : A1 (TASK-197) verified on production at 2026-10-26
-                      22:06 UTC. Squash 1a8cc54c (#722). Health ok, /login
+Last step           : A2 (TASK-196) verified on production at 2026-10-26
+                      22:51 UTC. Squash e7b27ef9 (#723). Health ok, /login
                       HTTP/2 200, no redirect to 0.0.0.0:3000.
-In-flight PR        : #723 — A2 (TASK-196)
-Next step           : A2 (TASK-196)
+In-flight PR        : #724 — B1 (TASK-190)
+Next step           : B1 (TASK-190)
 Blocked on          : nothing
-Last known-good     : 1a8cc54c (branch deploy-good/1a8cc54c); previous ddd2a31b
-                      (branch deploy-good/ddd2a31b)
-Notes               : A2 in progress. A2 Implemented is recorded only after CI is green.
+Last known-good     : e7b27ef9 (branch deploy-good/e7b27ef9); previous 1a8cc54c
+                      (branch deploy-good/1a8cc54c)
+Notes               : B1 Implemented on #724. Merged and Deployed are recorded after they happen.
+                      A line's hours are accepted for the cost math and not stored (TASK-191).
 ```
 
 ## Owner approvals
@@ -100,9 +101,9 @@ docs-only commit after the event. Planned tests are not passing tests.
 | S0.3 | Merge #720 | n/a | 2026-10-26 (owner, ddd2a31b) | 2026-10-26 | 2026-10-26 (health ok, /login 200) |
 | S0.4 | Merge #721 | n/a | 2026-10-26 (owner, c0544597) | n/a | n/a |
 | A1 | TASK-197 | 2026-10-26 (CI 40406723540, #722) | 2026-10-26 (#722, 1a8cc54c) | 2026-10-26 (~22:05 UTC) | 2026-10-26 (health ok, /login 200, 22:06 UTC) |
-| A2 | TASK-196 | | | | |
+| A2 | TASK-196 | 2026-10-26 (CI 40413156570, 40413164445, #723) | 2026-10-26 (#723, e7b27ef9) | 2026-10-26 (~22:51 UTC) | 2026-10-26 (health ok, /login 200, 22:51 UTC) |
 | B0 | TASK-189 | doc in #720 | 2026-10-26 (#720) | n/a | n/a |
-| B1 | TASK-190 | | | | |
+| B1 | TASK-190 | 2026-10-26 (CI 40419939119, 40419947446, #724) | | | |
 | B2 | TASK-191 | | | | |
 | B3 | TASK-192 | | | | |
 | B4 | TASK-193 | | | | |
@@ -515,6 +516,12 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 
 One line per state change: date, step, state, PR, evidence.
 
+- 2026-10-26 · B1 · Implemented · #724 · CI runs 40419939119 and 40419947446 green (lint, typecheck, build, test, e2e-smoke) on c9a4e416
+- 2026-10-26 · B1 · In progress · #724 · materials cost separate from the customer price
+- 2026-10-26 · A2 · Verified · health ok and /login HTTP/2 200 at 22:51 UTC; known-good deploy-good/e7b27ef9
+- 2026-10-26 · A2 · Deployed · e7b27ef9 · web recreated and healthy ~22:51 UTC. No migration, so no backup. Worker image left as it was.
+- 2026-10-26 · A2 · Merged · #723 · squash e7b27ef9 at 22:44 UTC
+- 2026-10-26 · A2 · Implemented · #723 · CI runs 40413156570 and 40413164445 green (lint, typecheck, build, test, e2e-smoke) on 18270eb2
 - 2026-10-26 · S0.4 · Merged by owner (#721, c0544597). G0 active: owner comment on #721 at 21:29 UTC.
 - 2026-10-26 · A2 · In progress · #723 · chosen option plus shared lines; hidden lines fold; lines sum to the invoice subtotal
 - 2026-10-26 · A1 · Verified · health ok and /login HTTP/2 200 at 22:06 UTC; known-good deploy-good/1a8cc54c
