@@ -1,4 +1,4 @@
-# TASK-190: Book materials as materials cost when an estimate is created
+# TASK-190: Materials cost field, and materials booked as materials cost
 
 Status:
 Proposed
@@ -23,9 +23,16 @@ Fixture A: internal labor $6,962.50 = 110.25 h x $50 + $1,450 materials;
 internal materials $0, so the AI review reported "$0 materials".
 
 Scope:
+- `unit_cost_cents` on materials and equipment lines (migration 208), separate
+  from the customer price. The price defaults to the cost. A line priced above
+  cost shows its markup (for example "marked up 20%") and is excluded from
+  automatic handling. Handling stays a separate line. A materials or
+  equipment line with no cost is a missing direct cost for the send rules.
+- Every path that writes materials lines (create, PATCH, Apply to quote, the
+  materials generator hand-off, convert) carries the cost.
 - Itemized create: labor cost = labor lines only (line hours x cost rate when
   hours exist, else price / billing rate x cost rate); materials cost = sum of
-  materials lines; handling-fee, adjustment and travel lines are neither labor
+  materials line costs; handling-fee, adjustment and travel lines are neither labor
   nor materials cost; no phantom handling in the margin.
 - Margin percentage uses the same split.
 
@@ -37,7 +44,10 @@ Acceptance Criteria:
       internal_material_cost_cents 145000 and internal_labor_cost_cents 551250.
 - [ ] A handling-fee line changes neither cost field.
 - [ ] Margin percentage has no handling revenue that is not on the quote.
+- [ ] A materials line with cost $200 and price $240 shows "marked up 20%",
+      gets no automatic handling, and counts $200 as materials cost.
+- [ ] A new materials line with only a cost entered gets price = cost.
 - [ ] Unit tests for each line type.
 
 Effort:
-0.5 day.
+1.5 days.

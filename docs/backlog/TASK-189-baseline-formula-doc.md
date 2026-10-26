@@ -23,15 +23,19 @@ Scope:
   materials at cost, handling only when turned on, equipment, travel once,
   other direct costs, effective labor rate on high-end hours against the cost
   floor); what the selling rate covers (labor cost, overhead, profit); the
-  send rules (incomplete is a draft state, never a bypass); double-count rules
+  send rules (incomplete is a draft state, never a bypass); travel hours;
+  materials cost vs price; the existing Massachusetts rule; double-count rules
   (setup, protection, cleanup and travel are one line each at the right scope;
   an extra setup line is allowed when a separate visit or work area needs it).
 - The Fixture A worked example.
 
 Acceptance Criteria:
-- [ ] The doc exists and is linked from TASK-188 and `docs/working/system-map.md`.
-- [ ] Recomputing the worked example by hand from the doc gives $8,908.75 /
-      $10,800.00 / $12,691.25, gap +$21.25 (+0.20%), effective rate $70.86/h.
+- [x] The doc exists at `docs/working/hourly-baseline.md` and is linked from
+      TASK-188 (owner decision 2026-10-26: no system-map link).
+- [ ] Every worked example (A to G) lists all of its inputs, and recomputing
+      each by hand from those inputs gives the stated results (Example A:
+      $8,908.75 / $10,800.00 / $12,691.25, gap +$21.25 (+0.20%), effective
+      rate $70.86/h).
 - [ ] The owner has read and approved it before TASK-191 to TASK-195 start.
 
 Effort:

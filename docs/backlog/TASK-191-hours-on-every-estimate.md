@@ -31,6 +31,9 @@ Scope:
 - Drafts save with missing hours as null, never 0. UI labels them person-hours,
   with the hint "2 painters x 8 h = 16 h".
 - Carry hours through PATCH, create, Apply and the edit form.
+- Travel-time line: hours from the travel calculation (billable travel minutes
+  / 60), source travel_calc, editable; counted once in the baseline hours.
+  Mileage, tolls and parking stay other direct costs.
 - Every creation path in TASK-188 "Creation paths and coverage" passes hours
   and sources:
   - Quick estimate wizard and Fix now: an hours field (low-high person-hours)
@@ -55,6 +58,8 @@ Acceptance Criteria:
       call Send until hours and direct costs are complete.
 - [ ] Fix now shows the hours field before Send.
 - [ ] Coverage tests for paths 1-11 pass.
+- [ ] A travel calculation of 60 billable minutes gives the travel-time line
+      1-1 h, source travel_calc (doc Example F).
 - [ ] A blank hours field saves as null and reloads blank.
 - [ ] Adding price-book item with typical 2 h shows 2 h, source price_book;
       editing it to 3 h shows source owner.
