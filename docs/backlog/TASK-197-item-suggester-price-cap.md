@@ -1,4 +1,4 @@
-# TASK-197: AI line suggestions cannot set their own price
+# TASK-197: AI line suggestions never set a price
 
 Status:
 Proposed
@@ -19,13 +19,16 @@ when an item has no default price, the model's number is used with no upper
 limit at `price_max_cents`.
 
 Scope:
-- Price = the item's default price; else the model's number clamped to
-  [price_min_cents, price_max_cents] (min only when no max); the suggestion
-  shows "AI price, check" when the model's number was used.
+Owner decision (2026-10-26): the AI never sets or proposes a price.
+- Price = the item's default price; else its minimum price; else no price,
+  shown as "Price needed" (a missing cost for the send checklist).
+- The model's price is never read; the suggestion tool no longer asks the
+  model for a price.
 
 Acceptance Criteria:
-- [ ] A model price of $9,999 on an item ranged $100-$300 becomes $300.
-- [ ] Items with a default price ignore the model's price.
+- [ ] An item with a default price uses it; with no default but a minimum,
+      uses the minimum; with neither, has no price and shows "Price needed".
+- [ ] A model response containing a price never changes the line's price.
 
 Related:
 TASK-204.

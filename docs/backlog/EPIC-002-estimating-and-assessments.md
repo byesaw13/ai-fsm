@@ -5,6 +5,14 @@ re-keying, and keeping estimate structure consistent across jobs.
 
 ## Active tasks
 
+## Estimating assistant, Phase 3 slice (TASK-209 to TASK-216)
+
+Approved by the owner 2026-10-26. Design: `docs/working/estimating-assistant-phase3.md`.
+Foundation plus paint pilot first; the four other formula families follow only
+after the pilot passes. Starts after PR #720 merges.
+
+- [TASK-209: Estimating assistant, Phase 3 slice (parent)](TASK-209-estimating-assistant-phase3.md) — children TASK-210 to TASK-216.
+
 ## Hourly baseline and estimate audit (TASK-188 to TASK-206)
 
 Owner decisions 2026-10-26: every estimate is compared with the company's
@@ -14,7 +22,7 @@ way past the send rules. Audit findings from the same day are filed as
 separate tasks by severity.
 
 - [TASK-188: Hourly baseline on every estimate (parent)](TASK-188-hourly-baseline-every-estimate.md) — children TASK-189 to TASK-195, in order.
-- [TASK-197: AI line suggestions cannot set their own price](TASK-197-item-suggester-price-cap.md) — High.
+- [TASK-197: AI line suggestions never set a price](TASK-197-item-suggester-price-cap.md) — High.
 - [TASK-199: Painting edit prices lines with the account's rates](TASK-199-painting-edit-account-rates.md) — Medium, latent.
 - [TASK-200: Multi-option estimates keep correct totals and line types](TASK-200-multi-option-create-edit.md) — Medium, latent.
 - [TASK-201: Room-by-room engine path is atomic and keeps adjustments](TASK-201-engine-path-atomic.md) — Medium, latent.

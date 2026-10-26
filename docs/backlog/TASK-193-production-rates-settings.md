@@ -24,7 +24,9 @@ Scope:
 - Settings (owner/admin): view and edit rates and modifiers; `calibrated` and
   `calibrated_at` per row, default false.
 - The square-foot calculator produces hours from rates: quantity / rate
-  (per-hour units) or quantity / rate x 8 (per-day units), times
+  (per-hour units) or quantity / rate x hours per day (per-day units; an
+  editable Settings value, default 8, shown next to each conversion; owner
+  decision 2026-10-26), times
   (1 + sum of applied modifier percentages) for prep, tall walls and cutting
   around built-ins. Each line saves the rate id, value, unit, modifiers and
   calibration state.

@@ -103,7 +103,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-209**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-217**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -179,7 +179,7 @@ closed in tests; owner-flow AC still open.
 | TASK-194 | [Baseline panel, send rules and freeze at send](TASK-194-baseline-panel-send-rules.md) | 002 | Proposed |
 | TASK-195 | [Rewrite the estimate review around the baseline](TASK-195-review-rewrite.md) | 002 | Proposed |
 | TASK-196 | [Convert to invoice copies only the right lines, and lines add up](TASK-196-invoice-convert-integrity.md) | 004 | Proposed |
-| TASK-197 | [AI line suggestions cannot set their own price](TASK-197-item-suggester-price-cap.md) | 002 | Proposed |
+| TASK-197 | [AI line suggestions never set a price](TASK-197-item-suggester-price-cap.md) | 002 | Proposed |
 | TASK-198 | [Keep the deposit rule when it works out to $0 at create](TASK-198-deposit-rule-kept-at-create.md) | 004 | Proposed |
 | TASK-199 | [Painting edit prices lines with the account's rates](TASK-199-painting-edit-account-rates.md) | 002 | Proposed |
 | TASK-200 | [Multi-option estimates keep correct totals and line types](TASK-200-multi-option-create-edit.md) | 002 | Proposed |
@@ -191,6 +191,14 @@ closed in tests; owner-flow AC still open.
 | TASK-206 | [Estimate API cleanup and stale sent estimates](TASK-206-estimate-api-cleanup.md) | 002 | Proposed |
 | TASK-207 | [Record password changes in the audit log](TASK-207-password-change-audit.md) | 005 | Proposed |
 | TASK-208 | [Hourly baseline on change orders](TASK-208-change-order-baseline.md) | 004 | Proposed |
+| TASK-209 | [Estimating assistant, Phase 3 slice (parent)](TASK-209-estimating-assistant-phase3.md) | 002 | Proposed |
+| TASK-210 | [Price observation ledger and catalog cache](TASK-210-price-observation-ledger.md) | 002 | Proposed |
+| TASK-211 | [Duplicate-safe purchase imports (history and book modes)](TASK-211-duplicate-safe-purchase-imports.md) | 002 | Proposed |
+| TASK-212 | [Package sizes and units](TASK-212-package-sizes.md) | 002 | Proposed |
+| TASK-213 | [Price selection and confidence with reasons](TASK-213-price-confidence.md) | 002 | Proposed |
+| TASK-214 | [Paint pilot: one paint rule, real paint prices](TASK-214-paint-pilot.md) | 002 | Proposed |
+| TASK-215 | [Estimated vs actual hours within matching categories](TASK-215-estimated-vs-actual-hours.md) | 002 | Proposed |
+| TASK-216 | [Remaining formula families](TASK-216-remaining-formula-families.md) | 002 | Deferred |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |

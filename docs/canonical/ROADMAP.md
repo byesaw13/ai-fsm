@@ -104,12 +104,14 @@ Location capture, visit candidates, day map, hybrid tracking are **shipped infra
 - Referral ROI reporting (TASK-017)
 - **Narrow production takeoff foundation (authorized 2026-08-10 CEO+eng review):** price_book code **1007** door-hardware deterministic material takeoff into `shopping_list_json` → job buy-list seed. See **TASK-103**. This is **not** full Production Intelligence (no Work Item Library platform, no licensed Craftsman import activation, no estimate-price engine flip).
 - **Gate:** Phase 1 ops remains active in parallel. Owner may proceed with TASK-103 as Phase 3 estimate/materials work; broader PI (TASK-047/048, multi-family catalog, calc snapshots) stays Phase 4 until this slice proves out.
+- **Phase 3 slice — estimating assistant (approved 2026-10-26).** Price observation ledger with source, date, supplier/location and evidence-based confidence; duplicate-safe receipt and Pro Xtra imports (price-history and book modes, persistent review records); package sizes; estimated vs actual hours within matching categories. Quantity formulas start with an interior paint and primer pilot (TASK-214); drywall patching, caulk, trim/baseboard and paint supplies (TASK-216) follow only after the pilot success criteria are met. Depends on the hourly baseline (TASK-188 to TASK-195). Design: `docs/working/estimating-assistant-phase3.md`; parent TASK-209. No paid feeds, no automated market recommendations, no win/loss learning. The assistant assists; the owner approves every price.
 
 ### Phase 4 — Production Intelligence (deferred)
 
 - Work Item Library (TASK-047) and Confidence Engine (TASK-048) remain proposed
 - Catalog-wide Production Profiles, Material Assemblies platform, calibration publish, licensed source catalog volume import
 - No broader PI expansion until Phases 0–3 are boring **and** TASK-103 pilot evidence exists
+- Estimating assistant, later: supplier feeds, local market evidence (`market` observations with source, date, geography, confidence), price recommendations with explanation, win/loss and actual-hours learning (PI-007), travel and material-run attribution to jobs
 
 ## Phase → Epic Mapping
 
