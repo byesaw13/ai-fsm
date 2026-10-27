@@ -8,6 +8,7 @@ import {
   estimateFinishExpectationSchema,
   estimateMinimumOverrideReasonSchema,
   estimateTripCountSchema,
+  lineItemTypeSchema,
   type EstimateSpec,
   type PreparedScope,
 } from "@ai-fsm/domain";
@@ -40,7 +41,7 @@ const lineItemInputSchema = z.object({
   hours_low: z.number().nonnegative().nullable().optional(),
   hours_high: z.number().nonnegative().nullable().optional(),
   hours_source: z.enum(HOUR_SOURCES).nullable().optional(),
-  line_item_type: z.enum(["labor", "materials", "handling_fee", "adjustment"]).default("labor"),
+  line_item_type: lineItemTypeSchema.default("labor"),
   visible_to_customer: z.boolean().default(true),
   adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
   sort_order: z.number().int().default(0),

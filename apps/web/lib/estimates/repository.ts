@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { appendAuditLog } from "@/lib/db/audit";
 import { calcTotals, lineItemTotal } from "./math";
-import { computeEstimate, sqftPaintingToSpec } from "@ai-fsm/domain";
+import { computeEstimate, sqftPaintingToSpec, type LineItemType } from "@ai-fsm/domain";
 import { laborCostCentsFromHours } from "@/lib/pricing/labor-hours";
 import { loadPricingRules } from "@/lib/pricing/settings";
 import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "./deposit-policy";
@@ -19,7 +19,7 @@ export interface LineItemInput {
   hours_low?: number | null;
   hours_high?: number | null;
   hours_source?: HourSource | null;
-  line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
+  line_item_type: LineItemType;
   visible_to_customer: boolean;
   adjustment_type?: string | null;
   sort_order: number;

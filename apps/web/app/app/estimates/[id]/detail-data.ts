@@ -77,7 +77,7 @@ export interface LineItemRow {
   unit_price_cents: number;
   unit_cost_cents: number | null;
   total_cents: number;
-  line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
+  line_item_type: "labor" | "materials" | "equipment" | "handling_fee" | "adjustment";
   visible_to_customer: boolean;
   adjustment_type: string | null;
   price_book_id: string | null;

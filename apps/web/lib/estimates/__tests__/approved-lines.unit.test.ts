@@ -37,6 +37,13 @@ describe("approvedLines", () => {
     expect(drafted[0]).toMatchObject({ estimate_line_item_id: "paint", unit_cost_cents: 20_000 });
   });
 
+  it("keeps an equipment line as equipment on the invoice", () => {
+    const drafted = invoiceLinesFor(estimateBase, [
+      line({ id: "lift", description: "Lift rental", total_cents: 12_000, line_item_type: "equipment" }),
+    ]);
+    expect(drafted[0].line_item_type).toBe("equipment");
+  });
+
   it("keeps only shared lines when nothing is selected", () => {
     const lines = [
       line({ id: "shared", description: "Trip fee", total_cents: 5_000 }),
@@ -61,7 +68,9 @@ describe("invoiceLinesFor", () => {
       quantity: 1,
       unit_price_cents: 5_000,
       total_cents: 5_000,
+      line_item_type: "adjustment",
     });
+    expect(drafted[0].line_item_type).toBe("labor");
     expect(drafted.some((row) => row.description.includes("Internal"))).toBe(false);
     expect(drafted.reduce((sum, row) => sum + row.total_cents, 0)).toBe(15_000);
   });
@@ -71,7 +80,13 @@ describe("invoiceLinesFor", () => {
     expect(invoiceLinesFor(estimateBase, lines).map((row) => row.description)).toEqual(["Fix hinge"]);
     const withRisk = invoiceLinesFor({ ...estimateBase, risk_adjustment_cents: 4_000 }, lines);
     expect(withRisk.map((row) => row.description)).toEqual(["Fix hinge", "Risk adjustment"]);
-    expect(withRisk[1]).toMatchObject({ estimate_line_item_id: null, total_cents: 4_000, unit_price_cents: 4_000, quantity: 1 });
+    expect(withRisk[1]).toMatchObject({
+      estimate_line_item_id: null,
+      total_cents: 4_000,
+      unit_price_cents: 4_000,
+      quantity: 1,
+      line_item_type: "adjustment",
+    });
   });
 
   it("adds a travel line only for a surcharge with no snapshot", () => {
@@ -80,6 +95,7 @@ describe("invoiceLinesFor", () => {
     expect(manual.map((row) => row.description)).toEqual(["Fix hinge", "Travel"]);
     expect(manual[1].description.toLowerCase()).not.toContain("travel and service-area");
     expect(manual[1].total_cents).toBe(2_500);
+    expect(manual[1].line_item_type).toBe("adjustment");
 
     const snapshotted = invoiceLinesFor(
       { ...estimateBase, travel_surcharge_cents: 2_500, travel_snapshot_id: "snap-1" },

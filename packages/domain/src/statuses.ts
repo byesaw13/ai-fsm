@@ -251,7 +251,7 @@ export const estimateTransitions: Record<EstimateStatus, readonly EstimateStatus
 export const presentationModeSchema = z.enum(["standard", "multi_option"]);
 export type PresentationMode = z.infer<typeof presentationModeSchema>;
 
-export const lineItemTypeSchema = z.enum(["labor", "materials", "handling_fee", "adjustment"]);
+export const lineItemTypeSchema = z.enum(["labor", "materials", "equipment", "handling_fee", "adjustment"]);
 export type LineItemType = z.infer<typeof lineItemTypeSchema>;
 
 // === Invoice ===

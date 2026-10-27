@@ -2,7 +2,7 @@
 
 import { Button, Card } from "@/components/ui";
 import { formatCents } from "@/lib/estimates/pricing";
-import { lineTotal, type LineItemRow, type OptionTier } from "@/lib/estimates/form-helpers";
+import { LINE_ITEM_TYPE_CHOICES, lineTotal, type LineItemRow, type OptionTier } from "@/lib/estimates/form-helpers";
 import {
   HOURS_MISSING_LABEL,
   OPTION_BASELINE_NOTE,
@@ -102,6 +102,19 @@ export function EstimateTierEditor({
                     disabled={disabled}
                     style={{ marginBottom: "var(--space-1)", fontSize: "var(--text-sm)" }}
                   />
+                  <select
+                    className="p7-select"
+                    aria-label="Line type"
+                    value={row.line_item_type ?? "labor"}
+                    onChange={(e) => onUpdateTierLineItem(ti, li, "line_item_type", e.target.value)}
+                    disabled={disabled}
+                    data-testid={`tier-${ti}-line-type-${li}`}
+                    style={{ marginBottom: "var(--space-1)", fontSize: "var(--text-sm)" }}
+                  >
+                    {LINE_ITEM_TYPE_CHOICES.map((choice) => (
+                      <option key={choice.value} value={choice.value}>{choice.label}</option>
+                    ))}
+                  </select>
                   <div style={{ display: "flex", gap: "var(--space-2)" }}>
                     <input
                       className="p7-input"

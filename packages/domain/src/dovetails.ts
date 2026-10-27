@@ -667,7 +667,7 @@ export const PRICING_MODE_LABELS: Record<typeof PRICING_MODES[number], string> =
 // Line item categories
 // ---------------------------------------------------------------------------
 
-export const LINE_ITEM_TYPES = ["labor", "materials", "handling_fee", "adjustment"] as const;
+export const LINE_ITEM_TYPES = ["labor", "materials", "equipment", "handling_fee", "adjustment"] as const;
 
 // ---------------------------------------------------------------------------
 // Estimate guardrails

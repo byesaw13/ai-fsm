@@ -9,7 +9,7 @@ import {
 // from here; the definition now lives in tracked-labor.ts to avoid an import cycle.
 export { roundedQuarterHoursFromMinutes };
 
-export const INVOICE_LINE_ITEM_TYPES = ["labor", "materials", "handling_fee", "adjustment"] as const;
+export const INVOICE_LINE_ITEM_TYPES = ["labor", "materials", "equipment", "handling_fee", "adjustment"] as const;
 export type InvoiceLineItemType = (typeof INVOICE_LINE_ITEM_TYPES)[number];
 
 export interface InvoiceTotals {

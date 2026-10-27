@@ -125,7 +125,7 @@ interface LineItemRow {
   quantity: number;
   unit_price_cents: number;
   total_cents: number;
-  line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
+  line_item_type: "labor" | "materials" | "equipment" | "handling_fee" | "adjustment";
   material_kind: string | null;
   store_section: string | null;
   sort_order: number;

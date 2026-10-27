@@ -1,4 +1,4 @@
-import type { PrepLevel, ShoppingList, EstimateResult, RoomSpec, ProjectOptions } from "@ai-fsm/domain";
+import type { LineItemType, PrepLevel, ShoppingList, EstimateResult, RoomSpec, ProjectOptions } from "@ai-fsm/domain";
 import {
   buildShoppingList,
   buildShoppingListFromEstimateResult,
@@ -22,7 +22,7 @@ export interface LineItemRow {
   unit_price: string;
   price_book_id?: string;
   /** Kept from the saved line so an edit-form save does not reclassify it. */
-  line_item_type?: "labor" | "materials" | "handling_fee" | "adjustment";
+  line_item_type?: LineItemType;
   /** What this materials line cost. The customer price stays on unit_price. */
   unit_cost_cents?: number | null;
   visible_to_customer?: boolean;
@@ -70,6 +70,31 @@ export function handlingPriceCents(row: LineItemRow): number {
   const price = parseCents(row.unit_price);
   if (materialMarkupPct({ unit_price_cents: price, unit_cost_cents: row.unit_cost_cents ?? null }) != null) return 0;
   return lineTotal(row);
+}
+
+/** Choices shown on a quote line. Equipment is a rental or use charge, not materials. */
+export const LINE_ITEM_TYPE_CHOICES: { value: LineItemType; label: string }[] = [
+  { value: "labor", label: "Labor" },
+  { value: "materials", label: "Materials" },
+  { value: "equipment", label: "Equipment (rental or use charge)" },
+  { value: "handling_fee", label: "Handling fee" },
+  { value: "adjustment", label: "Adjustment" },
+];
+
+/**
+ * Lines whose price feeds the form's 15% handling.
+ * The description heuristic stays. An equipment line is excluded even when
+ * its description contains "material", so a rental does not change handling.
+ */
+export function handlingBasisRows(rows: LineItemRow[]): LineItemRow[] {
+  return rows.filter((row) => {
+    if (row.line_item_type === "equipment") return false;
+    return row.description.toLowerCase().includes("material");
+  });
+}
+
+export function handlingBasisCents(rows: LineItemRow[], scopeMaterialsCents = 0): number {
+  return handlingBasisRows(rows).reduce((sum, row) => sum + handlingPriceCents(row), 0) + scopeMaterialsCents;
 }
 
 /** Materials generator hand-off: one line, price equal to cost, cost kept. */
