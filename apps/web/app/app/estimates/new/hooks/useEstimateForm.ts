@@ -28,7 +28,7 @@ import { useEstimateTiers } from "./useEstimateTiers";
 import {
   parseCents, lineTotal, mapPrepLevel,
   EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
-  buildManualShoppingList,
+  buildManualShoppingList, priceBookLineForSubmit,
 
   type LineItemRow, type OptionTier,
 } from "@/lib/estimates/form-helpers";
@@ -735,7 +735,7 @@ export function useEstimateForm({
             (row, i) => !usedPriceBookRows.has(i) && row.price_book_id === item.price_book_id,
           );
           if (idx >= 0) usedPriceBookRows.add(idx);
-          return { ...item, ...formHourColumns(idx >= 0 ? lineItems[idx] : {}) };
+          return priceBookLineForSubmit(item, idx >= 0 ? lineItems[idx] : undefined);
         });
         const scopeMatCents = scopeMaterialsTotalCents;
         const scopeMaterialItems = priceBookItems

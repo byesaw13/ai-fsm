@@ -169,6 +169,22 @@ export function savedLineToRow(item: SavedLineItem): LineItemRow {
  * turns a materials line into labor or detaches a prepared line. New rows take
  * the API defaults.
  */
+/**
+ * Price-book rows are priced from ScopeBuilder. The visible row still owns
+ * the type the person picked and the hours they edited. Omitting the type
+ * drops an Equipment selection and the API stores the line as labor.
+ */
+export function priceBookLineForSubmit<T extends object>(
+  item: T,
+  row: Pick<LineItemRow, "line_item_type" | "hours_low" | "hours_high" | "hours_source"> | undefined,
+): T & ReturnType<typeof formHourColumns> & { line_item_type?: LineItemType } {
+  return {
+    ...item,
+    ...formHourColumns(row ?? {}),
+    ...(row?.line_item_type ? { line_item_type: row.line_item_type } : {}),
+  };
+}
+
 export function rowToLineItemPayload(row: LineItemRow, index: number) {
   return {
     description: row.description,
