@@ -9,6 +9,7 @@ import {
 } from "@/lib/documents/service-location";
 import { loadPricingSettings, type BusinessPricingSettings } from "@/lib/pricing/settings";
 import { selectActiveHandoffInvoices } from "./handoff-invoices";
+import type { HourSource } from "@/lib/estimates/stored-hours";
 
 // ---------------------------------------------------------------------------
 // Row types
@@ -62,6 +63,9 @@ export interface EstimateRow {
   room_specs: unknown | null;
   source_visit_id: string | null;
   prepared_scope: unknown | null;
+  labor_hours_low: number | string | null;
+  labor_hours_high: number | string | null;
+  labor_hours_source: HourSource | null;
 }
 
 export interface LineItemRow {
@@ -78,6 +82,9 @@ export interface LineItemRow {
   adjustment_type: string | null;
   price_book_id: string | null;
   prepared_group_key: string | null;
+  hours_low: number | string | null;
+  hours_high: number | string | null;
+  hours_source: HourSource | null;
   sort_order: number;
   created_at: string;
 }
@@ -174,7 +181,8 @@ export async function loadEstimateDetail(
 
     const lineItemsResult = await client.query(
       `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, unit_cost_cents, total_cents, line_item_type,
-              visible_to_customer, adjustment_type, price_book_id, prepared_group_key, sort_order, created_at
+              visible_to_customer, adjustment_type, price_book_id, prepared_group_key,
+              hours_low, hours_high, hours_source, sort_order, created_at
        FROM estimate_line_items
        WHERE estimate_id = $1
        ORDER BY sort_order ASC, created_at ASC`,

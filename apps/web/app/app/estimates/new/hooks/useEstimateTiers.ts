@@ -5,6 +5,7 @@ import {
   lineTotal, EMPTY_ROW, DEFAULT_TIERS,
   type LineItemRow, type OptionTier,
 } from "@/lib/estimates/form-helpers";
+import { withHourEdit } from "@/lib/estimates/stored-hours";
 
 export function useEstimateTiers(getLineItemsSubtotal: () => number, initialMode: "itemized" | "flat_rate" | "multi_option" = "itemized") {
   const [mode, setMode] = useState<"itemized" | "flat_rate" | "multi_option">(initialMode);
@@ -55,7 +56,7 @@ export function useEstimateTiers(getLineItemsSubtotal: () => number, initialMode
           ? {
               ...t,
               line_items: t.line_items.map((row, li) =>
-                li === lineIndex ? { ...row, [field]: value } : row
+                li === lineIndex ? withHourEdit(row, field, value) : row
               ),
             }
           : t

@@ -291,6 +291,9 @@ export default async function EstimateDetailPage({
             adjustment_type: item.adjustment_type,
             price_book_id: item.price_book_id,
             prepared_group_key: item.prepared_group_key,
+            hours_low: item.hours_low,
+            hours_high: item.hours_high,
+            hours_source: item.hours_source,
           }))}
           initialOptions={options.map((opt) => ({
             id: opt.id,
@@ -304,6 +307,9 @@ export default async function EstimateDetailPage({
               unit_price_cents: li.unit_price_cents,
               unit_cost_cents: li.unit_cost_cents,
               line_item_type: li.line_item_type,
+              hours_low: li.hours_low,
+              hours_high: li.hours_high,
+              hours_source: li.hours_source,
             })),
           }))}
           initialSqFt={estimate.sq_ft}
@@ -311,6 +317,8 @@ export default async function EstimateDetailPage({
           initialIncludesTrim={estimate.includes_trim}
           initialIncludesCeiling={estimate.includes_ceiling}
           initialMaterialCostCents={estimate.internal_material_cost_cents}
+          initialLaborHoursLow={estimate.labor_hours_low ?? null}
+          initialLaborHoursHigh={estimate.labor_hours_high ?? null}
           initialLaborHours={estimate.sq_ft !== null
             ? laborHoursFromCostCents(
                 estimate.internal_labor_cost_cents,

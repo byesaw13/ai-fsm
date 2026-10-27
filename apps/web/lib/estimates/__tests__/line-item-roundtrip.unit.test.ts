@@ -24,6 +24,9 @@ describe("edit form line round trip", () => {
       line_item_type: "materials",
       visible_to_customer: true,
       prepared_group_key: "bath_floor",
+      hours_low: null,
+      hours_high: null,
+      hours_source: null,
     });
   });
 
@@ -72,6 +75,9 @@ describe("edit form line round trip", () => {
       quantity: 1,
       unit_price_cents: 0,
       sort_order: 1,
+      hours_low: null,
+      hours_high: null,
+      hours_source: null,
     });
   });
 });

@@ -100,7 +100,7 @@ describe("PUT /estimates/[id]/prepared-scope", () => {
     expect(patch.line_items).toEqual([
       expect.objectContaining({ quantity: 2.5, unit_price_cents: 8500, line_item_type: "labor", prepared_group_key: "bath", sort_order: 0 }),
       expect.objectContaining({ quantity: 1, unit_price_cents: 4000, line_item_type: "materials", prepared_group_key: "bath", sort_order: 1 }),
-      { ...HAND_LINE, sort_order: 2 },
+      { ...HAND_LINE, sort_order: 2, hours_low: null, hours_high: null, hours_source: null },
     ]);
   });
 

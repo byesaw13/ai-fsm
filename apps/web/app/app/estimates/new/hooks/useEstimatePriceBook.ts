@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import type { PriceBookService } from "@/components/PriceBookSelector";
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import type { LineItemRow } from "@/lib/estimates/form-helpers";
+import { formatHourInput, priceBookHourRange } from "@/lib/estimates/stored-hours";
 
 export interface PriceBookEntry {
   service: PriceBookService;
@@ -61,7 +62,21 @@ export function useEstimatePriceBook(): UseEstimatePriceBookReturn {
     setPriceBookItems((prev) => [...prev, { service, priceCents, instanceId }]);
     const unitPrice = service.default_price_cents ?? priceCents;
     const description = `${service.code} — ${service.name}${service.description ? ` — ${service.description}` : ""}`;
-    onAddLineItem({ description, quantity: "1", unit_price: (unitPrice / 100).toFixed(2), price_book_id: service.id });
+    const bookHours = priceBookHourRange(service);
+    onAddLineItem({
+      description,
+      quantity: "1",
+      unit_price: (unitPrice / 100).toFixed(2),
+      price_book_id: service.id,
+      line_item_type: "labor",
+      ...(bookHours
+        ? {
+            hours_low: formatHourInput(bookHours.hours_low),
+            hours_high: formatHourInput(bookHours.hours_high),
+            hours_source: "price_book" as const,
+          }
+        : {}),
+    });
   }
 
   function handleScopeChange(instanceId: string, result: ScopeBuilderResult) {

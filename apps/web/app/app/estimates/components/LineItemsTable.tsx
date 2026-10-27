@@ -4,6 +4,17 @@ import { Button } from "@/components/ui";
 import { formatCents } from "@/lib/estimates/pricing";
 import { lineTotal, parseCents, type LineItemRow } from "@/lib/estimates/form-helpers";
 import { markupLabel } from "@/lib/estimates/cost-split";
+import {
+  HOURS_MISSING_LABEL,
+  PERSON_HOURS_HINT,
+  PERSON_HOURS_LABEL,
+  hoursAreMissing,
+} from "@/lib/estimates/stored-hours";
+
+function lineShowsHours(row: LineItemRow): boolean {
+  if (!row.line_item_type || row.line_item_type === "labor") return true;
+  return Boolean((row.hours_low ?? "").trim() || (row.hours_high ?? "").trim());
+}
 
 interface LineItemsTableProps {
   items: LineItemRow[];
@@ -64,6 +75,11 @@ export function LineItemsTable({
         </p>
       ) : (
         <div style={{ overflowX: "auto" }}>
+          {items.some(lineShowsHours) && (
+            <p className="muted" style={{ fontSize: "var(--text-xs)", margin: "0 0 var(--space-2)" }}>
+              {PERSON_HOURS_LABEL}. {PERSON_HOURS_HINT}
+            </p>
+          )}
           <table className="line-items-table" style={{ width: "100%" }}>
             <thead>
               <tr>
@@ -91,6 +107,49 @@ export function LineItemsTable({
                     {row.prepared_group_key && (
                       <div className="muted" style={{ fontSize: "var(--text-xs)", marginTop: "var(--space-1)" }}>
                         From prepared scope. Apply to quote replaces this line.
+                      </div>
+                    )}
+                    {lineShowsHours(row) && (
+                      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)", alignItems: "center" }}>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", whiteSpace: "nowrap" }}>
+                          {PERSON_HOURS_LABEL}
+                        </span>
+                        <input
+                          className="p7-input"
+                          type="number"
+                          min="0"
+                          step="0.25"
+                          inputMode="decimal"
+                          placeholder="Low"
+                          aria-label={`${PERSON_HOURS_LABEL} low`}
+                          value={row.hours_low ?? ""}
+                          onChange={(e) => onUpdate(i, "hours_low", e.target.value)}
+                          disabled={disabled}
+                          data-testid={`${p}line-item-hours-low-${i}`}
+                          style={{ width: 72 }}
+                        />
+                        <input
+                          className="p7-input"
+                          type="number"
+                          min="0"
+                          step="0.25"
+                          inputMode="decimal"
+                          placeholder="High"
+                          aria-label={`${PERSON_HOURS_LABEL} high`}
+                          value={row.hours_high ?? ""}
+                          onChange={(e) => onUpdate(i, "hours_high", e.target.value)}
+                          disabled={disabled}
+                          data-testid={`${p}line-item-hours-high-${i}`}
+                          style={{ width: 72 }}
+                        />
+                        {(!row.line_item_type || row.line_item_type === "labor") && hoursAreMissing(row.hours_low, row.hours_high) && (
+                          <span
+                            style={{ fontSize: "var(--text-xs)", color: "var(--color-danger)", whiteSpace: "nowrap" }}
+                            data-testid={`${p}line-item-hours-missing-${i}`}
+                          >
+                            {HOURS_MISSING_LABEL}
+                          </span>
+                        )}
                       </div>
                     )}
                   </td>

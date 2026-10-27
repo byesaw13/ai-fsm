@@ -5,6 +5,8 @@ import { formatCents } from "@/lib/money";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
+import { PersonHoursFields } from "../components/PersonHoursFields";
+import { formHourColumns, quickEstimateCanSend } from "@/lib/estimates/stored-hours";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -80,6 +82,9 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
   // Once the estimate is created we keep its id so a retry (e.g. after a send
   // failure) reuses it instead of creating a duplicate.
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [hoursLow, setHoursLow] = useState("");
+  const [hoursHigh, setHoursHigh] = useState("");
+  const [directCostsConfirmed, setDirectCostsConfirmed] = useState(false);
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
 
@@ -120,6 +125,29 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
       setError("Please enter a price greater than $0.");
       return;
     }
+    const sendGate = quickEstimateCanSend({
+      hoursLow,
+      hoursHigh,
+      directCostsConfirmed,
+      priceCents: flat_rate_cents,
+    });
+    if (send && !sendGate.ok) {
+      setError(sendGate.hoursMissing
+        ? "Hours missing. Enter the person-hour range before sending."
+        : "Confirm other direct costs before sending.");
+      return;
+    }
+    const hours = formHourColumns({
+      hours_low: hoursLow,
+      hours_high: hoursHigh,
+      hours_source: hoursLow.trim() || hoursHigh.trim() ? "owner" : null,
+    });
+    const hourBody = {
+      labor_hours_low: hours.hours_low,
+      labor_hours_high: hours.hours_high,
+      labor_hours_source: hours.hours_source,
+      ...(directCostsConfirmed ? { direct_costs_confirmed: true } : {}),
+    };
     setError("");
     setSubmitting(true);
     try {
@@ -135,6 +163,7 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
             notes: [selectedService.name, notes.trim()].filter(Boolean).join("\n\n") || null,
             presentation_mode: "standard",
             pricing_mode: "flat_rate",
+            ...hourBody,
           }),
         });
         if (!res.ok) {
@@ -144,6 +173,18 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
         }
         id = (await res.json() as { id: string }).id;
         setCreatedId(id);
+      } else if (send) {
+        // A draft saved before the range was filled still has to store it.
+        const patch = await fetch(`/api/v1/estimates/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(hourBody),
+        });
+        if (!patch.ok) {
+          const d = await patch.json().catch(() => ({}));
+          setError(d.error?.message ?? "Could not save the person-hours.");
+          return;
+        }
       }
 
       // Deliver through the dedicated send action (the transition endpoint
@@ -436,6 +477,26 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
         />
       </div>
 
+      <PersonHoursFields
+        low={hoursLow}
+        high={hoursHigh}
+        onLow={setHoursLow}
+        onHigh={setHoursHigh}
+        disabled={submitting}
+        idPrefix="quick-person-hours"
+      />
+
+      <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+        <input
+          type="checkbox"
+          checked={directCostsConfirmed}
+          onChange={(e) => setDirectCostsConfirmed(e.target.checked)}
+          disabled={submitting}
+          data-testid="quick-direct-costs"
+        />
+        Other direct costs confirmed, including $0
+      </label>
+
       {error && (
         <p style={{ color: "#dc2626", fontSize: "var(--text-sm)", margin: 0 }}>{error}</p>
       )}
@@ -458,7 +519,12 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
         <button
           type="button"
           onClick={() => handleSubmit(true)}
-          disabled={submitting}
+          disabled={submitting || !quickEstimateCanSend({
+            hoursLow,
+            hoursHigh,
+            directCostsConfirmed,
+            priceCents: parseDollars(priceInput),
+          }).ok}
           style={{
             padding: "var(--space-4)", borderRadius: "var(--radius-md)",
             border: "1px solid var(--accent)", background: "var(--bg-card)",

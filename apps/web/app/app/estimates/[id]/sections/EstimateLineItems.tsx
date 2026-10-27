@@ -2,10 +2,41 @@ import { formatDollars } from "../format";
 import type { EstimateRow, LineItemRow, OptionWithItems } from "../detail-data";
 import { lineNeedsPriceReview } from "@/lib/estimates/review-health";
 import { markupLabel } from "@/lib/estimates/cost-split";
+import {
+  HOURS_MISSING_LABEL,
+  OPTION_BASELINE_NOTE,
+  PERSON_HOURS_LABEL,
+  formatHourInput,
+} from "@/lib/estimates/stored-hours";
+
+function hoursText(low: number | string | null | undefined, high: number | string | null | undefined): string | null {
+  const left = formatHourInput(low);
+  const right = formatHourInput(high);
+  if (!left && !right) return null;
+  if (left && right && left !== right) return `${PERSON_HOURS_LABEL}: ${left}–${right} h`;
+  return `${PERSON_HOURS_LABEL}: ${left || right} h`;
+}
+
+function lineHoursNote(item: Pick<LineItemRow, "hours_low" | "hours_high" | "line_item_type">): string | null {
+  const text = hoursText(item.hours_low, item.hours_high);
+  if (text) return text;
+  if (!item.line_item_type || item.line_item_type === "labor") return HOURS_MISSING_LABEL;
+  return null;
+}
 
 /** Postgres numerics arrive as "1.00" — render whole quantities without decimals. */
 function fmtQty(q: number | string): string {
   return Number(q).toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+function HoursNote({ item }: { item: Pick<LineItemRow, "hours_low" | "hours_high" | "line_item_type"> }) {
+  const label = lineHoursNote(item);
+  if (!label) return null;
+  return (
+    <span data-testid="line-person-hours" style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+      {label}
+    </span>
+  );
 }
 
 function MarkupNote({ item }: { item: Pick<LineItemRow, "unit_price_cents" | "unit_cost_cents"> }) {
@@ -41,6 +72,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
         <div className="card">
           <h2>Options</h2>
           <p className="muted">Compare options and choose the one that best fits your needs.</p>
+          <p className="muted" data-testid="option-baseline-note">{OPTION_BASELINE_NOTE}</p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${options.length}, 1fr)`, gap: "var(--space-4)" }}>
           {options.map((option) => (
@@ -76,6 +108,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                         {item.description}
                         {lineNeedsPriceReview(item) && <ReviewMark />}
                         <MarkupNote item={item} />
+                        <HoursNote item={item} />
                       </td>
                       <td>{fmtQty(item.quantity)}</td>
                       <td>{formatDollars(item.unit_price_cents)}</td>
@@ -113,9 +146,14 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
           {lineItems.length === 0 && estimate.subtotal_cents === 0 ? (
             <p className="muted">No line items.</p>
           ) : lineItems.length === 0 ? (
-            <div style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg)", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontWeight: 600 }}>Flat rate</span>
-              <span style={{ fontWeight: 700 }}>{formatDollars(estimate.subtotal_cents)}</span>
+            <div style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg)", border: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontWeight: 600 }}>Flat rate</span>
+                <span style={{ fontWeight: 700 }}>{formatDollars(estimate.subtotal_cents)}</span>
+              </div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+                {hoursText(estimate.labor_hours_low, estimate.labor_hours_high) ?? HOURS_MISSING_LABEL}
+              </div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
@@ -126,6 +164,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                       {item.description}
                       {lineNeedsPriceReview(item) && <ReviewMark />}
                       <MarkupNote item={item} />
+                      <HoursNote item={item} />
                     </span>
                     <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>{formatDollars(item.total_cents)}</span>
                   </div>
@@ -167,7 +206,12 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
             <table className="line-items-table" data-testid="line-items-table">
               <tbody>
                 <tr data-testid="line-item-row">
-                  <td>Flat rate</td>
+                  <td>
+                    Flat rate
+                    <span data-testid="line-person-hours" style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                      {hoursText(estimate.labor_hours_low, estimate.labor_hours_high) ?? HOURS_MISSING_LABEL}
+                    </span>
+                  </td>
                   <td colSpan={2}></td>
                   <td>{formatDollars(estimate.subtotal_cents)}</td>
                 </tr>
@@ -209,6 +253,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                         {item.description}
                         {lineNeedsPriceReview(item) && <ReviewMark />}
                         <MarkupNote item={item} />
+                        <HoursNote item={item} />
                       </td>
                       <td>{fmtQty(item.quantity)}</td>
                       <td>{formatDollars(item.unit_price_cents)}</td>

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
+import { PersonHoursFields } from "@/app/app/estimates/components/PersonHoursFields";
+import { formHourColumns } from "@/lib/estimates/stored-hours";
 
 interface Props {
   label: string;
@@ -24,11 +26,18 @@ export function FixNowEstimateButton({
   const router = useRouter();
   const toast = useToast();
   const [creating, setCreating] = useState(false);
+  const [hoursLow, setHoursLow] = useState("");
+  const [hoursHigh, setHoursHigh] = useState("");
 
   async function handleCreate() {
     setCreating(true);
     try {
       const description = note ? `${label} — ${note}` : label;
+      const hours = formHourColumns({
+        hours_low: hoursLow,
+        hours_high: hoursHigh,
+        hours_source: hoursLow.trim() || hoursHigh.trim() ? "owner" : null,
+      });
       const dateStr = new Date(visitDate).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -48,6 +57,9 @@ export function FixNowEstimateButton({
               quantity: 1,
               unit_price_cents: 0,
               line_item_type: "labor",
+              hours_low: hours.hours_low,
+              hours_high: hours.hours_high,
+              hours_source: hours.hours_source,
             },
           ],
         }),
@@ -67,13 +79,23 @@ export function FixNowEstimateButton({
   }
 
   return (
-    <button
-      className="p7-btn p7-btn-secondary p7-btn-sm"
-      onClick={handleCreate}
-      disabled={creating}
-      data-testid="create-estimate-btn"
-    >
-      {creating ? "Creating…" : "Create Estimate"}
-    </button>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", alignItems: "flex-start" }}>
+      <PersonHoursFields
+        low={hoursLow}
+        high={hoursHigh}
+        onLow={setHoursLow}
+        onHigh={setHoursHigh}
+        disabled={creating}
+        idPrefix="fix-now-hours"
+      />
+      <button
+        className="p7-btn p7-btn-secondary p7-btn-sm"
+        onClick={handleCreate}
+        disabled={creating}
+        data-testid="create-estimate-btn"
+      >
+        {creating ? "Creating…" : "Create Estimate"}
+      </button>
+    </div>
   );
 }

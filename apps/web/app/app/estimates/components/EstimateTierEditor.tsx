@@ -3,6 +3,13 @@
 import { Button, Card } from "@/components/ui";
 import { formatCents } from "@/lib/estimates/pricing";
 import { lineTotal, type LineItemRow, type OptionTier } from "@/lib/estimates/form-helpers";
+import {
+  HOURS_MISSING_LABEL,
+  OPTION_BASELINE_NOTE,
+  PERSON_HOURS_HINT,
+  PERSON_HOURS_LABEL,
+  hoursAreMissing,
+} from "@/lib/estimates/stored-hours";
 
 interface EstimateTierEditorProps {
   tiers: OptionTier[];
@@ -26,6 +33,13 @@ export function EstimateTierEditor({
   tierSubtotalCents,
 }: EstimateTierEditorProps) {
   return (
+    <>
+    <p className="muted" data-testid="option-baseline-note" style={{ fontSize: "var(--text-sm)", margin: "0 0 var(--space-2)" }}>
+      {OPTION_BASELINE_NOTE}
+    </p>
+    <p className="muted" style={{ fontSize: "var(--text-xs)", margin: "0 0 var(--space-2)" }}>
+      {PERSON_HOURS_LABEL}. {PERSON_HOURS_HINT}
+    </p>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-4)", marginBottom: "var(--space-3)" }}>
       {tiers.map((tier, ti) => {
         const tierSub = tierSubtotalCents(tier);
@@ -112,6 +126,32 @@ export function EstimateTierEditor({
                     <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", lineHeight: "var(--space-5)" }}>
                       {formatCents(lineTotal(row))}
                     </span>
+                    <input
+                      className="p7-input"
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      placeholder="Low"
+                      aria-label={`${PERSON_HOURS_LABEL} low`}
+                      value={row.hours_low ?? ""}
+                      onChange={(e) => onUpdateTierLineItem(ti, li, "hours_low", e.target.value)}
+                      disabled={disabled}
+                      data-testid={`tier-${ti}-hours-low-${li}`}
+                      style={{ width: 64, fontSize: "var(--text-sm)" }}
+                    />
+                    <input
+                      className="p7-input"
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      placeholder="High"
+                      aria-label={`${PERSON_HOURS_LABEL} high`}
+                      value={row.hours_high ?? ""}
+                      onChange={(e) => onUpdateTierLineItem(ti, li, "hours_high", e.target.value)}
+                      disabled={disabled}
+                      data-testid={`tier-${ti}-hours-high-${li}`}
+                      style={{ width: 64, fontSize: "var(--text-sm)" }}
+                    />
                     {tier.line_items.length > 1 && (
                       <button
                         type="button"
@@ -124,6 +164,11 @@ export function EstimateTierEditor({
                       </button>
                     )}
                   </div>
+                  {(!row.line_item_type || row.line_item_type === "labor") && hoursAreMissing(row.hours_low, row.hours_high) && (
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--color-danger)", marginTop: 2 }}>
+                      {HOURS_MISSING_LABEL}
+                    </div>
+                  )}
                 </div>
               ))}
               <Button
@@ -152,5 +197,6 @@ export function EstimateTierEditor({
         );
       })}
     </div>
+    </>
   );
 }

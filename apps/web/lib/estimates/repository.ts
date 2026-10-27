@@ -8,6 +8,7 @@ import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "./deposit
 import { computeConditionTier } from "./guardrails";
 import { defaultMaterialPrice, splitInternalCosts } from "./cost-split";
 import { explicitMaterialDepositCents } from "./itemized-preserve";
+import { lineHourColumns, storedHour, storedHourSource, type HourSource } from "./stored-hours";
 
 export interface LineItemInput {
   description: string;
@@ -15,8 +16,9 @@ export interface LineItemInput {
   /** Missing on a materials line that only has a cost. Normalized before totals. */
   unit_price_cents?: number | null;
   unit_cost_cents?: number | null;
-  /** Labor cost uses this when the caller has it. The column arrives in TASK-191. */
+  hours_low?: number | null;
   hours_high?: number | null;
+  hours_source?: HourSource | null;
   line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
   visible_to_customer: boolean;
   adjustment_type?: string | null;
@@ -60,6 +62,10 @@ export interface PatchEstimateInput {
   includes_ceiling?: boolean;
   material_cost_cents?: number;
   labor_hours_estimate?: number;
+  labor_hours_low?: number | null;
+  labor_hours_high?: number | null;
+  labor_hours_source?: HourSource | null;
+  direct_costs_confirmed?: boolean;
   trip_count?: string;
   requires_drying_or_curing?: boolean;
   difficult_access?: boolean;
@@ -94,6 +100,7 @@ export async function getEstimateById(client: PoolClient, id: string, accountId:
             e.trip_count, e.requires_drying_or_curing, e.difficult_access,
             e.old_house_risk, e.coordination_required, e.finish_expectation,
             e.travel_surcharge_cents, e.risk_adjustment_cents,
+            e.labor_hours_low, e.labor_hours_high, e.labor_hours_source,
             e.minimum_service_override_reason, e.minimum_service_override_note,
             e.pricing_review_status, e.pricing_reviewed_at, e.pricing_reviewed_by,
             e.scope_assumptions, e.condition_tier,
@@ -108,6 +115,7 @@ export async function getEstimateById(client: PoolClient, id: string, accountId:
 
   const lineItemsResult = await client.query(
     `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, unit_cost_cents,
+            hours_low, hours_high, hours_source,
             total_cents, line_item_type, visible_to_customer, adjustment_type, sort_order, created_at
      FROM estimate_line_items
      WHERE estimate_id = $1
@@ -237,6 +245,21 @@ export async function updateEstimateById(
   if (patch.job_id !== undefined) { setClauses.push(`job_id = $${idx++}`); params.push(patch.job_id); }
   if (patch.property_id !== undefined) { setClauses.push(`property_id = $${idx++}`); params.push(patch.property_id); }
   if (patch.notes !== undefined) { setClauses.push(`notes = $${idx++}`); params.push(patch.notes); }
+  if (patch.labor_hours_low !== undefined) {
+    setClauses.push(`labor_hours_low = $${idx++}`);
+    params.push(storedHour(patch.labor_hours_low));
+  }
+  if (patch.labor_hours_high !== undefined) {
+    setClauses.push(`labor_hours_high = $${idx++}`);
+    params.push(storedHour(patch.labor_hours_high));
+  }
+  if (patch.labor_hours_source !== undefined) {
+    setClauses.push(`labor_hours_source = $${idx++}`);
+    params.push(storedHourSource(patch.labor_hours_source));
+  }
+  if (patch.direct_costs_confirmed === true) {
+    setClauses.push(`direct_costs_confirmed_at = now()`);
+  }
   if (patch.internal_notes !== undefined) { setClauses.push(`internal_notes = $${idx++}`); params.push(patch.internal_notes); }
   if (patch.expires_at !== undefined) { setClauses.push(`expires_at = $${idx++}`); params.push(patch.expires_at); }
   if (patch.sq_ft !== undefined) { setClauses.push(`sq_ft = $${idx++}`); params.push(patch.sq_ft); }
@@ -396,14 +419,18 @@ export async function updateEstimateById(
           `INSERT INTO estimate_line_items
              (estimate_id, description, quantity, unit_price_cents, total_cents,
               line_item_type, visible_to_customer, adjustment_type, sort_order,
-              price_book_id, prepared_group_key, unit_cost_cents)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+              price_book_id, prepared_group_key, unit_cost_cents,
+              hours_low, hours_high, hours_source)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
           [
             id, item.description, item.quantity, item.unit_price_cents,
             lineItemTotal(item), item.line_item_type, item.visible_to_customer,
             item.adjustment_type ?? null, item.sort_order ?? i,
             item.price_book_id ?? null, item.prepared_group_key ?? null,
             item.unit_cost_cents ?? null,
+            lineHourColumns(item).hours_low,
+            lineHourColumns(item).hours_high,
+            lineHourColumns(item).hours_source,
           ]
         );
       }
@@ -442,13 +469,17 @@ export async function updateEstimateById(
         await client.query(
           `INSERT INTO estimate_line_items
              (estimate_id, option_id, description, quantity, unit_price_cents, total_cents,
-              line_item_type, visible_to_customer, adjustment_type, sort_order, unit_cost_cents)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+              line_item_type, visible_to_customer, adjustment_type, sort_order, unit_cost_cents,
+              hours_low, hours_high, hours_source)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
           [
             id, optionId, item.description, item.quantity, item.unit_price_cents,
             lineItemTotal(item), item.line_item_type, item.visible_to_customer,
             item.adjustment_type ?? null, item.sort_order ?? li,
             item.unit_cost_cents ?? null,
+            lineHourColumns(item).hours_low,
+            lineHourColumns(item).hours_high,
+            lineHourColumns(item).hours_source,
           ]
         );
       }

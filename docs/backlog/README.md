@@ -173,7 +173,7 @@ closed in tests; owner-flow AC still open.
 | TASK-188 | [Hourly baseline on every estimate (parent)](TASK-188-hourly-baseline-every-estimate.md) | 002 | Proposed |
 | TASK-189 | [Write the hourly baseline formula down first](TASK-189-baseline-formula-doc.md) | 002 | Proposed |
 | TASK-190 | [Materials cost field, and materials booked as materials cost](TASK-190-materials-cost-split-at-create.md) | 002 | Done |
-| TASK-191 | [Person-hours on every estimate](TASK-191-hours-on-every-estimate.md) | 002 | Proposed |
+| TASK-191 | [Person-hours on every estimate](TASK-191-hours-on-every-estimate.md) | 002 | In progress |
 | TASK-192 | [Equipment line type](TASK-192-equipment-line-type.md) | 002 | Proposed |
 | TASK-193 | [Editable production rates with calibration](TASK-193-production-rates-settings.md) | 002 | Proposed |
 | TASK-194 | [Baseline panel, send rules and freeze at send](TASK-194-baseline-panel-send-rules.md) | 002 | Proposed |

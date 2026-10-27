@@ -16,6 +16,7 @@ import {
 import { logger } from "@/lib/logger";
 import { getPathId } from "@/lib/route-utils";
 import { linePriceMissing } from "@/lib/estimates/cost-split";
+import { HOUR_SOURCES } from "@/lib/estimates/stored-hours";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,9 @@ const lineItemInputSchema = z.object({
   quantity: z.number().positive(),
   unit_price_cents: z.number().int().nonnegative().optional(),
   unit_cost_cents: z.number().int().nonnegative().nullable().optional(),
+  hours_low: z.number().nonnegative().nullable().optional(),
   hours_high: z.number().nonnegative().nullable().optional(),
+  hours_source: z.enum(HOUR_SOURCES).nullable().optional(),
   line_item_type: z.enum(["labor", "materials", "handling_fee", "adjustment"]).default("labor"),
   visible_to_customer: z.boolean().default(true),
   adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
@@ -66,6 +69,17 @@ const lineItemInputSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "Enter a price, or a cost on a materials line",
       path: ["unit_price_cents"],
+    });
+  }
+  if (
+    item.hours_low != null &&
+    item.hours_high != null &&
+    item.hours_low > item.hours_high
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Hours low cannot be above high",
+      path: ["hours_low"],
     });
   }
 });
@@ -104,6 +118,10 @@ const patchEstimateSchema = z.object({
   includes_ceiling: z.boolean().optional(),
   material_cost_cents: z.number().int().nonnegative().optional(),
   labor_hours_estimate: z.number().positive().optional(),
+  labor_hours_low: z.number().nonnegative().nullable().optional(),
+  labor_hours_high: z.number().nonnegative().nullable().optional(),
+  labor_hours_source: z.enum(HOUR_SOURCES).nullable().optional(),
+  direct_costs_confirmed: z.boolean().optional(),
   trip_count: estimateTripCountSchema.optional(),
   requires_drying_or_curing: z.boolean().optional(),
   difficult_access: z.boolean().optional(),
@@ -117,6 +135,18 @@ const patchEstimateSchema = z.object({
   scope_assumptions: z.string().nullable().optional(),
   room_specs: z.array(z.record(z.unknown())).optional(),
   shopping_list_json: z.record(z.unknown()).optional(),
+}).superRefine((input, ctx) => {
+  if (
+    input.labor_hours_low != null &&
+    input.labor_hours_high != null &&
+    input.labor_hours_low > input.labor_hours_high
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Hours low cannot be above high",
+      path: ["labor_hours_low"],
+    });
+  }
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, session) => {

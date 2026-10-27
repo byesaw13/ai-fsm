@@ -190,6 +190,9 @@ describe("preparedScopeToLineItems", () => {
       quantity: 6.5,
       unit_price_cents: 8500,
       line_item_type: "labor",
+      hours_low: 5,
+      hours_high: 8,
+      hours_source: "ai_allowance",
     });
     expect(lineItems[1]).toMatchObject({ description: "Room 1 repairs, ceiling, baseboard and plates — materials allowance", quantity: 1, unit_price_cents: 8500, line_item_type: "materials" });
     expect(lineItems).toHaveLength(10);

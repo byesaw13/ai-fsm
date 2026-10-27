@@ -13,6 +13,7 @@ import { generatorMaterialRow } from "@/lib/estimates/form-helpers";
 import { PaintingEstimatorSection } from "../../components/PaintingEstimatorSection";
 import { EstimateTierEditor } from "../../components/EstimateTierEditor";
 import { LineItemsTable } from "../../components/LineItemsTable";
+import { PersonHoursFields } from "../../components/PersonHoursFields";
 import type { LineItemRow, OptionTier } from "../hooks/useEstimateForm";
 import type { PaintingEstimateResult } from "../hooks/useEstimatePricing";
 import type { EditableSuggestion, ScopeResult } from "../hooks/useEstimateAI";
@@ -78,6 +79,10 @@ interface Step2Props {
   // Tiers / flat rate
   flatRate: string;
   setFlatRate: (v: string) => void;
+  personHoursLow: string;
+  setPersonHoursLow: (v: string) => void;
+  personHoursHigh: string;
+  setPersonHoursHigh: (v: string) => void;
   tiers: OptionTier[];
   taxRateNum: number;
   updateTier: (tierIndex: number, updates: Partial<OptionTier>) => void;
@@ -136,6 +141,8 @@ export function Step2Pricing({
   handleAddPriceBookItem,
   paintingMode, setPaintingMode, roomSpecs, projectOptions, handleRoomByRoomChange,
   flatRate, setFlatRate,
+  personHoursLow, setPersonHoursLow,
+  personHoursHigh, setPersonHoursHigh,
   tiers, taxRateNum, updateTier, addTierLineItem, removeTierLineItem, updateTierLineItem, tierSubtotalCents,
   itemDescription, setItemDescription, itemSuggesting, itemSuggestError,
   suggestions, setSuggestions, bundleCategories, hasLegalFlagSuggestions,
@@ -511,6 +518,14 @@ export function Step2Pricing({
                   onChange={(e) => setFlatRate(e.target.value)}
                   disabled={pending}
                   data-testid="flat-rate-input"
+                />
+                <PersonHoursFields
+                  low={personHoursLow}
+                  high={personHoursHigh}
+                  onLow={setPersonHoursLow}
+                  onHigh={setPersonHoursHigh}
+                  disabled={pending}
+                  idPrefix="flat-person-hours"
                 />
               </div>
             ) : mode === "multi_option" ? (
