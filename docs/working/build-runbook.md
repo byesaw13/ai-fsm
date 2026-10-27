@@ -19,21 +19,20 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : B1 (TASK-190) verified on production at 2026-10-27
-                      00:04 UTC. Squash f4837336 (#724). Health ok, /login
-                      HTTP/2 200, no redirect to 0.0.0.0:3000. Draft check:
-                      internal labor 10000 and materials 20000, then deleted.
-In-flight PR        : #726
-Next step           : B2 (TASK-191) in progress on task/191-person-hours
+Last step           : B2 (TASK-191) verified on production at 2026-10-27
+                      01:28 UTC. Squash 20c7d5f8 (#726). Health ok, /login
+                      HTTP/2 200, no redirect to 0.0.0.0:3000. Draft
+                      237ba3cd kept total 1082125. Its 8 labor lines have
+                      null hours. Line totals unchanged.
+In-flight PR        : none
+Next step           : B3 (TASK-192)
 Blocked on          : nothing
-Last known-good     : f4837336 (branch deploy-good/f4837336); previous e7b27ef9
-                      (branch deploy-good/e7b27ef9)
-Notes               : Migration 208 applied. Backup ai_fsm_20261026T235404Z.dump
-                      was verified before deploy. The proxy could not resolve
-                      ai-fsm-web-1 from 19:32 UTC (before this deploy); it was
-                      connected to business_proxy, then the public checks passed.
-                      The worker container was left running. B2 stores person-hours
-                      in migration 209 on this branch. Not merged. Not deployed.
+Last known-good     : 20c7d5f8 (branch deploy-good/20c7d5f8); previous f4837336
+                      (branch deploy-good/f4837336)
+Notes               : Migration 209 applied. Backup ai_fsm_20261027T012137Z.dump
+                      was verified before deploy (1387 TOC entries). The worker
+                      container was left running. Staff hour screens were not
+                      opened in a browser.
 ```
 
 ## Owner approvals
@@ -109,7 +108,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | A2 | TASK-196 | 2026-10-26 (CI 40413156570, 40413164445, #723) | 2026-10-26 (#723, e7b27ef9) | 2026-10-26 (~22:51 UTC) | 2026-10-26 (health ok, /login 200, 22:51 UTC) |
 | B0 | TASK-189 | doc in #720 | 2026-10-26 (#720) | n/a | n/a |
 | B1 | TASK-190 | 2026-10-26 (CI 40419939119, 40419947446, #724) | 2026-10-26 (#724, f4837336) | 2026-10-27 (~00:02 UTC) | 2026-10-27 (draft split, 00:04 UTC) |
-| B2 | TASK-191 | | | | |
+| B2 | TASK-191 | 2026-10-27 (CI 40429996387, 40430001995, #726) | 2026-10-27 (#726, 20c7d5f8) | 2026-10-27 (~01:28 UTC) | 2026-10-27 (draft hours null, totals unchanged, 01:28 UTC) |
 | B3 | TASK-192 | | | | |
 | B4 | TASK-193 | | | | |
 | B5 | TASK-194 | | | | |
@@ -521,6 +520,10 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 
 One line per state change: date, step, state, PR, evidence.
 
+- 2026-10-27 · B2 · Verified · health ok and /login HTTP/2 200 at 01:28 UTC; draft 237ba3cd total stayed 1082125 and its 8 labor lines have null hours; known-good deploy-good/20c7d5f8
+- 2026-10-27 · B2 · Deployed · 20c7d5f8 · web recreated and healthy ~01:28 UTC. Migration 209 applied after backup ai_fsm_20261027T012137Z.dump. Worker image left as it was.
+- 2026-10-27 · B2 · Merged · #726 · squash 20c7d5f8 at 01:21 UTC
+- 2026-10-27 · B2 · Implemented · #726 · CI runs 40429996387 and 40430001995 green (lint, typecheck, build, test, e2e-smoke) on b4e3ddea
 - 2026-10-27 · B2 · In progress · #726 · person-hours on labor lines and on a flat quote; blank stays null
 - 2026-10-27 · B1 · Verified · health ok and /login HTTP/2 200 at 00:04 UTC; draft labor 10000 materials 20000 then deleted; known-good deploy-good/f4837336
 - 2026-10-27 · B1 · Deployed · f4837336 · web recreated and healthy ~00:02 UTC. Migration 208 applied after backup ai_fsm_20261026T235404Z.dump. Worker image left as it was.
