@@ -82,16 +82,19 @@ export function leastCertainHourSource(
   return best;
 }
 
-/** Price-book hours. Typical hours fill a missing side. No hours stays null. */
+/** Price-book hours. Typical hours fill a missing side. No hours stays null.
+ * Postgres NUMERIC arrives as a string. Number.isFinite rejects that string. */
 export function priceBookHourRange(row: {
-  labor_hours_low?: number | null;
-  labor_hours_high?: number | null;
-  labor_hours_typical?: number | null;
-  default_labor_hours?: number | null;
+  labor_hours_low?: number | string | null;
+  labor_hours_high?: number | string | null;
+  labor_hours_typical?: number | string | null;
+  default_labor_hours?: number | string | null;
 }): { hours_low: number; hours_high: number; hours_source: "price_book" } | null {
-  const side = (value: number | null | undefined): number | null => {
-    if (value == null || !Number.isFinite(value) || value < 0) return null;
-    return value;
+  const side = (value: number | string | null | undefined): number | null => {
+    if (value == null || value === "") return null;
+    const n = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return n;
   };
   const typical = side(row.labor_hours_typical) ?? side(row.default_labor_hours);
   let low = side(row.labor_hours_low) ?? typical;
@@ -107,13 +110,14 @@ export function priceBookHourRange(row: {
   return { hours_low: low!, hours_high: high!, hours_source: "price_book" };
 }
 
-/** A blank field is null. An explicit 0 is kept. */
+/** A blank field is null. An explicit 0 is kept.
+ * Invalid text, including a negative, is null. This runs while the form renders. */
 export function parseHourInput(raw: string | number | null | undefined): number | null {
-  if (typeof raw === "number") return storedHour(raw);
   if (raw == null) return null;
-  const text = raw.trim();
-  if (text === "") return null;
-  return storedHour(Number(text));
+  const n = typeof raw === "number" ? raw : Number(raw.trim());
+  if (typeof raw === "string" && raw.trim() === "") return null;
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
 }
 
 export function formatHourInput(value: number | string | null | undefined): string {

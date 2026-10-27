@@ -150,11 +150,18 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
   await syncLineItems(estimateId, result);
 
   if (args.stampLaborHours != null && Number.isFinite(args.stampLaborHours) && args.stampLaborHours >= 0) {
+    // One submitted total. Room-by-room and a materials row can emit several
+    // labor lines. Writing the total on each of them multiplies the hours.
     await query(
       `UPDATE estimate_line_items
        SET hours_low = $2, hours_high = $2, hours_source = 'owner'
-       WHERE estimate_id = $1 AND option_id IS NULL AND line_item_type = 'labor'
-         AND hours_low IS NULL AND hours_high IS NULL`,
+       WHERE id = (
+         SELECT id FROM estimate_line_items
+         WHERE estimate_id = $1 AND option_id IS NULL AND line_item_type = 'labor'
+           AND hours_low IS NULL AND hours_high IS NULL
+         ORDER BY (COALESCE(total_cents, 0) > 0) DESC, COALESCE(total_cents, 0) DESC, sort_order ASC
+         LIMIT 1
+       )`,
       [estimateId, args.stampLaborHours],
     );
   }

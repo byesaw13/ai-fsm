@@ -4,6 +4,7 @@ import {
   hoursAreMissing,
   leastCertainHourSource,
   lineHourColumns,
+  parseHourInput,
   priceBookHourRange,
   quickEstimateCanSend,
   storedHour,
@@ -94,6 +95,15 @@ describe("person-hour helpers", () => {
       hours_source: "price_book",
     });
     expect(priceBookHourRange({})).toBeNull();
+    expect(priceBookHourRange({
+      labor_hours_low: "1.00",
+      labor_hours_high: "3.00",
+      labor_hours_typical: "2.00",
+    })).toEqual({
+      hours_low: 1,
+      hours_high: 3,
+      hours_source: "price_book",
+    });
   });
 
   it("treats a blank form field as null and an edit as the owner's", () => {
@@ -108,6 +118,10 @@ describe("person-hour helpers", () => {
       hours_source: "owner",
     });
     expect(hoursAreMissing("", "8")).toBe(true);
+    expect(parseHourInput("-1")).toBeNull();
+    expect(parseHourInput("abc")).toBeNull();
+    expect(parseHourInput("2.00")).toBe(2);
+    expect(hoursAreMissing("-1", "8")).toBe(true);
     const edited = withHourEdit(
       { hours_low: "2", hours_high: "2", hours_source: "price_book" as string | null },
       "hours_high",

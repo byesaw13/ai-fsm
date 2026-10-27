@@ -369,6 +369,7 @@ export async function createEstimate(
   const estimateHours = storedHourRange(labor_hours_low, labor_hours_high);
   const estimateHourSource = storedHourSource(labor_hours_source);
 
+  let paintingHoursPlaced = false;
   function lineHoursForInsert(item: (typeof line_items)[number]) {
     const hours = lineHourColumns(item);
     const type = item.line_item_type ?? "labor";
@@ -377,8 +378,10 @@ export async function createEstimate(
       type === "labor" &&
       hours.hours_low == null &&
       hours.hours_high == null &&
-      labor_hours_estimate != null
+      labor_hours_estimate != null &&
+      !paintingHoursPlaced
     ) {
+      paintingHoursPlaced = true;
       return lineHourColumns({
         hours_low: labor_hours_estimate,
         hours_high: labor_hours_estimate,

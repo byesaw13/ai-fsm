@@ -224,6 +224,43 @@ describe.skipIf(!RUN)("creation paths store person-hours", () => {
     expect(labor[0].total_cents).not.toBe(100);
   });
 
+  it("4b. a painting total is stored on one labor line when materials add another", async () => {
+    const spec = sqftPaintingToSpec({
+      sq_ft: 200,
+      prep_level: 3,
+      includes_trim: false,
+      includes_ceiling: false,
+      material_cost_cents: 5000,
+      labor_hours_estimate: 6,
+    });
+    const res = await api("POST", "/api/v1/estimates", {
+      client_id: clientId,
+      tax_rate: 0,
+      sq_ft: 200,
+      prep_level: 3,
+      labor_hours_estimate: 6,
+      material_cost_cents: 5000,
+      line_items: [
+        { description: "Painting labor", quantity: 1, unit_price_cents: 100, line_item_type: "labor" },
+        { description: "Materials", quantity: 1, unit_price_cents: 5000, line_item_type: "materials" },
+      ],
+      engine_spec: spec,
+    });
+    expect(res.status).toBe(201);
+    const lines = await lineHours(res.data.id);
+    const labor = lines.filter((line) => line.line_item_type === "labor");
+    expect(labor.length).toBeGreaterThan(1);
+    const withHours = lines.filter((line) => line.hours_low != null || line.hours_high != null);
+    expect(withHours).toHaveLength(1);
+    expect(withHours[0]).toMatchObject({
+      line_item_type: "labor",
+      hours_low: "6.00",
+      hours_high: "6.00",
+      hours_source: "owner",
+    });
+    expect(withHours[0].total_cents).toBeGreaterThan(0);
+  });
+
   it("5. a price-book draft stores the book's hour range", async () => {
     const hours = priceBookHourRange({ labor_hours_low: 1, labor_hours_high: 3, labor_hours_typical: 2 });
     expect(hours).toEqual({ hours_low: 1, hours_high: 3, hours_source: "price_book" });
