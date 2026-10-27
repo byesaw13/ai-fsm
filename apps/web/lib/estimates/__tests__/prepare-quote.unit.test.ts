@@ -47,8 +47,10 @@ function raw(t: Partial<RawTask> & Pick<RawTask, "description" | "group_key">): 
     customer_supplied: false,
     is_alternative: false,
     price_book_code: null,
-    work_type: "other",
+    work_type: "generic",
     paint_grade: null,
+    repair_class: null,
+    extra_visit: false,
     ...t,
   };
 }
@@ -362,9 +364,15 @@ describe("toPreparedScope — wall painting at the owner's pace (TASK-184)", () 
     expect(patch).toMatchObject({ hours_low: 1, hours_high: 2, hours_source: "ai_allowance", materials_cents: 1500 });
   });
 
-  it("falls back to the price book and the model's allowance without a pace", () => {
+  it("falls back to the model's allowance without a pace, never the whole-room price book entry (TASK-217)", () => {
     const scope = toPreparedScope(output, summary, priceBook, SOURCE);
-    expect(scope.tasks[0]).toMatchObject({ hours_low: 7, hours_high: 11, hours_source: "price_book" });
+    expect(scope.tasks[0]).toMatchObject({ hours_low: 7, hours_high: 11, hours_source: "ai_allowance", price_book_code: null });
+    expect(scope.tasks[0].estimate_notes).toEqual(
+      expect.arrayContaining([
+        { kind: "assumption", text: "Whole-room price book entry 5020 was not used for a single task." },
+        { kind: "missing", text: "No wall painting rate (5012)." },
+      ]),
+    );
     // Paint is still computed from the area
     expect(scope.tasks[0].materials_cents).toBe(22500);
   });

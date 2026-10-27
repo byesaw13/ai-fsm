@@ -75,7 +75,7 @@ const OUTPUT = {
     {
       room_id: "r4", description: "Paint ceiling", kind: "requested", group_key: "bath", quantity_key: "ceiling_sqft",
       count: null, count_unit: null, hours_low: 2, hours_high: 3, materials_cents: 4000, customer_supplied: false, is_alternative: false, price_book_code: null,
-      work_type: "other", paint_grade: null,
+      work_type: "generic", paint_grade: null, repair_class: null, extra_visit: false,
     },
   ],
   questions: [],
@@ -88,7 +88,8 @@ function queueNoDraftThenContext() {
     .mockResolvedValueOnce({ rows: [] }) // open draft lookup
     .mockResolvedValueOnce({ rows: [CONTEXT_ROW] }) // visit/job/property
     .mockResolvedValueOnce({ rows: [] }) // price book
-    .mockResolvedValueOnce({ rows: [] }); // wall paint pace
+    .mockResolvedValueOnce({ rows: [] }) // wall paint pace
+    .mockResolvedValueOnce({ rows: [] }); // trim paint pace
 }
 
 beforeEach(() => {

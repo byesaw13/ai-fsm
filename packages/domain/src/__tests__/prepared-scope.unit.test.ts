@@ -4,6 +4,7 @@ import {
   parsePreparedScope,
   pickStartingHours,
   wallPaintHours,
+  trimPaintHours,
   materialLineCents,
   materialListStale,
   summarizePreparedScope,
@@ -236,5 +237,22 @@ describe("itemized materials (TASK-187)", () => {
 
   it("survives a save and readback", () => {
     expect(parsePreparedScope(JSON.parse(JSON.stringify(itemized)))?.materials?.bath.lines).toHaveLength(3);
+  });
+});
+
+describe("trimPaintHours (TASK-217)", () => {
+  it("is the length over the daily pace, plus or minus 15%", () => {
+    // 40 ft at 120 ft a day = 2.67 h
+    expect(trimPaintHours(40, { linear_ft_per_day: 120 })).toEqual({ low: 2.25, high: 3 });
+  });
+
+  it("is null without a length or a pace", () => {
+    expect(trimPaintHours(null, { linear_ft_per_day: 120 })).toBeNull();
+    expect(trimPaintHours(40, null)).toBeNull();
+  });
+
+  it("keeps the trim method on readback", () => {
+    const t = { ...SCOPE.tasks[0], method: "trim_paint" as const, estimate_notes: [{ kind: "limitation" as const, text: "uncalibrated" }] };
+    expect(parsePreparedScope({ ...SCOPE, tasks: [t] })?.tasks[0]).toMatchObject({ method: "trim_paint", estimate_notes: [{ kind: "limitation" }] });
   });
 });

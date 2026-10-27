@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeAssessmentRoomGeometry } from "../painting";
+import { computeAssessmentRoomGeometry, trimPaintGallons } from "../painting";
 import {
   buildAssessmentJobDescription,
   normalizeAssessmentRoom,
@@ -245,5 +245,12 @@ describe("computeAssessmentRoomGeometry — partial walls, skip areas, vaulted (
     });
     expect(text).toMatch(/paint only Wall with door 7 ft/);
     expect(text).toMatch(/not painted: Cabinets 10 x 9 ft/);
+  });
+});
+
+describe("trimPaintGallons (TASK-217)", () => {
+  it("converts length at 0.5 sq ft per foot, two coats, rounded up", () => {
+    expect(trimPaintGallons(40)).toBe(1);
+    expect(trimPaintGallons(400)).toBe(2); // 200 sq ft x 2 / 350 x 1.1 = 1.26
   });
 });

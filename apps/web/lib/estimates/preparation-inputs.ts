@@ -1,15 +1,15 @@
 import type { PoolClient } from "pg";
-import type { WallPaintRate } from "@ai-fsm/domain";
+import type { TrimPaintRate, WallPaintRate } from "@ai-fsm/domain";
 import type { PriceBookHours } from "@/lib/estimates/prepare-quote";
 
 /**
  * What Prepare Quote and Revise read besides the assessment: price book hours
- * and the owner's wall painting pace (production rate 5012 and its tall-wall
- * modifier, TASK-184). Run inside the estimate's account context.
+ * the owner's wall painting pace (production rate 5012 and its tall-wall
+ * modifier, TASK-184) and trim pace (rate 5003, TASK-217). Run inside the estimate's account context.
  */
 export async function loadPreparationInputs(
   client: Pick<PoolClient, "query">,
-): Promise<{ priceBook: PriceBookHours[]; wallPaintRate: WallPaintRate | null }> {
+): Promise<{ priceBook: PriceBookHours[]; wallPaintRate: WallPaintRate | null; trimPaintRate: TrimPaintRate | null }> {
   const { rows: priceBook } = await client.query<PriceBookHours>(
     `SELECT code, name,
             labor_hours_low::float AS labor_hours_low,
@@ -24,8 +24,14 @@ export async function loadPreparationInputs(
        ON m.service_code = r.service_code AND m.complexity_factor_key = 'vaulted_ceilings'
      WHERE r.service_code = '5012' AND r.scope_component_key = 'wall_sqft' AND r.rate_unit = 'sqft_per_day'`,
   );
+  // Trim pace (TASK-217): rate 5003, baseboard and casing.
+  const { rows: trim } = await client.query<{ lf_per_day: number }>(
+    `SELECT base_rate::float AS lf_per_day FROM production_rates
+     WHERE service_code = '5003' AND scope_component_key = 'trim_linear_ft' AND rate_unit = 'linear_ft_per_day'`,
+  );
   return {
     priceBook,
+    trimPaintRate: trim[0] ? { linear_ft_per_day: trim[0].lf_per_day } : null,
     wallPaintRate: pace[0] ? { sqft_per_day: pace[0].sqft_per_day, tall_wall_modifier_pct: pace[0].tall_pct ?? 0 } : null,
   };
 }

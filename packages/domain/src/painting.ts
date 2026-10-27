@@ -274,6 +274,17 @@ export function wallPaintGallons(sqft: number, coats: number = 2): number {
   return sqft > 0 ? Math.ceil(((sqft * coats) / COVERAGE_SQFT_PER_GAL) * WASTE_FACTOR) : 0;
 }
 
+/**
+ * Trim is converted to paint area at 0.5 sq ft per linear foot, the same
+ * equivalent the room-by-room estimator uses (estimate-engine/painting.ts).
+ */
+export const TRIM_PAINT_SQFT_PER_LF = 0.5;
+
+/** Finish paint for trim by length, through the area equivalent above (TASK-217). */
+export function trimPaintGallons(linearFt: number, coats: number = 2): number {
+  return wallPaintGallons(linearFt * TRIM_PAINT_SQFT_PER_LF, coats);
+}
+
 export function computeRoomPainting(room: RoomSpec, coatCount: number = 2): RoomPaintingResult {
   const measurements = computeRoomMeasurements(room);
   const { wall_sqft, ceiling_sqft, trim_lf } = measurements;

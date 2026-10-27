@@ -6,11 +6,8 @@ import {
   allocateFixedPrice,
   bindQuantities,
   computeAssessmentRoomGeometry,
-  pickStartingHours,
   summarizePreparedScope,
-  wallPaintGallons,
-  wallPaintHours,
-  PAINT_CENTS_PER_GALLON,
+  type TrimPaintRate,
   type WallPaintRate,
   type AssessmentRoom,
   type AssessmentSummary,
@@ -21,6 +18,7 @@ import {
 import { roomGeometryLines } from "@/lib/assessments/room-geometry-display";
 import type { CreateEstimateInput } from "@/lib/estimates/create-estimate";
 import { leastCertainHourSource, type HourSource } from "@/lib/estimates/stored-hours";
+import { applyRoomRules, estimateTask, type RoomRuleFacts } from "@/lib/estimates/task-methods";
 
 type PreparedLineItem = CreateEstimateInput["line_items"][number];
 
@@ -59,8 +57,10 @@ export const preparationTaskSchema = z.object({
   customer_supplied: z.boolean(),
   is_alternative: z.boolean(),
   price_book_code: z.string().nullable(),
-  work_type: z.enum(["wall_paint", "other"]),
+  work_type: z.enum(["wall_paint", "ceiling_paint", "trim_paint", "drywall_prep", "generic"]),
   paint_grade: z.enum(["economy", "standard", "premium", "designer"]).nullable(),
+  repair_class: z.enum(["ordinary_fill", "patch_small", "patch_medium", "patch_large", "texture_match"]).nullable(),
+  extra_visit: z.boolean(),
 });
 
 /** What the model returns. Rooms are referenced by the ids it was given. */
@@ -88,6 +88,8 @@ export interface PreparationSource {
   assessmentUpdatedAt: string | null;
   /** The owner's wall painting pace; null leaves wall painting to the price book or the model. */
   wallPaintRate?: WallPaintRate | null;
+  /** The owner's trim painting pace (rate 5003, TASK-217). */
+  trimPaintRate?: TrimPaintRate | null;
 }
 
 const SYSTEM_PROMPT = `You prepare a draft quote for Dovetails Services LLC, a residential handyman and home maintenance business in southern New Hampshire. You read the owner's room-by-room site assessment and list the work.
@@ -97,11 +99,19 @@ Rules:
 - kind: "requested" for work the customer asked for, "observed" for problems the owner noted that need work, "suggested" only for work nobody asked for. Never add whole-room painting, subfloor replacement or fixture upgrades as anything but "suggested".
 - quantity_key says which measured quantity a task uses. Do not compute areas or lengths yourself; the application does. For items the owner counted or measured directly (3 faceplates, 2 ft of baseboard), use quantity_key "count" with count and count_unit. Use null when a task needs no quantity.
 - groups are customer-facing lines (for example one per room, with flooring separate when it is a distinct trade). group_key is a short slug.
-- hours_low and hours_high: your honest labor allowance for one person doing that task, in hours. Include setup, protection and cleanup. Do not count drying time as worked hours. Use null only if you cannot estimate at all.
+- hours_low and hours_high: your honest labor allowance for one person doing that task, in hours, including preparation and protection that task itself needs (for example masking built-ins before painting around them). Do not count drying time as worked hours. Use null only if you cannot estimate at all.
+- Setup, protection and cleanup shared by the whole job (moving in, covering floors, daily cleanup) are one whole-job task with room_id null. Do not repeat them inside each task.
 - materials_cents: a rough materials allowance in cents for supplies Dovetails buys. If the customer supplies the item, set customer_supplied true and materials_cents 0. Use null when the price depends on a product choice not yet made.
-- price_book_code: the catalog code when one clearly fits the task, else null.
-- work_type "wall_paint" for painting wall surfaces of a room (quantity_key net_wall_sqft); the application then sets hours from the owner's painting pace and paint from the area. Patching, wallpaper removal, trim, ceilings, cabinets and shelving are "other". Give one wall_paint task per room; the room's measured walls already leave out unpainted walls and areas.
-- paint_grade for wall_paint tasks: "premium" when the owner asks for high quality paint, "standard" otherwise; null for other work.
+- price_book_code: the catalog code when one clearly fits the task, else null. Never put a whole-room code (room painting walls only, walls + ceiling + trim, pre-sale refresh) on a single surface.
+- work_type says what kind of work a task is; the application picks the estimating method:
+  - "wall_paint": painting a room's walls (quantity_key net_wall_sqft). One per room; the room's measured walls already leave out unpainted walls and areas.
+  - "ceiling_paint": painting a ceiling (quantity_key ceiling_sqft).
+  - "trim_paint": painting baseboard, casing or other trim (quantity_key baseboard_lf, or "count" with count_unit "lf" when the owner gave a length).
+  - "drywall_prep": filling or patching drywall (quantity_key "count", count = number of repairs). Set repair_class: "ordinary_fill" for nail holes, picture-hanger holes and small dings; "patch_small" up to 6 in; "patch_medium" 6 to 12 in; "patch_large" over 12 in; "texture_match" when texture must be matched. Set extra_visit true when the repair needs a return visit (compound drying between coats before painting).
+  - "generic" for everything else (wallpaper removal, cabinets, shelving, fixtures, the whole-job setup task).
+  Painting walls, ceiling and trim in one room are separate tasks in the same group. Do not add touch-up painting for a room whose walls are being painted.
+- repair_class and extra_visit apply to drywall_prep only; otherwise null and false.
+- paint_grade for painting tasks: "premium" when the owner asks for high quality paint, "standard" otherwise; null for other work.
 - questions: only what changes price or scope and is not already answered in the notes. Attach each to the tasks it affects by index. Do not ask about room size for tasks that do not need it.
 - When the owner wants options shown (for example two flooring types), list each option as its own task. Mark the recommended or first option is_alternative false and every other option is_alternative true, so the quote charges for one. Every other task is is_alternative false.
 - alternatives: real options the customer might choose between (for example blending a patch versus repainting the whole wall). exclusions: conditions the quote does not cover, such as concealed damage.`;
@@ -164,54 +174,55 @@ export interface TaskBuildContext {
   /** Group key → label; new group keys are added here. */
   groups: Map<string, string>;
   wallPaintRate?: WallPaintRate | null;
+  trimPaintRate?: TrimPaintRate | null;
 }
 
 export function taskBuildContext(
   summary: AssessmentSummary,
   priceBook: PriceBookHours[],
   groups: Map<string, string>,
-  wallPaintRate?: WallPaintRate | null,
+  rates: { wallPaintRate?: WallPaintRate | null; trimPaintRate?: TrimPaintRate | null } = {},
 ): TaskBuildContext {
   return {
     roomsById: new Map(summary.rooms.map((r) => [r.id, r])),
     byCode: new Map(priceBook.map((p) => [p.code, p])),
     groups,
-    wallPaintRate,
+    wallPaintRate: rates.wallPaintRate,
+    trimPaintRate: rates.trimPaintRate,
   };
 }
 
 /**
  * One model task as a prepared task (quantity not yet bound). Unknown rooms
  * become whole-job work, suggestions and non-default options start
- * unconfirmed, wall painting is paced and its paint computed from the area,
- * and price-book hours win over the model's allowance. Pure.
+ * unconfirmed, and hours and materials come from the trade method for the
+ * task's kind of work (TASK-217), with each limitation noted. Pure.
  */
 export function buildPreparedTask(t: PreparationTask, id: string, ctx: TaskBuildContext): PreparedTask {
   const groupKey = slug(t.group_key, "general");
   if (!ctx.groups.has(groupKey)) ctx.groups.set(groupKey, groupKey.replace(/_/g, " "));
-  const pb = t.price_book_code ? ctx.byCode.get(t.price_book_code) : undefined;
   const roomId = t.room_id && ctx.roomsById.has(t.room_id) ? t.room_id : null;
   const geometry = roomId ? computeAssessmentRoomGeometry(ctx.roomsById.get(roomId)!) : null;
-  // Wall painting is priced from the net wall area when the room has one (TASK-184).
-  const wallPaint = t.work_type === "wall_paint" && geometry !== null;
-  const quantityKey =
-    wallPaint && geometry.net_wall_sqft.value !== null ? ("net_wall_sqft" as const) : t.quantity_key;
-  const wallSqft =
-    wallPaint && (quantityKey === "net_wall_sqft" || quantityKey === "gross_wall_sqft")
-      ? geometry[quantityKey].value
-      : null;
-  const isCount = quantityKey === "count";
-  const paced = wallPaintHours(wallSqft, geometry?.max_wall_height_ft ?? null, ctx.wallPaintRate ?? null);
-  // A paced area beats the price book's flat per-room hours.
-  const hours = pickStartingHours({
-    price_book: pb && !paced ? { low: pb.labor_hours_low ?? pb.labor_hours_typical, high: pb.labor_hours_high ?? pb.labor_hours_typical } : null,
-    production_rate: paced,
-    ai_allowance: { low: nonNegative(t.hours_low), high: nonNegative(t.hours_high) },
-  });
-  let materials = t.customer_supplied ? 0 : nonNegative(t.materials_cents);
-  if (wallSqft !== null && !t.customer_supplied) {
-    materials = wallPaintGallons(wallSqft) * PAINT_CENTS_PER_GALLON[t.paint_grade ?? "standard"];
-  }
+  // A surface method needs a room; without one the task is estimated as generic work.
+  const method = roomId || t.work_type === "generic" || t.work_type === "drywall_prep" ? t.work_type : "generic";
+  const est = estimateTask(
+    {
+      method,
+      quantity_key: t.quantity_key,
+      count: t.count,
+      count_unit: t.count_unit,
+      hours_low: t.hours_low,
+      hours_high: t.hours_high,
+      materials_cents: t.materials_cents,
+      customer_supplied: t.customer_supplied,
+      paint_grade: t.paint_grade,
+      price_book_code: t.price_book_code,
+      repair_class: method === "drywall_prep" ? t.repair_class : null,
+      extra_visit: method === "drywall_prep" && t.extra_visit,
+    },
+    { geometry, byCode: ctx.byCode, wallPaintRate: ctx.wallPaintRate, trimPaintRate: ctx.trimPaintRate },
+  );
+  const isCount = est.quantity_key === "count";
   return {
     id,
     room_id: roomId,
@@ -220,15 +231,26 @@ export function buildPreparedTask(t: PreparationTask, id: string, ctx: TaskBuild
     // Suggestions and the non-default side of an option wait for the owner.
     confirmed: t.kind !== "suggested" && !t.is_alternative,
     group_key: groupKey,
-    quantity_key: quantityKey,
+    quantity_key: est.quantity_key,
     count: isCount && typeof t.count === "number" && t.count > 0 ? t.count : null,
     ...(isCount && t.count_unit ? { count_unit: t.count_unit } : {}),
     quantity: null,
-    hours_low: hours?.low ?? null,
-    hours_high: hours?.high ?? null,
-    hours_source: hours?.source ?? null,
-    materials_cents: materials === null ? null : Math.round(materials),
-    price_book_code: pb ? pb.code : null,
+    hours_low: est.hours?.low ?? null,
+    hours_high: est.hours?.high ?? null,
+    hours_source: est.hours?.source ?? null,
+    materials_cents: est.materials_cents === null ? null : Math.round(est.materials_cents),
+    price_book_code: est.price_book_code,
+    method,
+    ...(est.notes.length ? { estimate_notes: est.notes.slice(0, 10) } : {}),
+  };
+}
+
+/** What the room rules need to know about a model task. */
+export function roomRuleFacts(t: PreparationTask): RoomRuleFacts {
+  return {
+    repair_class: t.work_type === "drywall_prep" ? t.repair_class : null,
+    extra_visit: t.work_type === "drywall_prep" && t.extra_visit,
+    ai_hours: { low: nonNegative(t.hours_low), high: nonNegative(t.hours_high) },
   };
 }
 
@@ -249,10 +271,10 @@ export function toPreparedScope(
     if (!groups.has(key)) groups.set(key, g.label.trim() || key);
   }
 
-  const ctx = taskBuildContext(summary, priceBook, groups, source.wallPaintRate);
-  const tasks: PreparedTask[] = output.tasks
-    .filter((t) => t.description.trim())
-    .map((t, i) => buildPreparedTask(t, `t${i + 1}`, ctx));
+  const ctx = taskBuildContext(summary, priceBook, groups, source);
+  const raw = output.tasks.filter((t) => t.description.trim());
+  const built = raw.map((t, i) => buildPreparedTask(t, `t${i + 1}`, ctx));
+  const tasks: PreparedTask[] = applyRoomRules(built, new Map(built.map((t, i) => [t.id, roomRuleFacts(raw[i])])));
 
   const idAt = (index: number) => tasks[index]?.id;
   const questions: PreparedQuestion[] = output.questions

@@ -5,6 +5,8 @@ re-keying, and keeping estimate structure consistent across jobs.
 
 ## Active tasks
 
+- [TASK-217: Trade-aware estimating methods in Prepare Quote](TASK-217-trade-aware-estimate-methods.md) — focused correction, owner-approved 2026-10-27.
+
 ## Estimating assistant, Phase 3 slice (TASK-209 to TASK-216)
 
 Approved by the owner 2026-10-26. Design: `docs/working/estimating-assistant-phase3.md`.
