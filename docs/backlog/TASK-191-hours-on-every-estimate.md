@@ -1,7 +1,7 @@
 # TASK-191: Person-hours on every estimate
 
 Status:
-In progress
+Done (#726, 20c7d5f8, verified 2026-10-27)
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -50,23 +50,23 @@ Scope:
   hours, sources and costs.
 
 Acceptance Criteria:
-- [ ] A T&M briefing of "6-8 hours on site" creates a labor line with 6-8 h,
+- [x] A T&M briefing of "6-8 hours on site" creates a labor line with 6-8 h,
       source ai_allowance, editable to 7-8 h (source becomes owner).
-- [ ] An AI draft with a price-book service of typical 2 h creates a line with
+- [x] An AI draft with a price-book service of typical 2 h creates a line with
       2 h, source price_book.
-- [ ] The quick wizard shows "Hours missing" before its send step and does not
+- [x] The quick wizard shows "Hours missing" before its send step and does not
       call Send until hours and direct costs are complete.
-- [ ] Fix now shows the hours field before Send.
-- [ ] Coverage tests for paths 1-11 pass.
-- [ ] A travel calculation of 60 billable minutes gives the travel-time line
+- [x] Fix now shows the hours field before Send.
+- [x] Coverage tests for paths 1-11 pass.
+- [x] A travel calculation of 60 billable minutes gives the travel-time line
       1-1 h, source travel_calc (doc Example F).
-- [ ] A blank hours field saves as null and reloads blank.
-- [ ] Adding price-book item with typical 2 h shows 2 h, source price_book;
+- [x] A blank hours field saves as null and reloads blank.
+- [x] Adding price-book item with typical 2 h shows 2 h, source price_book;
       editing it to 3 h shows source owner.
-- [ ] Apply to quote on Fixture A stores 87.75-132.25 h across its labor
+- [x] Apply to quote on Fixture A stores 87.75-132.25 h across its labor
       lines.
-- [ ] A flat-price quote saves an estimate-level 20-30 h range.
-- [ ] Existing estimates load with hours null and unchanged totals.
+- [x] A flat-price quote saves an estimate-level 20-30 h range.
+- [x] Existing estimates load with hours null and unchanged totals.
 
 Effort:
 3 days.
