@@ -1,7 +1,7 @@
 # TASK-192: Equipment line type
 
 Status:
-In progress
+Done
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -29,9 +29,9 @@ Scope:
   keeps the type.
 
 Acceptance Criteria:
-- [ ] A $120 equipment line leaves the handling amount unchanged.
-- [ ] Convert produces an equipment invoice line.
-- [ ] The migration applies and reverses cleanly on a copy of production data.
+- [x] A $120 equipment line leaves the handling amount unchanged.
+- [x] Convert produces an equipment invoice line.
+- [x] The migration applies and reverses cleanly on a copy of production data.
 
 Related:
 TASK-152 (job materials and equipment become invoice lines; uses the same type).
