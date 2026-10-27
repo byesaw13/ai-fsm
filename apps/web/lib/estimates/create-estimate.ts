@@ -13,6 +13,7 @@ import {
 } from "@ai-fsm/domain";
 import { defaultMaterialPrice, linePriceMissing, splitInternalCosts } from "@/lib/estimates/cost-split";
 import { explicitMaterialDepositCents } from "@/lib/estimates/itemized-preserve";
+import { HOUR_SOURCES, lineHourColumns, storedHourRange, storedHourSource } from "@/lib/estimates/stored-hours";
 import { logger } from "@/lib/logger";
 import { reviewEstimateGuardrails, computeConditionTier } from "@/lib/estimates/guardrails";
 import { computeAndPersist } from "@/lib/estimates/compute";
@@ -35,8 +36,10 @@ const lineItemInputSchema = z.object({
   quantity: z.number().positive(),
   unit_price_cents: z.number().int().nonnegative().optional(),
   unit_cost_cents: z.number().int().nonnegative().nullable().optional(),
-  /** Used for labor cost when sent. Stored with the line in TASK-191. */
+  /** Person-hours. Blank stays null, never zero. */
+  hours_low: z.number().nonnegative().nullable().optional(),
   hours_high: z.number().nonnegative().nullable().optional(),
+  hours_source: z.enum(HOUR_SOURCES).nullable().optional(),
   line_item_type: z.enum(["labor", "materials", "handling_fee", "adjustment"]).default("labor"),
   visible_to_customer: z.boolean().default(true),
   adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
@@ -48,6 +51,17 @@ const lineItemInputSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "Enter a price, or a cost on a materials line",
       path: ["unit_price_cents"],
+    });
+  }
+  if (
+    item.hours_low != null &&
+    item.hours_high != null &&
+    item.hours_low > item.hours_high
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Hours low cannot be above high",
+      path: ["hours_low"],
     });
   }
 });
@@ -92,6 +106,10 @@ export const createEstimateSchema = z.object({
   includes_ceiling: z.boolean().default(false),
   material_cost_cents: z.number().int().nonnegative().default(0),
   labor_hours_estimate: z.number().positive().optional(),
+  /** Flat quotes store this range on the estimate. It is not added to line hours. */
+  labor_hours_low: z.number().nonnegative().nullable().optional(),
+  labor_hours_high: z.number().nonnegative().nullable().optional(),
+  labor_hours_source: z.enum(HOUR_SOURCES).nullable().optional(),
   // Pricing guardrails
   trip_count: estimateTripCountSchema.default("one_trip"),
   requires_drying_or_curing: z.boolean().default(false),
@@ -127,6 +145,18 @@ export const createEstimateSchema = z.object({
       })
     )
     .optional(),
+}).superRefine((input, ctx) => {
+  if (
+    input.labor_hours_low != null &&
+    input.labor_hours_high != null &&
+    input.labor_hours_low > input.labor_hours_high
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Hours low cannot be above high",
+      path: ["labor_hours_low"],
+    });
+  }
 });
 
 export type CreateEstimateInput = z.infer<typeof createEstimateSchema>;
@@ -177,6 +207,9 @@ export async function createEstimate(
     includes_ceiling,
     material_cost_cents,
     labor_hours_estimate,
+    labor_hours_low,
+    labor_hours_high,
+    labor_hours_source,
     trip_count,
     requires_drying_or_curing,
     difficult_access,
@@ -330,6 +363,8 @@ export async function createEstimate(
   }, pricingRules);
   // In flat-rate mode, ignore any line_items that were mistakenly sent
   const itemsToInsert = flat_rate_cents !== undefined ? [] : line_items;
+  const estimateHours = storedHourRange(labor_hours_low, labor_hours_high);
+  const estimateHourSource = storedHourSource(labor_hours_source);
 
   const estimate = await withEstimateContext(session, async (client) => {
     // Verify client belongs to account
@@ -355,13 +390,14 @@ export async function createEstimate(
           risk_adjustment_cents, minimum_service_override_reason,
           minimum_service_override_note, pricing_review_status, scope_assumptions,
           condition_tier, shopping_list_json, specified_materials_json, room_specs,
-          booking_request_id, pricing_mode, source_visit_id, prepared_scope)
+          booking_request_id, pricing_mode, source_visit_id, prepared_scope,
+          labor_hours_low, labor_hours_high, labor_hours_source)
         VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $10, $11,
                 $12, $13, $14, $15, $16, $17, $18, $19,
                 $20, $21, $22, $23, $24, $25, $26, $27,
                 $28, $29, $30, $31, $32, $33, $34, $35,
                 $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47,
-                $48, $49)
+                $48, $49, $50, $51, $52)
         RETURNING id`,
       [
         session.accountId,
@@ -413,6 +449,9 @@ export async function createEstimate(
         commercialPricingMode,
         extra.sourceVisitId ?? null,
         extra.preparedScope ? JSON.stringify(extra.preparedScope) : null,
+        estimateHours.low,
+        estimateHours.high,
+        estimateHours.low == null && estimateHours.high == null ? null : estimateHourSource,
       ]
     );
     const estimateId = result.rows[0].id;
@@ -437,12 +476,13 @@ export async function createEstimate(
         for (let li = 0; li < option.line_items.length; li++) {
           const item = option.line_items[li];
           const itemTotal = lineItemTotal(item);
+          const hours = lineHourColumns(item);
           await client.query(
             `INSERT INTO estimate_line_items
                (estimate_id, option_id, description, quantity, unit_price_cents, total_cents,
                 line_item_type, visible_to_customer, adjustment_type, sort_order, price_book_id,
-                unit_cost_cents)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                unit_cost_cents, hours_low, hours_high, hours_source)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
             [
               estimateId,
               optionId,
@@ -456,6 +496,9 @@ export async function createEstimate(
               item.sort_order ?? li,
               item.price_book_id ?? null,
               item.unit_cost_cents ?? null,
+              hours.hours_low,
+              hours.hours_high,
+              hours.hours_source,
             ]
           );
         }
@@ -465,12 +508,13 @@ export async function createEstimate(
       for (let i = 0; i < itemsToInsert.length; i++) {
         const item = itemsToInsert[i];
         const itemTotal = lineItemTotal(item);
+        const hours = lineHourColumns(item);
         await client.query(
           `INSERT INTO estimate_line_items
              (estimate_id, description, quantity, unit_price_cents, total_cents,
               line_item_type, visible_to_customer, adjustment_type, sort_order, price_book_id,
-              prepared_group_key, unit_cost_cents)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+              prepared_group_key, unit_cost_cents, hours_low, hours_high, hours_source)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
           [
             estimateId,
             item.description,
@@ -484,6 +528,9 @@ export async function createEstimate(
             item.price_book_id ?? null,
             extra.lineGroupKeys?.[i] ?? null,
             item.unit_cost_cents ?? null,
+            hours.hours_low,
+            hours.hours_high,
+            hours.hours_source,
           ]
         );
       }

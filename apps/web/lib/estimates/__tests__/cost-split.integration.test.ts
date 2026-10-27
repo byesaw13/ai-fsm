@@ -3,7 +3,7 @@
  *
  * Tier: HTTP integration. Skips without TEST_DATABASE_URL and TEST_BASE_URL.
  * Fixture A is the hourly baseline: 110.25 labor hours and $1,450 of materials.
- * Hours are sent and used for cost, and are not stored until TASK-191.
+ * Hours are sent and used for cost. TASK-191 stores them; this test checks the costs.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
