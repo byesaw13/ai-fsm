@@ -7,11 +7,14 @@ import {
   type AssessmentSummary,
   type PreparedScope,
   type PreparedTask,
+  type TrimPaintRate,
   type WallPaintRate,
 } from "@ai-fsm/domain";
+import { applyRoomRules } from "@/lib/estimates/task-methods";
 import {
   PREPARE_QUOTE_MODEL,
   buildPreparedTask,
+  roomRuleFacts,
   preparationTaskSchema,
   taskBuildContext,
   type PriceBookHours,
@@ -61,6 +64,7 @@ export interface RevisionContext {
   summary: AssessmentSummary;
   priceBook: PriceBookHours[];
   wallPaintRate?: WallPaintRate | null;
+  trimPaintRate?: TrimPaintRate | null;
 }
 
 type TaskValues = Pick<PreparedTask, "hours_low" | "hours_high" | "materials_cents" | "confirmed">;
@@ -93,7 +97,7 @@ export function applyRevision(
   ctx: RevisionContext,
 ): { scope: PreparedScope; changes: RevisionChange[] } {
   const groups = new Map(scope.groups.map((g) => [g.key, g.label]));
-  const build = taskBuildContext(ctx.summary, ctx.priceBook, groups, ctx.wallPaintRate);
+  const build = taskBuildContext(ctx.summary, ctx.priceBook, groups, ctx);
   const tasks = scope.tasks.map((t) => ({ ...t }));
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const refs = new Map<string, string>();
@@ -104,7 +108,9 @@ export function applyRevision(
     if (c.action === "add") {
       if (!c.task || !c.task.description.trim()) continue;
       const id = `t${++next}`;
-      const [added] = bindQuantities([buildPreparedTask(c.task, id, build)], ctx.summary.rooms);
+      // Room rules see the tasks already in the room but only change the new one (TASK-217).
+      const ruled = applyRoomRules([...tasks, buildPreparedTask(c.task, id, build)], new Map([[id, roomRuleFacts(c.task)]]));
+      const [added] = bindQuantities([ruled[ruled.length - 1]], ctx.summary.rooms);
       tasks.push(added);
       byId.set(id, added);
       if (c.ref) refs.set(c.ref, id);
@@ -170,7 +176,7 @@ Rules:
 - Return only changes. Leave every task you were not asked about, and whose answer does not affect it, alone.
 - An answer that rules work out (for example "No, do not paint the cabinets") excludes that task: action "exclude". Never delete work.
 - "update" changes a task's description, hours or materials; set a field to null to keep it. "include" puts an excluded task back.
-- "add" is for work the owner asks for or an answer reveals (for example a contingency allowance for possible subfloor damage). Write the task like a prepared task: room_id from the rooms given, quantity_key for measured quantities (the application computes areas), work_type "wall_paint" for painting a room's walls. Give it a short ref.
+- "add" is for work the owner asks for or an answer reveals (for example a contingency allowance for possible subfloor damage). Write the task like a prepared task: room_id from the rooms given, quantity_key for measured quantities (the application computes areas), work_type for the kind of work ("wall_paint", "ceiling_paint", "trim_paint", "drywall_prep" with repair_class and extra_visit, or "generic"). Give it a short ref.
 - When the owner asks to compare choices (for example sheet vinyl versus LVP), add the second choice as a task with is_alternative true and list both in alternatives_add, using task ids or refs.
 - hours are one person's labor including setup and cleanup; materials_cents is what Dovetails buys, in cents.
 - reason: one short sentence the owner can check. summary: one or two sentences on what changed overall.`;

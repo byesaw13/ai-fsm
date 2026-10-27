@@ -77,12 +77,12 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       );
       if (!rows[0]) return null;
       const settings = await loadPricingSettings(client, session.accountId);
-      const { priceBook, wallPaintRate } = await loadPreparationInputs(client);
-      return { ...rows[0], settings, priceBook, wallPaintRate };
+      const { priceBook, wallPaintRate, trimPaintRate } = await loadPreparationInputs(client);
+      return { ...rows[0], settings, priceBook, wallPaintRate, trimPaintRate };
     });
     if (!context) return errorResponse(session, 404, "NOT_FOUND", "Visit not found");
 
-    const source = { visitId, assessmentUpdatedAt: context.assessment_updated_at, wallPaintRate: context.wallPaintRate };
+    const source = { visitId, assessmentUpdatedAt: context.assessment_updated_at, wallPaintRate: context.wallPaintRate, trimPaintRate: context.trimPaintRate };
     // No AI, no draft: an empty draft would take the visit's one draft slot.
     let scope;
     let failure: unknown = null;

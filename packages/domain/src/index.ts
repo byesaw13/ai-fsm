@@ -58,6 +58,8 @@ export {
   computePaintingProject,
   computeAssessmentRoomGeometry,
   wallPaintGallons,
+  trimPaintGallons,
+  TRIM_PAINT_SQFT_PER_LF,
   PAINT_CENTS_PER_GALLON,
 } from "./painting";
 export type {

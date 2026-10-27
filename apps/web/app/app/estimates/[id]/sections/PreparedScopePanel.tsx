@@ -16,7 +16,7 @@ import {
 import { Button, useToast } from "@/components/ui";
 import { formatCents } from "@/lib/money";
 import type { RevisionChange } from "@/lib/estimates/revise-quote";
-import { hoursSourceLabel, kindLabel, quantityLabel, tmRangeLabel, workAreaFlags, workAreaRows } from "@/lib/estimates/prepared-scope-display";
+import { hoursSourceLabel, kindLabel, methodLabel, quantityLabel, tmRangeLabel, workAreaFlags, workAreaRows } from "@/lib/estimates/prepared-scope-display";
 
 interface Props {
   estimateId: string;
@@ -324,7 +324,7 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
                     <span>
                       {t.description}
                       <span style={{ ...label, display: "block" }}>
-                        {[t.room_id ? roomNames[t.room_id] ?? null : "Whole job", kindLabel(t.kind), t.quantity ? quantityLabel(t.quantity) : null, t.confirmed ? null : "not included"]
+                        {[t.room_id ? roomNames[t.room_id] ?? null : "Whole job", methodLabel(t.method), kindLabel(t.kind), t.quantity ? quantityLabel(t.quantity) : null, t.confirmed ? null : "not included"]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>
@@ -347,6 +347,11 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
                         onChange={(e) => patchTask(t.id, { materials_cents: parseDollars(e.target.value) })} />
                     </div>
                     <span style={{ ...label, alignSelf: "flex-end", flex: "1 1 100%" }}>Hours: {hoursSourceLabel(t.hours_source)}</span>
+                    {(t.estimate_notes ?? []).map((n, i) => (
+                      <span key={i} style={{ ...label, flex: "1 1 100%", color: n.kind === "missing" ? "var(--warning, var(--fg))" : undefined }}>
+                        {n.kind === "missing" ? "Missing: " : n.kind === "limitation" ? "Limitation: " : "Assumed: "}{n.text}
+                      </span>
+                    ))}
                   </div>
                   {questions.map((q) => (
                     <div key={q.id} style={{ paddingLeft: "var(--space-5)", marginTop: "var(--space-2)" }}>

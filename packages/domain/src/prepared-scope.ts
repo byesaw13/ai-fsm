@@ -19,6 +19,20 @@ export type ScopeTaskKind = "observed" | "requested" | "suggested";
 /** Where a starting hour range came from. */
 export type HoursSource = "price_book" | "production_rate" | "ai_allowance" | "owner" | "revision";
 
+/**
+ * What kind of work a task is (TASK-217). Classification only: the estimating
+ * method that sets its hours and materials is chosen from what data exists, so
+ * a task can be ceiling painting even when no ceiling production rate exists.
+ */
+export type TaskMethod = "wall_paint" | "ceiling_paint" | "trim_paint" | "drywall_prep" | "generic";
+
+/** Something the owner should know about how a task was estimated. */
+export interface EstimateNote {
+  /** missing: a measurement, rate or price is absent. limitation: the method used has a known weakness. assumption: a judgment the app made. */
+  kind: "missing" | "limitation" | "assumption";
+  text: string;
+}
+
 /** Which room quantity a task uses, or a plain count of items. */
 export type QuantityKey =
   | "floor_sqft"
@@ -59,6 +73,10 @@ export interface PreparedTask {
   /** Materials allowance in cents; null means not priced yet. */
   materials_cents: number | null;
   price_book_code?: string | null;
+  /** Kind of work (TASK-217); absent on tasks prepared before it. */
+  method?: TaskMethod;
+  /** How the hours and materials were reached and what is missing. */
+  estimate_notes?: EstimateNote[];
 }
 
 export interface PreparedGroup {
@@ -261,6 +279,19 @@ export function wallPaintHours(
   return { low: quarter(hours * 0.85), high: quarter(hours * 1.15) };
 }
 
+/** The owner's trim painting pace (production rate 5003, baseboard and casing). */
+export interface TrimPaintRate {
+  linear_ft_per_day: number;
+}
+
+/** Hour range for trim at the owner's pace: length over the daily rate, plus or minus 15%, in quarter hours (TASK-217). */
+export function trimPaintHours(linearFt: number | null, rate: TrimPaintRate | null): HoursCandidate | null {
+  if (!rate || rate.linear_ft_per_day <= 0 || linearFt === null || linearFt <= 0) return null;
+  const hours = (linearFt / rate.linear_ft_per_day) * 8;
+  const quarter = (n: number) => Math.max(0.25, Math.round(n * 4) / 4);
+  return { low: quarter(hours * 0.85), high: quarter(hours * 1.15) };
+}
+
 export interface PreparedGroupSummary {
   key: string;
   label: string;
@@ -369,6 +400,11 @@ export const preparedScopeSchema = z.object({
         hours_source: z.enum(["price_book", "production_rate", "ai_allowance", "owner", "revision"]).nullable(),
         materials_cents: z.number().int().min(0).nullable(),
         price_book_code: z.string().max(40).nullable().optional(),
+        method: z.enum(["wall_paint", "ceiling_paint", "trim_paint", "drywall_prep", "generic"]).optional(),
+        estimate_notes: z
+          .array(z.object({ kind: z.enum(["missing", "limitation", "assumption"]), text: z.string().max(300) }))
+          .max(10)
+          .optional(),
       }),
     )
     .max(200),

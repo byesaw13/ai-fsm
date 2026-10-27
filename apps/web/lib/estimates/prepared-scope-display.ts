@@ -7,6 +7,7 @@ import {
   type PreparedScope,
   type PreparedScopeSummary,
   type ScopeTaskKind,
+  type TaskMethod,
 } from "@ai-fsm/domain";
 
 const QUANTITY_NAMES: Record<PreparedQuantity["key"], string> = {
@@ -40,12 +41,26 @@ export function quantityLabel(q: PreparedQuantity): string {
 export function hoursSourceLabel(source: HoursSource | null): string {
   switch (source) {
     case "price_book": return "price book";
-    case "production_rate": return "production rate";
+    // No rate is calibrated against real jobs yet (TASK-193 adds calibration).
+    case "production_rate": return "production rate (uncalibrated)";
     case "ai_allowance": return "AI allowance";
     case "owner": return "yours";
     case "revision": return "revised from your note";
     default: return "no hours yet";
   }
+}
+
+const METHOD_LABELS: Record<TaskMethod, string> = {
+  wall_paint: "Wall painting",
+  ceiling_paint: "Ceiling painting",
+  trim_paint: "Trim painting",
+  drywall_prep: "Drywall prep",
+  generic: "General",
+};
+
+/** The kind of work a task was classified as (TASK-217); null for tasks prepared before it. */
+export function methodLabel(method: TaskMethod | undefined): string | null {
+  return method ? METHOD_LABELS[method] : null;
 }
 
 export function kindLabel(kind: ScopeTaskKind): string {
@@ -71,6 +86,8 @@ export interface WorkAreaRow {
   included_count: number;
   /** What still needs the owner: unanswered questions, included tasks missing hours or a materials price. */
   open_questions: number;
+  /** Included tasks with a missing measurement, rate or price note (TASK-217). */
+  missing_inputs: number;
   missing_hours: number;
   missing_materials: number;
   /** Materials come from an itemized list (TASK-187), and whether its tasks changed since. */
@@ -120,6 +137,7 @@ export function workAreaRows(scope: PreparedScope, laborRateCents: number): Work
         task_count: tasks.length,
         included_count: included.length,
         open_questions: scope.questions.filter((q) => !q.answer && q.task_ids.some((id) => ids.has(id))).length,
+        missing_inputs: included.filter((t) => t.estimate_notes?.some((n) => n.kind === "missing")).length,
         missing_hours: included.filter((t) => t.hours_low === null || t.hours_high === null).length,
         missing_materials: list
           ? list.lines.filter((l) => l.unit_cost_cents === null).length
@@ -137,6 +155,7 @@ export function workAreaRows(scope: PreparedScope, laborRateCents: number): Work
 export function workAreaFlags(row: WorkAreaRow): string {
   return [
     row.open_questions > 0 ? `${row.open_questions} open question${row.open_questions === 1 ? "" : "s"}` : null,
+    row.missing_inputs > 0 ? `${row.missing_inputs} missing a measurement, rate or price` : null,
     row.missing_hours > 0 ? `${row.missing_hours} without hours` : null,
     row.missing_materials > 0 ? `${row.missing_materials} not priced` : null,
     row.materials_stale ? "materials list made before the tasks changed" : null,

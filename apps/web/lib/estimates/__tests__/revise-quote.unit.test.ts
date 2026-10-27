@@ -38,7 +38,7 @@ function change(c: Partial<RevisionOutput["changes"][number]> & Pick<RevisionOut
 const ADD_TASK = {
   room_id: "s1", description: "Paint the remaining walls", kind: "requested" as const, group_key: "son", quantity_key: "net_wall_sqft" as const,
   count: null, count_unit: null, hours_low: 6, hours_high: 9, materials_cents: 20000, customer_supplied: false, is_alternative: false,
-  price_book_code: null, work_type: "wall_paint" as const, paint_grade: "premium" as const,
+  price_book_code: null, work_type: "wall_paint" as const, paint_grade: "premium" as const, repair_class: null, extra_visit: false,
 };
 
 describe("applyRevision (TASK-186)", () => {
@@ -69,7 +69,7 @@ describe("applyRevision (TASK-186)", () => {
   });
 
   it("adds an option pair that refers to an added task by its ref", () => {
-    const alt = { ...ADD_TASK, description: "LVP instead", is_alternative: true, work_type: "other" as const, quantity_key: null, paint_grade: null };
+    const alt = { ...ADD_TASK, description: "LVP instead", is_alternative: true, work_type: "generic" as const, quantity_key: null, paint_grade: null };
     const out: RevisionOutput = {
       summary: "s",
       changes: [change({ action: "add", task: alt, ref: "lvp", reason: "Compare." })],
@@ -78,6 +78,18 @@ describe("applyRevision (TASK-186)", () => {
     const { scope } = applyRevision(SCOPE, out, CTX);
     expect(scope.tasks.at(-1)).toMatchObject({ id: "t6", confirmed: false });
     expect(scope.alternatives).toEqual([{ id: "a1", label: "Wallpaper wall vs LVP", task_ids: ["t3", "t6"], note: null }]);
+  });
+
+  it("added work goes through the trade methods and room rules (TASK-217)", () => {
+    const painted = { ...SCOPE, tasks: [...SCOPE.tasks, { ...SCOPE.tasks[2], id: "t9", description: "Paint walls", method: "wall_paint" as const }] };
+    const fill = {
+      ...ADD_TASK, description: "Fill nail holes", work_type: "drywall_prep" as const, quantity_key: "count" as const, count: 6,
+      count_unit: "each" as const, paint_grade: null, repair_class: "ordinary_fill" as const,
+    };
+    const { scope } = applyRevision(painted, { summary: "s", changes: [change({ action: "add", task: fill, ref: null, reason: "Holes." })], alternatives_add: [] }, CTX);
+    expect(scope.tasks.at(-1)).toMatchObject({ method: "drywall_prep", hours_low: 0, hours_high: 0, materials_cents: 0 });
+    // The existing tasks are not touched by the rules.
+    expect(scope.tasks.slice(0, -1)).toEqual(painted.tasks);
   });
 
   it("skips unknown task ids and changes that change nothing", () => {
