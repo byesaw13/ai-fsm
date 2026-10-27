@@ -21,6 +21,7 @@ import { resolveLaborRateCents } from "@/lib/estimates/tm-briefing";
 import { preparedShoppingList } from "@/lib/estimates/itemize-materials";
 import { loadPricingSettings } from "@/lib/pricing/settings";
 import { modelPreparedProfit, parsePreparedScope } from "@ai-fsm/domain";
+import { parseHourInput, storedHourSource } from "@/lib/estimates/stored-hours";
 
 export const dynamic = "force-dynamic";
 
@@ -85,9 +86,12 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
       const { lineItems, groupKeys } = built;
 
       // Lines the owner added by hand stay exactly as they are, after the prepared ones.
-      const { rows: handLines } = await client.query<LineItemInput & { sort_order: number }>(
+      const { rows: handLines } = await client.query<
+        LineItemInput & { sort_order: number; hours_low: string | number | null; hours_high: string | number | null; hours_source: string | null }
+      >(
         `SELECT description, quantity::float AS quantity, unit_price_cents, unit_cost_cents, line_item_type,
-                visible_to_customer, adjustment_type, sort_order, price_book_id
+                visible_to_customer, adjustment_type, sort_order, price_book_id,
+                hours_low, hours_high, hours_source
          FROM estimate_line_items
          WHERE estimate_id = $1 AND option_id IS NULL AND prepared_group_key IS NULL
          ORDER BY sort_order`,
@@ -103,8 +107,17 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
           visible_to_customer: li.visible_to_customer,
           sort_order: i,
           prepared_group_key: groupKeys[i],
+          hours_low: li.hours_low ?? null,
+          hours_high: li.hours_high ?? null,
+          hours_source: li.hours_source ?? null,
         })),
-        ...handLines.map((li, i) => ({ ...li, sort_order: lineItems.length + i })),
+        ...handLines.map((li, i) => ({
+          ...li,
+          hours_low: parseHourInput(li.hours_low),
+          hours_high: parseHourInput(li.hours_high),
+          hours_source: storedHourSource(li.hours_source),
+          sort_order: lineItems.length + i,
+        })),
       ];
       const taxRate = est.subtotal_cents > 0 ? Math.round((est.tax_cents / est.subtotal_cents) * 10_000) / 100 : 0;
       await updateEstimateById(client, id, session, { line_items: combined, tax_rate: taxRate });

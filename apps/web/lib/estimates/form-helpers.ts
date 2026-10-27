@@ -10,6 +10,7 @@ import {
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import type { PriceBookEntry } from "@/app/app/estimates/new/hooks/useEstimatePriceBook";
 import { materialMarkupPct } from "@/lib/estimates/cost-split";
+import { formHourColumns, formatHourInput, type HourSource } from "@/lib/estimates/stored-hours";
 
 // ---------------------------------------------------------------------------
 // Shared types for estimate forms (new + edit) and their hooks
@@ -28,6 +29,10 @@ export interface LineItemRow {
   adjustment_type?: string | null;
   /** Prepared-scope group that produced the line; Apply to quote replaces it (TASK-179). */
   prepared_group_key?: string | null;
+  /** Person-hours. Blank strings stay null on save. */
+  hours_low?: string;
+  hours_high?: string;
+  hours_source?: HourSource | null;
   /**
    * Links this flattened row back to its AiMaterialsDeltaItem (by `key`),
    * when it came from the AI materials generator. Lets submit-time
@@ -106,6 +111,9 @@ export interface SavedLineItem {
   adjustment_type?: string | null;
   price_book_id?: string | null;
   prepared_group_key?: string | null;
+  hours_low?: number | string | null;
+  hours_high?: number | string | null;
+  hours_source?: HourSource | null;
 }
 
 /** Saved line → editable row, keeping the fields the form does not show. */
@@ -120,6 +128,13 @@ export function savedLineToRow(item: SavedLineItem): LineItemRow {
     ...(item.visible_to_customer !== undefined ? { visible_to_customer: item.visible_to_customer } : {}),
     ...(item.adjustment_type ? { adjustment_type: item.adjustment_type } : {}),
     ...(item.prepared_group_key ? { prepared_group_key: item.prepared_group_key } : {}),
+    ...(item.hours_low != null || item.hours_high != null
+      ? {
+          hours_low: formatHourInput(item.hours_low),
+          hours_high: formatHourInput(item.hours_high),
+          hours_source: item.hours_source ?? null,
+        }
+      : {}),
   };
 }
 
@@ -141,6 +156,7 @@ export function rowToLineItemPayload(row: LineItemRow, index: number) {
     ...(row.adjustment_type ? { adjustment_type: row.adjustment_type } : {}),
     ...(row.price_book_id ? { price_book_id: row.price_book_id } : {}),
     ...(row.prepared_group_key ? { prepared_group_key: row.prepared_group_key } : {}),
+    ...formHourColumns(row),
   };
 }
 

@@ -24,6 +24,11 @@ export interface ComputeAndPersistArgs {
    * snapshot, and do not replace those rows or the cost split.
    */
   preserveItemizedLines?: boolean;
+  /**
+   * Painting replaces its lines from the engine, which has no hour columns.
+   * Write this range onto labor lines that are still blank.
+   */
+  stampLaborHours?: number | null;
 }
 
 export interface ComputeAndPersistResult {
@@ -143,6 +148,16 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
   );
 
   await syncLineItems(estimateId, result);
+
+  if (args.stampLaborHours != null && Number.isFinite(args.stampLaborHours) && args.stampLaborHours >= 0) {
+    await query(
+      `UPDATE estimate_line_items
+       SET hours_low = $2, hours_high = $2, hours_source = 'owner'
+       WHERE estimate_id = $1 AND option_id IS NULL AND line_item_type = 'labor'
+         AND hours_low IS NULL AND hours_high IS NULL`,
+      [estimateId, args.stampLaborHours],
+    );
+  }
 
   return { result };
 }

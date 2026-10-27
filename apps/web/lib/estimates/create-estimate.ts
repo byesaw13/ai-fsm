@@ -110,6 +110,8 @@ export const createEstimateSchema = z.object({
   labor_hours_low: z.number().nonnegative().nullable().optional(),
   labor_hours_high: z.number().nonnegative().nullable().optional(),
   labor_hours_source: z.enum(HOUR_SOURCES).nullable().optional(),
+  /** Wizard confirms other direct costs, including $0, before send. */
+  direct_costs_confirmed: z.boolean().optional(),
   // Pricing guardrails
   trip_count: estimateTripCountSchema.default("one_trip"),
   requires_drying_or_curing: z.boolean().default(false),
@@ -210,6 +212,7 @@ export async function createEstimate(
     labor_hours_low,
     labor_hours_high,
     labor_hours_source,
+    direct_costs_confirmed,
     trip_count,
     requires_drying_or_curing,
     difficult_access,
@@ -366,6 +369,25 @@ export async function createEstimate(
   const estimateHours = storedHourRange(labor_hours_low, labor_hours_high);
   const estimateHourSource = storedHourSource(labor_hours_source);
 
+  function lineHoursForInsert(item: (typeof line_items)[number]) {
+    const hours = lineHourColumns(item);
+    const type = item.line_item_type ?? "labor";
+    if (
+      is_painting &&
+      type === "labor" &&
+      hours.hours_low == null &&
+      hours.hours_high == null &&
+      labor_hours_estimate != null
+    ) {
+      return lineHourColumns({
+        hours_low: labor_hours_estimate,
+        hours_high: labor_hours_estimate,
+        hours_source: "owner",
+      });
+    }
+    return hours;
+  }
+
   const estimate = await withEstimateContext(session, async (client) => {
     // Verify client belongs to account
     const clientRow = await client.query<{ id: string; name: string }>(
@@ -508,7 +530,7 @@ export async function createEstimate(
       for (let i = 0; i < itemsToInsert.length; i++) {
         const item = itemsToInsert[i];
         const itemTotal = lineItemTotal(item);
-        const hours = lineHourColumns(item);
+        const hours = lineHoursForInsert(item);
         await client.query(
           `INSERT INTO estimate_line_items
              (estimate_id, description, quantity, unit_price_cents, total_cents,
@@ -578,6 +600,13 @@ export async function createEstimate(
       });
     }
 
+    if (direct_costs_confirmed) {
+      await client.query(
+        `UPDATE estimates SET direct_costs_confirmed_at = now() WHERE id = $1`,
+        [estimateId],
+      );
+    }
+
     return estimateId;
   });
 
@@ -593,6 +622,7 @@ export async function createEstimate(
         // The new-estimate form always sends a general spec. Replacing the
         // rows would turn materials back into labor and drop their cost.
         preserveItemizedLines: !is_painting && !is_multi_option && flat_rate_cents === undefined,
+        stampLaborHours: is_painting ? labor_hours_estimate ?? null : null,
       });
     } catch (engErr) {
       logger.error("Engine compute failed after insert", engErr, { estimateId: estimate });

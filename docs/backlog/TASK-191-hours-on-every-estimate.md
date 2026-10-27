@@ -1,7 +1,7 @@
 # TASK-191: Person-hours on every estimate
 
 Status:
-Proposed
+In progress
 
 Epic:
 EPIC-002 Estimating & Assessments

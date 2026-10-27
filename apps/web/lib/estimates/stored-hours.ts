@@ -56,3 +56,135 @@ export function lineHourColumns(item: {
     hours_source: range.low == null && range.high == null ? null : source,
   };
 }
+
+/** Least certain first. A group's source is the least certain of its tasks. */
+const LEAST_CERTAIN_FIRST: readonly HourSource[] = [
+  "ai_allowance",
+  "production_rate",
+  "revision",
+  "price_book",
+  "owner",
+  "travel_calc",
+];
+
+export function leastCertainHourSource(
+  sources: Iterable<string | null | undefined>,
+): HourSource | null {
+  let best: HourSource | null = null;
+  let bestRank = Infinity;
+  for (const source of sources) {
+    if (!source) continue;
+    const rank = LEAST_CERTAIN_FIRST.indexOf(source as HourSource);
+    if (rank < 0 || rank >= bestRank) continue;
+    best = source as HourSource;
+    bestRank = rank;
+  }
+  return best;
+}
+
+/** Price-book hours. Typical hours fill a missing side. No hours stays null. */
+export function priceBookHourRange(row: {
+  labor_hours_low?: number | null;
+  labor_hours_high?: number | null;
+  labor_hours_typical?: number | null;
+  default_labor_hours?: number | null;
+}): { hours_low: number; hours_high: number; hours_source: "price_book" } | null {
+  const side = (value: number | null | undefined): number | null => {
+    if (value == null || !Number.isFinite(value) || value < 0) return null;
+    return value;
+  };
+  const typical = side(row.labor_hours_typical) ?? side(row.default_labor_hours);
+  let low = side(row.labor_hours_low) ?? typical;
+  let high = side(row.labor_hours_high) ?? typical;
+  if (low == null && high == null) return null;
+  if (low == null) low = high;
+  if (high == null) high = low;
+  if (low! > high!) {
+    const swap = low;
+    low = high;
+    high = swap;
+  }
+  return { hours_low: low!, hours_high: high!, hours_source: "price_book" };
+}
+
+/** A blank field is null. An explicit 0 is kept. */
+export function parseHourInput(raw: string | number | null | undefined): number | null {
+  if (typeof raw === "number") return storedHour(raw);
+  if (raw == null) return null;
+  const text = raw.trim();
+  if (text === "") return null;
+  return storedHour(Number(text));
+}
+
+export function formatHourInput(value: number | string | null | undefined): string {
+  if (value == null || value === "") return "";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return String(n);
+}
+
+/** A range is missing until both sides are filled. */
+export function hoursAreMissing(
+  low: string | number | null | undefined,
+  high: string | number | null | undefined,
+): boolean {
+  return parseHourInput(low) == null || parseHourInput(high) == null;
+}
+
+/** Form text → stored columns. Blank stays null, never zero. */
+export function formHourColumns(row: {
+  hours_low?: string | number | null;
+  hours_high?: string | number | null;
+  hours_source?: string | null;
+}): { hours_low: number | null; hours_high: number | null; hours_source: HourSource | null } {
+  return lineHourColumns({
+    hours_low: parseHourInput(row.hours_low),
+    hours_high: parseHourInput(row.hours_high),
+    hours_source: row.hours_source,
+  });
+}
+
+/** Editing either side makes the source the owner's. Clearing both clears the source. */
+export function withHourEdit<T extends {
+  hours_low?: string;
+  hours_high?: string;
+  hours_source?: string | null;
+}>(row: T, field: keyof T, value: string): T {
+  if (field !== "hours_low" && field !== "hours_high") {
+    return { ...row, [field]: value };
+  }
+  const next = { ...row, [field]: value };
+  const low = String(field === "hours_low" ? value : next.hours_low ?? "");
+  const high = String(field === "hours_high" ? value : next.hours_high ?? "");
+  next.hours_source = low.trim() === "" && high.trim() === "" ? null : "owner";
+  return next;
+}
+
+/** Billable travel minutes → a 1:1 person-hour range. Mileage is not hours. */
+export function travelTimeHours(minutes: number): {
+  hours_low: number;
+  hours_high: number;
+  hours_source: "travel_calc";
+} | null {
+  if (!Number.isFinite(minutes) || minutes <= 0) return null;
+  const hours = minutes / 60;
+  return { hours_low: hours, hours_high: hours, hours_source: "travel_calc" };
+}
+
+export const PERSON_HOURS_LABEL = "Person-hours";
+export const PERSON_HOURS_HINT = "2 painters x 8 h = 16 h";
+export const HOURS_MISSING_LABEL = "Hours missing";
+export const OPTION_BASELINE_NOTE = "Baseline not available for option quotes yet";
+
+export function quickEstimateCanSend(input: {
+  hoursLow: string;
+  hoursHigh: string;
+  directCostsConfirmed: boolean;
+  priceCents: number;
+}): { ok: boolean; hoursMissing: boolean } {
+  const hoursMissing = hoursAreMissing(input.hoursLow, input.hoursHigh);
+  return {
+    hoursMissing,
+    ok: !hoursMissing && input.directCostsConfirmed && input.priceCents > 0,
+  };
+}

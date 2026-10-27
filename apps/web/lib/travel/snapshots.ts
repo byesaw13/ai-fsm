@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { travelTimeHours } from "@/lib/estimates/stored-hours";
 import {
   buildTravelInvoiceLineDrafts,
   type TravelCalculationResult,
@@ -258,12 +259,26 @@ export async function applyTravelToEstimate(
     let sortOrder = Number(maxSort.rows[0]?.m ?? -1) + 1;
     for (const draft of drafts) {
       const qty = draft.quantity > 0 ? draft.quantity : 1;
+      const timeHours = draft.description.includes("— Travel time")
+        ? travelTimeHours(snapshot.billable_travel_minutes)
+        : null;
       await client.query(
         `INSERT INTO estimate_line_items
            (estimate_id, description, quantity, unit_price_cents, total_cents,
-            sort_order, line_item_type, visible_to_customer, adjustment_type)
-         VALUES ($1, $2, $3, $4, $5, $6, 'adjustment', true, 'travel_surcharge')`,
-        [estimateId, draft.description, qty, draft.unit_price_cents, draft.total_cents, sortOrder++]
+            sort_order, line_item_type, visible_to_customer, adjustment_type,
+            hours_low, hours_high, hours_source)
+         VALUES ($1, $2, $3, $4, $5, $6, 'adjustment', true, 'travel_surcharge', $7, $8, $9)`,
+        [
+          estimateId,
+          draft.description,
+          qty,
+          draft.unit_price_cents,
+          draft.total_cents,
+          sortOrder++,
+          timeHours?.hours_low ?? null,
+          timeHours?.hours_high ?? null,
+          timeHours?.hours_source ?? null,
+        ]
       );
     }
   }

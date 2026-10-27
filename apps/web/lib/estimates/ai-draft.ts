@@ -46,6 +46,10 @@ export interface DraftService {
   complexity_factor_keys: string[];
   trade_detected: string;
   detection_reasons: string[];
+  labor_hours_low?: number | null;
+  labor_hours_high?: number | null;
+  labor_hours_typical?: number | null;
+  default_labor_hours?: number | null;
   // Populated by the API route after the AI call
   computed_materials?: ComputedMaterial[];
   material_total_cents?: number;
@@ -575,6 +579,10 @@ export async function draftEstimate(
           complexity_factor_keys: s.complexity_factor_keys,
           trade_detected: s.trade_detected ?? "unknown",
           detection_reasons: s.detection_reasons ?? [],
+          labor_hours_low: pb.labor_hours_low ?? null,
+          labor_hours_high: pb.labor_hours_high ?? null,
+          labor_hours_typical: pb.labor_hours_typical ?? null,
+          default_labor_hours: pb.default_labor_hours ?? null,
         };
       });
 

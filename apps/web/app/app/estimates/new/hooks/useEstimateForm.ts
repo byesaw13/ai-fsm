@@ -40,6 +40,16 @@ import {
   reconcileAiMaterialsDelta,
   type AiMaterialsDeltaItem,
 } from "@/lib/estimates/materials-delta";
+import { formHourColumns, formatHourInput, withHourEdit } from "@/lib/estimates/stored-hours";
+
+/** Flat-quote or painting range. A blank side stays null, never zero. */
+function ownerHourFields(low: string, high: string) {
+  return formHourColumns({
+    hours_low: low,
+    hours_high: high,
+    hours_source: low.trim() || high.trim() ? "owner" : null,
+  });
+}
 
 export { type AiMaterialsDeltaItem } from "@/lib/estimates/materials-delta";
 
@@ -174,6 +184,8 @@ export function useEstimateForm({
   const [includesCeiling, setIncludesCeiling] = useState(false);
   const [materialCostDollars, setMaterialCostDollars] = useState("");
   const [laborHours, setLaborHours] = useState("");
+  const [personHoursLow, setPersonHoursLow] = useState("");
+  const [personHoursHigh, setPersonHoursHigh] = useState("");
   const [addedMaterials, setAddedMaterials] = useState<Set<string>>(new Set());
 
   const [lineItems, setLineItems] = useState<LineItemRow[]>(() => {
@@ -375,6 +387,14 @@ export function useEstimateForm({
           description: li.description,
           quantity: String(li.quantity),
           unit_price: (li.unit_price_cents / 100).toFixed(2),
+          line_item_type: li.line_item_type,
+          ...(li.hours_low != null || li.hours_high != null
+            ? {
+                hours_low: formatHourInput(li.hours_low ?? null),
+                hours_high: formatHourInput(li.hours_high ?? null),
+                hours_source: li.hours_source ?? "ai_allowance",
+              }
+            : {}),
         }))
       );
       setNotes(tm.notes);
@@ -505,7 +525,7 @@ export function useEstimateForm({
 
   function updateLineItem(index: number, field: keyof LineItemRow, value: string) {
     setLineItems((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+      prev.map((row, i) => (i === index ? withHourEdit(row, field, value) : row))
     );
   }
 
@@ -624,7 +644,9 @@ export function useEstimateForm({
               description: `Painting labor — ${parseFloat(sqFt).toLocaleString()} sq ft${includesCeiling ? " + ceiling" : ""}${includesTrim ? " + trim" : ""} (prep level ${prepLevel})`,
               quantity: 1,
               unit_price_cents: paintingResult.labor_flat_rate_cents,
+              line_item_type: "labor" as const,
               sort_order: 0,
+              ...ownerHourFields(laborHours, laborHours),
             },
             ...(paintingResult.material_cents > 0
               ? [{ description: "Materials", quantity: 1, unit_price_cents: paintingResult.material_cents, sort_order: 1 }]
@@ -654,6 +676,14 @@ export function useEstimateForm({
           tax_rate: taxRateNum,
           flat_rate_cents: parseCents(flatRate),
           line_items: [],
+          ...(() => {
+            const hours = ownerHourFields(personHoursLow, personHoursHigh);
+            return {
+              labor_hours_low: hours.hours_low,
+              labor_hours_high: hours.hours_high,
+              labor_hours_source: hours.hours_source,
+            };
+          })(),
         };
       } else if (mode === "multi_option") {
         const options = tiers.map((tier, ti) => {
@@ -668,6 +698,7 @@ export function useEstimateForm({
               quantity: parseFloat(row.quantity) || 1,
               unit_price_cents: parseCents(row.unit_price),
               sort_order: li,
+              ...formHourColumns(row),
               ...(row.price_book_id ? { price_book_id: row.price_book_id } : {}),
             })),
           };
@@ -696,6 +727,15 @@ export function useEstimateForm({
         const manualItems = lineItems.filter(
           (r) => (r.description.trim() || parseCents(r.unit_price) > 0) && !r.price_book_id
         );
+        // Price-book rows are priced from ScopeBuilder. Hours live on the visible row.
+        const usedPriceBookRows = new Set<number>();
+        const pricedBookItems = priceBookLineItems.map((item) => {
+          const idx = lineItems.findIndex(
+            (row, i) => !usedPriceBookRows.has(i) && row.price_book_id === item.price_book_id,
+          );
+          if (idx >= 0) usedPriceBookRows.add(idx);
+          return { ...item, ...formHourColumns(idx >= 0 ? lineItems[idx] : {}) };
+        });
         const { materialLineItems } = pricing;
         const scopeMatCents = scopeMaterialsTotalCents;
         const scopeMaterialItems = priceBookItems
@@ -723,14 +763,15 @@ export function useEstimateForm({
               }]
             : [];
         const allItems = [
-          ...priceBookLineItems,
+          ...pricedBookItems,
           ...manualItems.map((row, i) => ({
             description: row.description,
             quantity: parseFloat(row.quantity) || 1,
             unit_price_cents: parseCents(row.unit_price),
             ...(row.line_item_type ? { line_item_type: row.line_item_type } : {}),
             ...(row.unit_cost_cents != null ? { unit_cost_cents: row.unit_cost_cents } : {}),
-            sort_order: priceBookLineItems.length + i,
+            ...formHourColumns(row),
+            sort_order: pricedBookItems.length + i,
             price_book_id: row.price_book_id,
             price_book_code: undefined as string | undefined,
           })),
@@ -929,6 +970,8 @@ export function useEstimateForm({
     includesCeiling, setIncludesCeiling,
     materialCostDollars, setMaterialCostDollars,
     laborHours, setLaborHours,
+    personHoursLow, setPersonHoursLow,
+    personHoursHigh, setPersonHoursHigh,
     // Generic fields
     mode,
     lineItems,

@@ -48,6 +48,8 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     mode,
     lineItems,
     flatRate, setFlatRate,
+    personHoursLow, setPersonHoursLow,
+    personHoursHigh, setPersonHoursHigh,
     tiers,
     tripCount, setTripCount,
     requiresDryingOrCuring, setRequiresDryingOrCuring,
@@ -213,6 +215,8 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           projectOptions={projectOptions}
           handleRoomByRoomChange={handleRoomByRoomChange}
           flatRate={flatRate} setFlatRate={setFlatRate}
+          personHoursLow={personHoursLow} setPersonHoursLow={setPersonHoursLow}
+          personHoursHigh={personHoursHigh} setPersonHoursHigh={setPersonHoursHigh}
           tiers={tiers}
           taxRateNum={taxRateNum}
           updateTier={updateTier}

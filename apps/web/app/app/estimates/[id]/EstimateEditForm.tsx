@@ -38,6 +38,8 @@ import {
   type SavedLineItem,
 } from "@/lib/estimates/form-helpers";
 import { RoomByRoomEditor } from "../../estimates/new/components/RoomByRoomEditor";
+import { PersonHoursFields } from "../components/PersonHoursFields";
+import { formHourColumns, formatHourInput, withHourEdit } from "@/lib/estimates/stored-hours";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,7 +60,16 @@ interface InitialOption {
   description: string;
   is_recommended: boolean;
   sort_order: number;
-  line_items: { description: string; quantity: number; unit_price_cents: number; unit_cost_cents?: number | null; line_item_type?: LineItemRow["line_item_type"] }[];
+  line_items: {
+    description: string;
+    quantity: number;
+    unit_price_cents: number;
+    unit_cost_cents?: number | null;
+    line_item_type?: LineItemRow["line_item_type"];
+    hours_low?: number | string | null;
+    hours_high?: number | string | null;
+    hours_source?: LineItemRow["hours_source"];
+  }[];
 }
 
 interface EstimateEditFormProps {
@@ -80,6 +91,8 @@ interface EstimateEditFormProps {
   initialIncludesCeiling?: boolean;
   initialMaterialCostCents?: number | null;
   initialLaborHours?: number | null;
+  initialLaborHoursLow?: number | string | null;
+  initialLaborHoursHigh?: number | string | null;
   initialTripCount?: "one_trip" | "multi_trip";
   initialRequiresDryingOrCuring?: boolean;
   initialDifficultAccess?: boolean;
@@ -152,6 +165,8 @@ function StandardEstimateEditForm({
   initialIncludesCeiling,
   initialMaterialCostCents,
   initialLaborHours,
+  initialLaborHoursLow,
+  initialLaborHoursHigh,
   initialTripCount,
   initialRequiresDryingOrCuring,
   initialDifficultAccess,
@@ -214,6 +229,8 @@ function StandardEstimateEditForm({
     initialMaterialCostCents ? (initialMaterialCostCents / 100).toFixed(2) : ""
   );
   const [laborHours, setLaborHours] = useState(initialLaborHours?.toString() ?? "");
+  const [personHoursLow, setPersonHoursLow] = useState(formatHourInput(initialLaborHoursLow));
+  const [personHoursHigh, setPersonHoursHigh] = useState(formatHourInput(initialLaborHoursHigh));
   const [tripCount, setTripCount] = useState<"one_trip" | "multi_trip">(initialTripCount ?? "one_trip");
   const [requiresDryingOrCuring, setRequiresDryingOrCuring] = useState(initialRequiresDryingOrCuring ?? false);
   const [difficultAccess, setDifficultAccess] = useState(initialDifficultAccess ?? false);
@@ -349,7 +366,7 @@ function StandardEstimateEditForm({
 
   function updateLineItem(index: number, field: keyof LineItemRow, value: string) {
     setLineItems((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+      prev.map((row, i) => (i === index ? withHourEdit(row, field, value) : row))
     );
   }
 
@@ -382,7 +399,13 @@ function StandardEstimateEditForm({
               description: `Painting labor — ${parseFloat(sqFt).toLocaleString()} sq ft${includesCeiling ? " + ceiling" : ""}${includesTrim ? " + trim" : ""} (prep level ${prepLevel})`,
               quantity: 1,
               unit_price_cents: paintingResult.labor_flat_rate_cents,
+              line_item_type: "labor" as const,
               sort_order: 0,
+              ...formHourColumns({
+                hours_low: laborHours,
+                hours_high: laborHours,
+                hours_source: laborHours.trim() ? "owner" : null,
+              }),
             },
             ...(parseCents(materialCostDollars) > 0
               ? [
@@ -438,6 +461,18 @@ function StandardEstimateEditForm({
           tax_rate: taxRateNum,
           flat_rate_cents: parseCents(flatRate),
           line_items: [],
+          ...(() => {
+            const hours = formHourColumns({
+              hours_low: personHoursLow,
+              hours_high: personHoursHigh,
+              hours_source: personHoursLow.trim() || personHoursHigh.trim() ? "owner" : null,
+            });
+            return {
+              labor_hours_low: hours.hours_low,
+              labor_hours_high: hours.hours_high,
+              labor_hours_source: hours.hours_source,
+            };
+          })(),
           trip_count: tripCount,
           requires_drying_or_curing: requiresDryingOrCuring,
           difficult_access: difficultAccess,
@@ -757,6 +792,14 @@ function StandardEstimateEditForm({
                 disabled={pending}
                 data-testid="edit-flat-rate-input"
               />
+              <PersonHoursFields
+                low={personHoursLow}
+                high={personHoursHigh}
+                onLow={setPersonHoursLow}
+                onHigh={setPersonHoursHigh}
+                disabled={pending}
+                idPrefix="edit-person-hours"
+              />
             </div>
           ) : (
             <>
@@ -905,6 +948,9 @@ function TierEditor({
             unit_price_cents: li.unit_price_cents,
             unit_cost_cents: li.unit_cost_cents,
             line_item_type: li.line_item_type,
+            hours_low: li.hours_low,
+            hours_high: li.hours_high,
+            hours_source: li.hours_source,
           }))
         : [{ description: "", quantity: "1", unit_price: "0.00" }],
     }))
@@ -918,7 +964,7 @@ function TierEditor({
     setTiers((prev) => prev.map((t, i) =>
       i !== tierIdx ? t : {
         ...t,
-        line_items: t.line_items.map((li, j) => j === liIdx ? { ...li, [field]: val } : li),
+        line_items: t.line_items.map((li, j) => j === liIdx ? withHourEdit(li, field, val) : li),
       }
     ));
   }

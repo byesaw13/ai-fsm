@@ -6,6 +6,7 @@ import type { ShoppingList, SpecifiedMaterial } from "@ai-fsm/domain";
 import type { PriceBookService } from "@/components/PriceBookSelector";
 import type { DraftEstimate, DraftConfidence } from "@/lib/estimates/ai-draft";
 import type { LineItemRow, OptionTier } from "@/lib/estimates/form-helpers";
+import { formatHourInput, priceBookHourRange } from "@/lib/estimates/stored-hours";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -196,6 +197,17 @@ export function useEstimateAI({
     }
   }
 
+  function suggestionHours(typical: number | null) {
+    const hours = priceBookHourRange({ labor_hours_typical: typical });
+    if (!hours) return {};
+    return {
+      hours_low: formatHourInput(hours.hours_low),
+      hours_high: formatHourInput(hours.hours_high),
+      hours_source: "price_book" as const,
+      line_item_type: "labor" as const,
+    };
+  }
+
   function handleAddSuggestion(index: number) {
     const s = suggestions[index];
     if (!s) return;
@@ -203,6 +215,7 @@ export function useEstimateAI({
       description: `${s.code} — ${s.name}`,
       quantity: s.quantity.toString(),
       unit_price: suggestionUnitPrice(s.unit_price_cents),
+      ...suggestionHours(s.labor_hours_typical),
     }]);
     setSuggestions((prev) => prev.filter((_, i) => i !== index));
   }
@@ -219,6 +232,7 @@ export function useEstimateAI({
       quantity: s.quantity.toString(),
       unit_price: suggestionUnitPrice(s.unit_price_cents),
       price_book_id: s.price_book_id,
+      ...suggestionHours(s.labor_hours_typical),
     })));
     setSuggestions([]);
     setItemDescription("");
@@ -247,7 +261,10 @@ export function useEstimateAI({
         unit_type: svc.unit_type ?? "flat",
         description: null,
         notes: null,
-        default_labor_hours: null,
+        default_labor_hours: svc.default_labor_hours ?? null,
+        labor_hours_low: svc.labor_hours_low ?? null,
+        labor_hours_typical: svc.labor_hours_typical ?? null,
+        labor_hours_high: svc.labor_hours_high ?? null,
         requires_materials: false,
         upsell_codes: [],
         is_active: true,
@@ -255,11 +272,20 @@ export function useEstimateAI({
       priceBookItems.push({ service, priceCents: svc.base_price_cents, instanceId });
       // price_book_id tags this so handleSubmit excludes it from manualItems
       // (priceBookLineItems handles the actual submission price via ScopeBuilder)
+      const bookHours = priceBookHourRange(svc);
       lineItems.push({
         description: `${svc.service_code} — ${svc.service_name}`,
         quantity: "1",
         unit_price: (svc.base_price_cents / 100).toFixed(2),
         price_book_id: svc.service_id,
+        line_item_type: "labor",
+        ...(bookHours
+          ? {
+              hours_low: formatHourInput(bookHours.hours_low),
+              hours_high: formatHourInput(bookHours.hours_high),
+              hours_source: "price_book" as const,
+            }
+          : {}),
       });
       scopeMap[instanceId] = {
         scopeValues: svc.scope_values,

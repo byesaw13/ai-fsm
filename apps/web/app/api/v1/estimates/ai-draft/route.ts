@@ -140,7 +140,7 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       `SELECT id, code, name, category,
               price_min_cents, price_max_cents, default_price_cents, add_on_price_cents,
               unit_type, description, default_labor_hours, requires_materials, upsell_codes,
-              labor_hours_typical, scope_description, excluded_items,
+              labor_hours_low, labor_hours_typical, labor_hours_high, scope_description, excluded_items,
               legal_status_ma, legal_status_nh, quote_trigger
        FROM price_book
        WHERE is_active = true

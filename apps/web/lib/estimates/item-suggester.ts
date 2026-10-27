@@ -19,6 +19,8 @@ export interface PriceBookEntry {
   requires_materials: boolean;
   upsell_codes: string[];
   // Migration 042 enrichment fields
+  labor_hours_low?: number | null;
+  labor_hours_high?: number | null;
   labor_hours_typical: number | null;
   scope_description: string | null;
   excluded_items: string | null;

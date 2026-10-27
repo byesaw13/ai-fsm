@@ -20,6 +20,7 @@ import {
 } from "@ai-fsm/domain";
 import { roomGeometryLines } from "@/lib/assessments/room-geometry-display";
 import type { CreateEstimateInput } from "@/lib/estimates/create-estimate";
+import { leastCertainHourSource, type HourSource } from "@/lib/estimates/stored-hours";
 
 type PreparedLineItem = CreateEstimateInput["line_items"][number];
 
@@ -285,6 +286,24 @@ function fmtHours(n: number): string {
   return String(Math.round(n * 4) / 4);
 }
 
+/** Group range and the least certain source among tasks that have hours. */
+function laborHoursForGroup(
+  scope: PreparedScope,
+  key: string,
+): { hours_low: number; hours_high: number; hours_source: HourSource | null } | null {
+  const tasks = scope.tasks.filter(
+    (t) => t.confirmed && t.group_key === key && t.hours_low != null && t.hours_high != null,
+  );
+  if (tasks.length === 0) return null;
+  const summary = summarizePreparedScope(scope).groups.find((g) => g.key === key);
+  if (!summary) return null;
+  return {
+    hours_low: summary.hours_low,
+    hours_high: summary.hours_high,
+    hours_source: leastCertainHourSource(tasks.map((t) => t.hours_source)),
+  };
+}
+
 /**
  * One labor line (mid hours at the T&M rate) and one materials line per group
  * that has values. Groups still missing hours get no labor line; the prepared
@@ -299,8 +318,9 @@ export function preparedScopeToLineItems(
   const groupKeys: string[] = [];
   const pricing = scope.pricing;
   if (pricing?.mode === "fixed" && pricing.fixed_price_cents) {
-    // Fixed price (TASK-180): per-group labor and materials lines summing to the price, no hours shown.
+    // Fixed price (TASK-180): descriptions stay free of the word hours. The range is stored on the labor line.
     for (const line of allocateFixedPrice(scope, laborRateCents, pricing.fixed_price_cents)) {
+      const hours = line.kind === "labor" ? laborHoursForGroup(scope, line.group_key) : null;
       lineItems.push({
         description: line.kind === "labor" ? `${line.label} — labor` : `${line.label} — materials allowance`,
         quantity: 1,
@@ -309,6 +329,7 @@ export function preparedScopeToLineItems(
         line_item_type: line.kind,
         visible_to_customer: true,
         sort_order: lineItems.length,
+        ...(hours ?? {}),
       });
       groupKeys.push(line.group_key);
     }
@@ -317,6 +338,7 @@ export function preparedScopeToLineItems(
   for (const g of summary.groups) {
     const mid = Math.round(((g.hours_low + g.hours_high) / 2) * 4) / 4;
     if (mid > 0) {
+      const hours = laborHoursForGroup(scope, g.key);
       lineItems.push({
         description: `${g.label} — labor, est. ${fmtHours(g.hours_low)}–${fmtHours(g.hours_high)} h`,
         quantity: mid,
@@ -324,6 +346,7 @@ export function preparedScopeToLineItems(
         line_item_type: "labor",
         visible_to_customer: true,
         sort_order: lineItems.length,
+        ...(hours ?? {}),
       });
       groupKeys.push(g.key);
     }

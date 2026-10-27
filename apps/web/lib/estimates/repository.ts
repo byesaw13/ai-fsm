@@ -65,6 +65,7 @@ export interface PatchEstimateInput {
   labor_hours_low?: number | null;
   labor_hours_high?: number | null;
   labor_hours_source?: HourSource | null;
+  direct_costs_confirmed?: boolean;
   trip_count?: string;
   requires_drying_or_curing?: boolean;
   difficult_access?: boolean;
@@ -255,6 +256,9 @@ export async function updateEstimateById(
   if (patch.labor_hours_source !== undefined) {
     setClauses.push(`labor_hours_source = $${idx++}`);
     params.push(storedHourSource(patch.labor_hours_source));
+  }
+  if (patch.direct_costs_confirmed === true) {
+    setClauses.push(`direct_costs_confirmed_at = now()`);
   }
   if (patch.internal_notes !== undefined) { setClauses.push(`internal_notes = $${idx++}`); params.push(patch.internal_notes); }
   if (patch.expires_at !== undefined) { setClauses.push(`expires_at = $${idx++}`); params.push(patch.expires_at); }

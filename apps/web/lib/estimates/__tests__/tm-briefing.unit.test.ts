@@ -120,6 +120,18 @@ describe("tm-briefing pure helpers", () => {
     expect(draft.guardrails.requires_drying_or_curing).toBe(true);
   });
 
+  it("stores a 6 to 8 hour allowance on the on-site labor line", () => {
+    const draft = finalizeTmDraft(sampleExtraction({
+      labor_hours_min: 6,
+      labor_hours_max: 8,
+      travel_hours_min: 0,
+      travel_hours_max: 0,
+      materials: [],
+    }));
+    const laborLine = draft.line_items.find((l) => l.description.includes("on-site labor"));
+    expect(laborLine).toMatchObject({ hours_low: 6, hours_high: 8, hours_source: "ai_allowance" });
+  });
+
   it("customer notes include T&M language and rate", () => {
     const draft = finalizeTmDraft(sampleExtraction());
     const notes = draft.notes.toLowerCase();

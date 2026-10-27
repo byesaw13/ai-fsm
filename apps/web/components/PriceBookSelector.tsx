@@ -18,6 +18,9 @@ export interface PriceBookService {
   description: string | null;
   notes: string | null;
   default_labor_hours: number | null;
+  labor_hours_low?: number | null;
+  labor_hours_typical?: number | null;
+  labor_hours_high?: number | null;
   requires_materials: boolean;
   upsell_codes: string[];
   is_active: boolean;

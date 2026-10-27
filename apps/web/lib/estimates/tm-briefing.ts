@@ -70,6 +70,9 @@ export interface TmDraftLineItem {
   quantity: number;
   unit_price_cents: number;
   line_item_type: "labor" | "materials" | "adjustment";
+  hours_low?: number | null;
+  hours_high?: number | null;
+  hours_source?: "ai_allowance" | null;
 }
 
 export interface TmEstimateDraft {
@@ -363,6 +366,9 @@ export function finalizeTmDraft(
       quantity: labor_mid_hours,
       unit_price_cents: labor_rate_cents,
       line_item_type: "labor",
+      hours_low: extraction.labor_hours_min,
+      hours_high: extraction.labor_hours_max,
+      hours_source: "ai_allowance",
     });
   }
 
@@ -379,6 +385,9 @@ export function finalizeTmDraft(
       quantity: travel_mid_hours,
       unit_price_cents: travel_rate_cents,
       line_item_type: "labor",
+      hours_low: extraction.travel_hours_min,
+      hours_high: extraction.travel_hours_max,
+      hours_source: "ai_allowance",
     });
   }
 
