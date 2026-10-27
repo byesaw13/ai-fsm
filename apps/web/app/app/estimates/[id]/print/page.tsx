@@ -295,8 +295,8 @@ export default async function EstimatePrintPage({
                 sl!.sections!.map((sec) => (
                   <div key={sec.section} style={{ marginBottom: 8 }}>
                     <strong style={{ fontSize: "0.9em" }}>{sec.section}</strong>
-                    {[...sec.specified_items.map(m => `${m.name} — ${m.units_to_order} ${m.unit_label}`),
-                       ...sec.computed_items.map(m => `${m.material.material_name} — ${m.quantity} ${m.material.unit}`)
+                    {[...(sec.specified_items ?? []).map(m => `${m.name} — ${m.units_to_order} ${m.unit_label}`),
+                       ...(sec.computed_items ?? []).map(m => `${m.material.material_name} — ${m.quantity} ${m.material.unit}`)
                     ].map((row, i) => <p key={i} style={{ margin: "2px 0", fontSize: "0.85em" }}>{row}</p>)}
                   </div>
                 ))

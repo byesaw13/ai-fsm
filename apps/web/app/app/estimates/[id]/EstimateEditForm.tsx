@@ -105,6 +105,8 @@ interface EstimateEditFormProps {
   initialMinimumServiceOverrideNote?: string | null;
   // Room-by-room painting
   initialRoomSpecs?: RoomSpec[] | null;
+  /** Built by Prepare Quote: priced from its prepared scope, so painting and fixed-bid modes are off (TASK-218). */
+  hasPreparedScope?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +180,7 @@ function StandardEstimateEditForm({
   initialMinimumServiceOverrideReason,
   initialMinimumServiceOverrideNote,
   initialRoomSpecs,
+  hasPreparedScope = false,
 }: EstimateEditFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -643,7 +646,8 @@ function StandardEstimateEditForm({
           coordinationRequired={coordinationRequired} setCoordinationRequired={setCoordinationRequired}
         />
 
-        {/* Service Type Toggle */}
+        {/* Service Type Toggle — not on a prepared quote (TASK-218) */}
+        {!hasPreparedScope && (
         <div>
           <SectionHeader title="Service Type" as="h3" />
           <div
@@ -677,6 +681,7 @@ function StandardEstimateEditForm({
             ))}
           </div>
         </div>
+        )}
 
         {/* Painting Estimator */}
         {serviceType === "painting" && (
@@ -747,6 +752,7 @@ function StandardEstimateEditForm({
               count={mode === "itemized" ? lineItems.length : undefined}
               as="h3"
             />
+            {!hasPreparedScope && (
             <div
               style={{
                 display: "flex",
@@ -777,6 +783,7 @@ function StandardEstimateEditForm({
                 </button>
               ))}
             </div>
+            )}
           </div>
 
           {mode === "flat_rate" ? (
