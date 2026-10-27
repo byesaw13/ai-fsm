@@ -1,7 +1,7 @@
 # TASK-190: Materials cost field, and materials booked as materials cost
 
 Status:
-In progress
+Done (#724, f4837336, verified 2026-10-27)
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -40,14 +40,14 @@ Out of Scope:
 Backfilling existing estimates (Apply to quote already rewrites prepared ones).
 
 Acceptance Criteria:
-- [ ] Creating an estimate with Fixture A's 12 lines stores
+- [x] Creating an estimate with Fixture A's 12 lines stores
       internal_material_cost_cents 145000 and internal_labor_cost_cents 551250.
-- [ ] A handling-fee line changes neither cost field.
-- [ ] Margin percentage has no handling revenue that is not on the quote.
-- [ ] A materials line with cost $200 and price $240 shows "marked up 20%",
+- [x] A handling-fee line changes neither cost field.
+- [x] Margin percentage has no handling revenue that is not on the quote.
+- [x] A materials line with cost $200 and price $240 shows "marked up 20%",
       gets no automatic handling, and counts $200 as materials cost.
-- [ ] A new materials line with only a cost entered gets price = cost.
-- [ ] Unit tests for each line type.
+- [x] A new materials line with only a cost entered gets price = cost.
+- [x] Unit tests for each line type.
 
 Effort:
 1.5 days.
