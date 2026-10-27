@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatCents, parseDollarsToCents } from "@ai-fsm/money";
 import { PriceBookSelector } from "@/components/PriceBookSelector";
 
-type LineItemType = "labor" | "materials" | "handling_fee" | "adjustment";
+type LineItemType = "labor" | "materials" | "equipment" | "handling_fee" | "adjustment";
 
 interface LineItem {
   id: string;
@@ -26,6 +26,7 @@ interface Props {
 const TYPE_LABELS: Record<LineItemType, string> = {
   labor: "Labor",
   materials: "Materials",
+  equipment: "Equipment (rental or use charge)",
   handling_fee: "Handling fee",
   adjustment: "Adjustment / Discount",
 };

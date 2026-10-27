@@ -25,7 +25,7 @@ Last step           : B2 (TASK-191) verified on production at 2026-10-27
                       237ba3cd kept total 1082125. Its 8 labor lines have
                       null hours. Line totals unchanged.
 In-flight PR        : none
-Next step           : B3 (TASK-192)
+Next step           : B3 (TASK-192) in progress on task/192-equipment-line
 Blocked on          : nothing
 Last known-good     : 20c7d5f8 (branch deploy-good/20c7d5f8); previous f4837336
                       (branch deploy-good/f4837336)

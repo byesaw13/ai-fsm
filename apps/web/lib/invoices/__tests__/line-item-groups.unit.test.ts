@@ -14,6 +14,7 @@ describe("line-item-groups", () => {
     // Legacy/untagged materials fall under Materials.
     expect(lineItemSectionKey(item("materials", 100, { material_kind: null }))).toBe("materials");
     expect(lineItemSectionKey(item("labor", 100))).toBe("labor");
+    expect(lineItemSectionKey(item("equipment", 12_000))).toBe("equipment");
   });
 
   it("groups into fixed section order with per-section subtotals", () => {

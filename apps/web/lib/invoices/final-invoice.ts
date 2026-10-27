@@ -148,7 +148,7 @@ export async function createDraftFinalInvoiceForJob(
     description: string;
     quantity: number;
     unit_price_cents: number;
-    line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
+    line_item_type: "labor" | "materials" | "equipment" | "handling_fee" | "adjustment";
     sort_order: number;
   }> = [];
   let shouldUseEstimateTotals = false;
@@ -171,7 +171,7 @@ export async function createDraftFinalInvoiceForJob(
       description: string;
       quantity: string;
       unit_price_cents: number;
-      line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
+      line_item_type: "labor" | "materials" | "equipment" | "handling_fee" | "adjustment";
       sort_order: number;
       adjustment_type: string | null;
     }>(

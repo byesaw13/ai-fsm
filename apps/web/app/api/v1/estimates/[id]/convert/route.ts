@@ -122,7 +122,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       //    travel surcharge become their own lines so the lines add up.
       const lineItemsResult = await client.query(
         `SELECT id, option_id, description, quantity, unit_price_cents, unit_cost_cents, total_cents, sort_order,
-                adjustment_type, visible_to_customer
+                adjustment_type, visible_to_customer, line_item_type
          FROM estimate_line_items
          WHERE estimate_id = $1
          ORDER BY sort_order ASC, created_at ASC`,
@@ -139,6 +139,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         sort_order: string | number;
         adjustment_type: string | null;
         visible_to_customer: boolean;
+        line_item_type: ConvertSourceLine["line_item_type"];
       }>).map((item) => ({
         id: item.id,
         option_id: item.option_id,
@@ -150,6 +151,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         sort_order: Number(item.sort_order),
         adjustment_type: item.adjustment_type,
         visible_to_customer: item.visible_to_customer,
+        line_item_type: item.line_item_type,
       }));
       const chosen = approvedLines(sourceLines, estimate.selected_option_id);
       const lineItems = invoiceLinesFor(
@@ -275,8 +277,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         await client.query(
           `INSERT INTO invoice_line_items
              (invoice_id, estimate_line_item_id, description, quantity, unit_price_cents, total_cents, sort_order,
-              unit_cost_cents)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+              unit_cost_cents, line_item_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [
             invoiceId,
             item.estimate_line_item_id,
@@ -286,6 +288,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             item.total_cents,
             item.sort_order,
             item.unit_cost_cents,
+            item.line_item_type,
           ]
         );
       }

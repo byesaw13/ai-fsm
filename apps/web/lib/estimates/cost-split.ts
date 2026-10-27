@@ -2,11 +2,12 @@
  * Internal cost of an itemized quote (TASK-190).
  *
  * Labor cost is labor lines only: hours × the cost rate when the line has
- * hours, otherwise customer price ÷ billing rate × cost rate. Materials and
- * equipment cost is the cost entered on the line, never the customer price.
- * Handling, adjustments and travel are neither. Margin is a fraction of the
- * customer prices on these lines. Nothing here adds a handling charge that
- * is not already a line.
+ * hours, otherwise customer price ÷ billing rate × cost rate. Materials cost
+ * and equipment cost are the costs entered on those lines, never the customer
+ * price, and they stay apart. Handling, adjustments and travel are neither.
+ * Margin is a fraction of the customer prices on these lines and still
+ * subtracts equipment cost. Nothing here adds a handling charge that is not
+ * already a line.
  */
 
 export interface CostSplitLine {
@@ -27,16 +28,14 @@ export interface CostRates {
 export interface CostSplit {
   laborCostCents: number;
   materialCostCents: number;
-  /** (customer price − labor cost − materials cost) / customer price. 0 when nothing is priced. */
+  /** Direct cost of equipment and rental lines. Not part of the materials total. */
+  equipmentCostCents: number;
+  /** (customer price − labor − materials − equipment) / customer price. 0 when nothing is priced. */
   marginPct: number;
 }
 
 function linePriceCents(line: { quantity: number; unit_price_cents: number }): number {
   return Math.round(line.quantity * line.unit_price_cents);
-}
-
-function isMaterialCost(type: string): boolean {
-  return type === "materials" || type === "equipment";
 }
 
 function isExcluded(line: CostSplitLine): boolean {
@@ -48,14 +47,17 @@ function isExcluded(line: CostSplitLine): boolean {
 export function splitInternalCosts(lines: CostSplitLine[], rates: CostRates): CostSplit {
   let laborCostCents = 0;
   let materialCostCents = 0;
+  let equipmentCostCents = 0;
   let revenue = 0;
 
   for (const line of lines) {
     revenue += linePriceCents(line);
     if (isExcluded(line)) continue;
-    if (isMaterialCost(line.line_item_type)) {
+    if (line.line_item_type === "materials" || line.line_item_type === "equipment") {
       if (line.unit_cost_cents != null && line.unit_cost_cents >= 0) {
-        materialCostCents += Math.round(line.quantity * line.unit_cost_cents);
+        const cost = Math.round(line.quantity * line.unit_cost_cents);
+        if (line.line_item_type === "equipment") equipmentCostCents += cost;
+        else materialCostCents += cost;
       }
       continue;
     }
@@ -68,8 +70,10 @@ export function splitInternalCosts(lines: CostSplitLine[], rates: CostRates): Co
     }
   }
 
-  const marginPct = revenue > 0 ? (revenue - laborCostCents - materialCostCents) / revenue : 0;
-  return { laborCostCents, materialCostCents, marginPct };
+  const marginPct = revenue > 0
+    ? (revenue - laborCostCents - materialCostCents - equipmentCostCents) / revenue
+    : 0;
+  return { laborCostCents, materialCostCents, equipmentCostCents, marginPct };
 }
 
 /** Whole-number percent, or null when the line is not priced above its cost. */

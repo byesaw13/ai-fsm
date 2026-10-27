@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui";
 import { formatCents } from "@/lib/estimates/pricing";
-import { lineTotal, parseCents, type LineItemRow } from "@/lib/estimates/form-helpers";
+import { LINE_ITEM_TYPE_CHOICES, lineTotal, parseCents, type LineItemRow } from "@/lib/estimates/form-helpers";
 import { markupLabel } from "@/lib/estimates/cost-split";
 import {
   HOURS_MISSING_LABEL,
@@ -104,6 +104,19 @@ export function LineItemsTable({
                       disabled={disabled}
                       data-testid={`${p}line-item-desc-${i}`}
                     />
+                    <select
+                      className="p7-select"
+                      aria-label="Line type"
+                      value={row.line_item_type ?? "labor"}
+                      onChange={(e) => onUpdate(i, "line_item_type", e.target.value)}
+                      disabled={disabled}
+                      data-testid={`${p}line-item-type-${i}`}
+                      style={{ marginTop: "var(--space-1)", fontSize: "var(--text-sm)" }}
+                    >
+                      {LINE_ITEM_TYPE_CHOICES.map((choice) => (
+                        <option key={choice.value} value={choice.value}>{choice.label}</option>
+                      ))}
+                    </select>
                     {row.prepared_group_key && (
                       <div className="muted" style={{ fontSize: "var(--text-xs)", marginTop: "var(--space-1)" }}>
                         From prepared scope. Apply to quote replaces this line.

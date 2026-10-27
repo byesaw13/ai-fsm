@@ -245,6 +245,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                 {(() => {
                   const laborItems = lineItems.filter((li) => li.line_item_type === "labor" || !li.line_item_type);
                   const materialItems = lineItems.filter((li) => li.line_item_type === "materials");
+                  const equipmentItems = lineItems.filter((li) => li.line_item_type === "equipment");
                   const handlingItems = lineItems.filter((li) => li.line_item_type === "handling_fee");
                   const adjustmentItems = lineItems.filter((li) => li.line_item_type === "adjustment");
                   const renderRow = (item: LineItemRow, muted = false) => (
@@ -277,6 +278,19 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                         </tr>
                       )}
                       {materialItems.map((item) => renderRow(item))}
+                      {equipmentItems.length > 0 && (
+                        <tr>
+                          <td colSpan={4} style={{
+                            fontSize: "var(--text-xs)", fontWeight: 600,
+                            textTransform: "uppercase", letterSpacing: "0.05em",
+                            color: "var(--fg-muted)", paddingTop: "var(--space-3)",
+                            borderTop: "1px dashed var(--border)",
+                          }}>
+                            Equipment
+                          </td>
+                        </tr>
+                      )}
+                      {equipmentItems.map((item) => renderRow(item))}
                       {handlingItems.map((item) => renderRow(item, true))}
                     </>
                   );

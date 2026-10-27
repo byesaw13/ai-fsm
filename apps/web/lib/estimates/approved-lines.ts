@@ -1,3 +1,5 @@
+import type { LineItemType } from "@ai-fsm/domain";
+
 /**
  * Which estimate lines become the final invoice (TASK-196).
  *
@@ -20,6 +22,7 @@ export interface ConvertSourceLine {
   adjustment_type: string | null;
   visible_to_customer: boolean;
   unit_cost_cents?: number | null;
+  line_item_type?: LineItemType | null;
 }
 
 export interface InvoiceDraftLine {
@@ -30,6 +33,7 @@ export interface InvoiceDraftLine {
   total_cents: number;
   sort_order: number;
   unit_cost_cents: number | null;
+  line_item_type: LineItemType;
 }
 
 export interface InvoiceMoneyInput {
@@ -82,6 +86,7 @@ function adjustmentLine(description: string, cents: number, sortOrder: number): 
     total_cents: cents,
     sort_order: sortOrder,
     unit_cost_cents: null,
+    line_item_type: "adjustment",
   };
 }
 
@@ -115,6 +120,7 @@ export function invoiceLinesFor(
     total_cents: line.total_cents,
     sort_order: line.sort_order,
     unit_cost_cents: line.unit_cost_cents ?? null,
+    line_item_type: line.line_item_type ?? "labor",
   }));
 
   if (hidden.length > 0) {

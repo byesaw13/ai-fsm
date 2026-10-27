@@ -54,13 +54,22 @@ describe("splitInternalCosts", () => {
     expect(split.laborCostCents).toBe(0);
   });
 
-  it("counts an equipment line as materials cost", () => {
-    const split = splitInternalCosts(
-      [{ line_item_type: "equipment", quantity: 1, unit_price_cents: 15_000, unit_cost_cents: 12_000 }],
+  it("keeps a $120 equipment line out of materials cost and still counts that cost in the margin", () => {
+    const materials = splitInternalCosts(
+      [{ line_item_type: "materials", quantity: 1, unit_price_cents: 10_000, unit_cost_cents: 10_000 }],
       RATES,
     );
-    expect(split.materialCostCents).toBe(12_000);
+    const split = splitInternalCosts(
+      [
+        { line_item_type: "materials", quantity: 1, unit_price_cents: 10_000, unit_cost_cents: 10_000 },
+        { line_item_type: "equipment", quantity: 1, unit_price_cents: 12_000, unit_cost_cents: 12_000 },
+      ],
+      RATES,
+    );
+    expect(split.materialCostCents).toBe(materials.materialCostCents);
+    expect(split.equipmentCostCents).toBe(12_000);
     expect(split.laborCostCents).toBe(0);
+    expect(split.marginPct).toBeCloseTo((10_000 + 12_000 - 10_000 - 12_000) / (10_000 + 12_000), 10);
   });
 
   it("leaves a materials line with no cost out of materials cost", () => {
