@@ -19,19 +19,21 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : B2 (TASK-191) verified on production at 2026-10-27
-                      01:28 UTC. Squash 20c7d5f8 (#726). Health ok, /login
-                      HTTP/2 200, no redirect to 0.0.0.0:3000. Draft
-                      237ba3cd kept total 1082125. Its 8 labor lines have
-                      null hours. Line totals unchanged.
+Last step           : B3 (TASK-192) verified on production at 2026-10-27
+                      02:33 UTC. Squash 2842780e (#728). Health ok, /login
+                      HTTP/2 200, no redirect to 0.0.0.0:3000. A $100
+                      materials line and a $120 equipment line stored
+                      material cost 10000. The rental line type was
+                      equipment. Probe estimate f75410c8 and its client
+                      were deleted.
 In-flight PR        : none
-Next step           : B3 (TASK-192) in progress on task/192-equipment-line
+Next step           : B4 (TASK-193)
 Blocked on          : nothing
-Last known-good     : 20c7d5f8 (branch deploy-good/20c7d5f8); previous f4837336
-                      (branch deploy-good/f4837336)
-Notes               : Migration 209 applied. Backup ai_fsm_20261027T012137Z.dump
-                      was verified before deploy (1387 TOC entries). The worker
-                      container was left running. Staff hour screens were not
+Last known-good     : 2842780e (branch deploy-good/2842780e); previous 20c7d5f8
+                      (branch deploy-good/20c7d5f8)
+Notes               : Migration 210 applied. Backup ai_fsm_20261027T022524Z.dump
+                      was verified before deploy (1388 TOC entries). The worker
+                      container was left running. Staff type screens were not
                       opened in a browser.
 ```
 
@@ -109,7 +111,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | B0 | TASK-189 | doc in #720 | 2026-10-26 (#720) | n/a | n/a |
 | B1 | TASK-190 | 2026-10-26 (CI 40419939119, 40419947446, #724) | 2026-10-26 (#724, f4837336) | 2026-10-27 (~00:02 UTC) | 2026-10-27 (draft split, 00:04 UTC) |
 | B2 | TASK-191 | 2026-10-27 (CI 40429996387, 40430001995, #726) | 2026-10-27 (#726, 20c7d5f8) | 2026-10-27 (~01:28 UTC) | 2026-10-27 (draft hours null, totals unchanged, 01:28 UTC) |
-| B3 | TASK-192 | | | | |
+| B3 | TASK-192 | 2026-10-27 (CI 40437008165, 40437011775, #728) | 2026-10-27 (#728, 2842780e) | 2026-10-27 (~02:32 UTC) | 2026-10-27 (equipment cost apart, 02:33 UTC) |
 | B4 | TASK-193 | | | | |
 | B5 | TASK-194 | | | | |
 | B6 | TASK-195 | | | | |
@@ -520,6 +522,11 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 
 One line per state change: date, step, state, PR, evidence.
 
+- 2026-10-27 · B3 · Verified · health ok and /login HTTP/2 200 at 02:32 UTC; materials cost 10000 with a $120 equipment line typed equipment; probe f75410c8 deleted; known-good deploy-good/2842780e
+- 2026-10-27 · B3 · Deployed · 2842780e · web recreated and healthy ~02:32 UTC. Migration 210 applied after backup ai_fsm_20261027T022524Z.dump. Worker image left as it was.
+- 2026-10-27 · B3 · Merged · #728 · squash 2842780e at 02:25 UTC
+- 2026-10-27 · B3 · Implemented · #728 · CI runs 40437008165 and 40437011775 green (lint, typecheck, build, test, e2e-smoke) on 3ec687c3. equipment-line integration test passed.
+- 2026-10-27 · B3 · In progress · #728 · equipment is its own line; handling and the materials total leave it out
 - 2026-10-27 · B2 · Verified · health ok and /login HTTP/2 200 at 01:28 UTC; draft 237ba3cd total stayed 1082125 and its 8 labor lines have null hours; known-good deploy-good/20c7d5f8
 - 2026-10-27 · B2 · Deployed · 20c7d5f8 · web recreated and healthy ~01:28 UTC. Migration 209 applied after backup ai_fsm_20261027T012137Z.dump. Worker image left as it was.
 - 2026-10-27 · B2 · Merged · #726 · squash 20c7d5f8 at 01:21 UTC
