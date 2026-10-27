@@ -23,7 +23,7 @@ Last step           : B1 (TASK-190) verified on production at 2026-10-27
                       00:04 UTC. Squash f4837336 (#724). Health ok, /login
                       HTTP/2 200, no redirect to 0.0.0.0:3000. Draft check:
                       internal labor 10000 and materials 20000, then deleted.
-In-flight PR        : none yet
+In-flight PR        : #726
 Next step           : B2 (TASK-191) in progress on task/191-person-hours
 Blocked on          : nothing
 Last known-good     : f4837336 (branch deploy-good/f4837336); previous e7b27ef9
@@ -521,7 +521,7 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 
 One line per state change: date, step, state, PR, evidence.
 
-- 2026-10-27 · B2 · In progress · branch task/191-person-hours · person-hours on labor lines and on a flat quote; blank stays null
+- 2026-10-27 · B2 · In progress · #726 · person-hours on labor lines and on a flat quote; blank stays null
 - 2026-10-27 · B1 · Verified · health ok and /login HTTP/2 200 at 00:04 UTC; draft labor 10000 materials 20000 then deleted; known-good deploy-good/f4837336
 - 2026-10-27 · B1 · Deployed · f4837336 · web recreated and healthy ~00:02 UTC. Migration 208 applied after backup ai_fsm_20261026T235404Z.dump. Worker image left as it was.
 - 2026-10-26 · B1 · Merged · #724 · squash f4837336 at 23:53 UTC
