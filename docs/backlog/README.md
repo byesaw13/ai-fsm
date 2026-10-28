@@ -201,7 +201,7 @@ closed in tests; owner-flow AC still open.
 | TASK-216 | [Remaining formula families](TASK-216-remaining-formula-families.md) | 002 | Deferred |
 | TASK-217 | [Trade-aware estimating methods in Prepare Quote](TASK-217-trade-aware-estimate-methods.md) | 002 | In Progress |
 | TASK-218 | [Craftsman reference hours and parts beside the price book](TASK-218-craftsman-reference-hours.md) | 002 | In Progress |
-| TASK-219 | [Owner review of production rates against Craftsman](TASK-219-production-rate-review.md) | 002 | Ready |
+| TASK-219 | [Owner review of production rates against Craftsman](TASK-219-production-rate-review.md) | 002 | In Progress |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
