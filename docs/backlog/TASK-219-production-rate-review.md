@@ -1,7 +1,7 @@
 # TASK-219: Owner review of production rates against Craftsman
 
 Status:
-Ready
+In Progress
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -10,7 +10,7 @@ Phase:
 3 (estimating assistant slice; see ROADMAP Phase 3 bullet "TASK-219 production rate review")
 
 Owner approval:
-Build approved 2026-10-27. Waiting on the owner's keep / adopt / new-value decision for each rate.
+Build approved 2026-10-27. Owner rate decisions made 2026-10-27 (below).
 Nothing here needs a new table or column.
 
 Depends on:
@@ -76,6 +76,22 @@ Comparison (8 h per day; Craftsman hours exclude travel and setup):
 | 9012 Self-leveler | 200 SF / day | 0.040 / SF | none | none | none | Keep. |
 | 9013 Flooring removal | 300 SF / day | 0.027 / SF | Remove: sheet vinyl 0.019 / SF, carpet 0.007 / SF, tile 0.080 / SF (RIR) | 0.007 to 0.080 | 100 to 1,160 SF | Ours sits in the middle. Consider separate tile and carpet rates. |
 
+Owner decisions (2026-10-27), applied by migration 212:
+
+| Code | Was | Now | Decision |
+|---|---|---|---|
+| 2001 Faucet | 6 / day | **7 / day** | New value, between ours and Craftsman |
+| 2005 Toilet swap | 3 / day | **4 / day** | New value (2 h each) |
+| 2006 P-trap | 6 / day | **9 / day** | New value, between the two books |
+| 4007 Deck board set | 5 / day | **6 / day** | New value, between ours and Craftsman |
+| 4009 Stair / step repair | 4 / day | **12.5 / day** | Adopt Craftsman |
+| 5002 Interior door paint | 6 / day | **9 / day** | Adopt Craftsman (prime + 2 coats) |
+| 5003 Trim paint | 120 LF / day | **470 LF / day** | Adopt Craftsman |
+| 9013 Flooring removal | 300 SF / day | **410 SF / day** | New value (sheet vinyl pace) |
+| 4005 Floating shelf pair | 9 / day | 9 / day | Keep (weak Craftsman match) |
+| 2007, 4004, 5012, 9010 | | unchanged | Keep (match Craftsman) |
+| 2002, 2003, 4001, 4002, 4003, 4010, 9011, 9012 | | unchanged | Keep (no usable Craftsman line) |
+
 Candidate new rates (not built here; listed for the owner's next decision):
 - **Ceiling paint:** 350 SF/h first coat, 375 second (painting book, roll, textured).
 - **Baseboard install (4011):** 0.038 / LF, plus 0.022 / LF to remove old.
@@ -85,11 +101,10 @@ Candidate new rates (not built here; listed for the owner's next decision):
 - **Wall framing (4013):** 0.241 / LF.
 
 Acceptance Criteria:
-- [ ] Owner has marked every row Keep / Adopt / New value with a one-line reason; the filled table is
-      in this file.
-- [ ] One migration applies only the changed rows, each guarded on its seeded value, with a reversal
+- [x] Owner has marked every row Keep / Adopt / New value; the filled table is in this file.
+- [x] One migration applies only the changed rows, each guarded on its seeded value, with a reversal
       comment; `calibrated` untouched.
-- [ ] Each changed row's `notes` names the source and review date.
+- [x] Each changed row's `notes` names the source and review date.
 - [ ] A unit test pins the new values. Prepare Quote's existing rate tests still pass. Hours for a
       sample quote change only on the rows that changed.
 - [ ] After deploy, owner prepares one quote that uses a changed rate and confirms the hours look right.
