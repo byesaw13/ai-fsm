@@ -29,12 +29,19 @@ Last step           : B3 (TASK-192) verified on production at 2026-10-27
 In-flight PR        : none
 Next step           : B4 (TASK-193)
 Blocked on          : nothing
-Last known-good     : 2842780e (branch deploy-good/2842780e); previous 20c7d5f8
-                      (branch deploy-good/20c7d5f8)
+Last known-good     : 7490a24c (branch deploy-good/7490a24c); previous 25deb3e2
+                      (branch deploy-good/25deb3e2)
 Notes               : Migration 210 applied. Backup ai_fsm_20261027T022524Z.dump
                       was verified before deploy (1388 TOC entries). The worker
                       container was left running. Staff type screens were not
                       opened in a browser.
+                      Off-runbook deploy 2026-10-28 01:53 UTC of 7490a24c:
+                      TASK-218 (#733, mig 211 price_book.reference_hours) and
+                      TASK-219 (#734, mig 212 eight owner-decided production
+                      rates). Backup ai_fsm_20261028T014359Z.dump verified
+                      (1399 TOC entries). Health ok, /login HTTP/2 200, no
+                      redirect to 0.0.0.0:3000; rates and column checked in
+                      prod. Worker container was left running.
 ```
 
 ## Owner approvals
