@@ -48,6 +48,8 @@ type PriceBookRow = {
   return_trip_required: boolean;
   material_inclusion: "none_needed" | "customer_supplied" | "tech_supplied_included" | "billed_separately";
   risk_flags: string[];
+  // Migration 211 — Craftsman reference lines, display only (TASK-218)
+  reference_hours: unknown[];
   created_at: string;
   updated_at: string;
 };
@@ -115,6 +117,7 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
               legal_status_ma, legal_status_nh, two_person_required, quote_trigger,
               default_trip_count, return_trip_required, material_inclusion,
               COALESCE(risk_flags, '{}') AS risk_flags,
+              reference_hours,
               created_at::text, updated_at::text
        FROM price_book
        ${where}

@@ -1,7 +1,7 @@
 # TASK-219: Owner review of production rates against Craftsman
 
 Status:
-Proposed
+Ready
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -10,7 +10,8 @@ Phase:
 3 (estimating assistant slice; see ROADMAP Phase 3 bullet "TASK-219 production rate review")
 
 Owner approval:
-Required. The owner makes every rate decision. Nothing here needs a new table or column.
+Build approved 2026-10-27. Waiting on the owner's keep / adopt / new-value decision for each rate.
+Nothing here needs a new table or column.
 
 Depends on:
 None. TASK-218 (Craftsman reference beside the price book) is related but not required.

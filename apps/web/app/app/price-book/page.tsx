@@ -19,6 +19,9 @@ type PriceBookRow = {
   description: string | null;
   notes: string | null;
   default_labor_hours: number | null;
+  labor_hours_low: number | null;
+  labor_hours_typical: number | null;
+  labor_hours_high: number | null;
   requires_materials: boolean;
   upsell_codes: string[];
   is_active: boolean;
@@ -26,6 +29,7 @@ type PriceBookRow = {
   return_trip_required: boolean;
   material_inclusion: "none_needed" | "customer_supplied" | "tech_supplied_included" | "billed_separately";
   risk_flags: string[];
+  reference_hours: unknown;
   created_at: string;
   updated_at: string;
 };
@@ -39,9 +43,11 @@ export default async function PriceBookPage() {
     `SELECT id, code, name, category, tier, price_min_cents, price_max_cents,
             default_price_cents, add_on_price_cents, unit_type,
             description, notes, default_labor_hours::float, requires_materials,
+            labor_hours_low::float, labor_hours_typical::float, labor_hours_high::float,
             COALESCE(upsell_codes, '{}') AS upsell_codes, is_active,
             default_trip_count, return_trip_required, material_inclusion,
             COALESCE(risk_flags, '{}') AS risk_flags,
+            reference_hours,
             created_at::text, updated_at::text
      FROM price_book
      ORDER BY code ASC`
