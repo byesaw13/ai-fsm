@@ -15,6 +15,14 @@ after the pilot passes. Starts after PR #720 merges.
 
 - [TASK-209: Estimating assistant, Phase 3 slice (parent)](TASK-209-estimating-assistant-phase3.md) — children TASK-210 to TASK-216.
 
+## Craftsman reference hours (TASK-218)
+
+Proposed 2026-10-27; owner approval required (table-freeze exception). Source sheet:
+`docs/working/craftsman-reference-pricebook.md`.
+
+- [TASK-218: Craftsman reference hours and parts beside the price book](TASK-218-craftsman-reference-hours.md) — reference only; never feeds price or hours.
+- [TASK-219: Owner review of production rates against Craftsman](TASK-219-production-rate-review.md) — owner decides each of the 21 rates; one guarded data migration.
+
 ## Hourly baseline and estimate audit (TASK-188 to TASK-206)
 
 Owner decisions 2026-10-26: every estimate is compared with the company's
