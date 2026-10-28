@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { Card, Input, PageContainer, PageHeader, SectionHeader } from "@/components/ui";
 import { formatCents } from "@/lib/money";
+import { ReferenceBlock } from "./ReferenceBlock";
 import {
   PRICE_BOOK_CATEGORY_LABELS,
   PRICE_BOOK_TIER_LABELS,
@@ -22,6 +23,9 @@ interface Service {
   description: string | null;
   notes: string | null;
   default_labor_hours: number | null;
+  labor_hours_low: number | null;
+  labor_hours_typical: number | null;
+  labor_hours_high: number | null;
   requires_materials: boolean;
   upsell_codes: string[];
   is_active: boolean;
@@ -29,6 +33,7 @@ interface Service {
   return_trip_required: boolean;
   material_inclusion: "none_needed" | "customer_supplied" | "tech_supplied_included" | "billed_separately";
   risk_flags: string[];
+  reference_hours: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -51,7 +56,6 @@ const RISK_FLAG_LABELS: Record<string, string> = {
 interface Props {
   services: Service[];
 }
-
 
 function tierColor(tier: string): string {
   switch (tier) {
@@ -353,6 +357,7 @@ export default function PriceBookClient({ services }: Props) {
                             </>
                           )}
                         </div>
+                        <ReferenceBlock service={service} />
                       </div>
                     )}
                   </Card>

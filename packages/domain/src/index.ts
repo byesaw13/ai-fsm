@@ -17,6 +17,7 @@ export * from "./visits";
 export * from "./pricing";
 export * from "./dovetails";
 export * from "./pricing-settings";
+export * from "./reference-hours";
 export * from "./estimate-engine";
 export * from "./job-materials";
 export * from "./stages";

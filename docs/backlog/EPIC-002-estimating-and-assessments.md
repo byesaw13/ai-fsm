@@ -17,7 +17,7 @@ after the pilot passes. Starts after PR #720 merges.
 
 ## Craftsman reference hours (TASK-218)
 
-Proposed 2026-10-27; owner approval required (table-freeze exception). Source sheet:
+Approved by the owner 2026-10-27 (TASK-218 table-freeze exception included). Source sheet:
 `docs/working/craftsman-reference-pricebook.md`.
 
 - [TASK-218: Craftsman reference hours and parts beside the price book](TASK-218-craftsman-reference-hours.md) — reference only; never feeds price or hours.

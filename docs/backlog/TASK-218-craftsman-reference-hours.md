@@ -1,7 +1,7 @@
 # TASK-218: Craftsman reference hours and parts beside the price book
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -10,7 +10,7 @@ Phase:
 3 (estimating assistant slice; see ROADMAP Phase 3 bullet "TASK-218 Craftsman reference hours")
 
 Owner approval:
-Required before build. It adds one column to `price_book`, so it needs a table-freeze exception.
+Approved 2026-10-27, including the table-freeze exception for one `price_book` column.
 
 Depends on:
 None to start. Reads better once TASK-191 (hours on every estimate) lands, but does not need it.
@@ -37,11 +37,12 @@ Scope:
   (migration 184).
 - **Domain:** a Zod schema and type for one entry in `packages/domain`. Add a pure helper that returns
   the swap hours (install + remove) for a given quantity, and also returns the minimum when one is set.
-- **Load:** an owner-run script, `pnpm --filter @ai-fsm/web ref-hours:load <csv>`. It reads an
-  owner-reviewed CSV kept outside git (`~/craftsman-reference/approved.csv` on garonhome).
-  - It validates every row against the schema and checks the price book code exists.
-  - It replaces that code's entries in one transaction.
-  - It prints a before/after diff, and writes only with `--apply`.
+- **Load:** `scripts/load-reference-hours.mjs`, owner-run, in the same style as
+  `rebuild-hd-materials-catalog.mjs`. It reads an owner-reviewed CSV kept outside git
+  (`~/craftsman-reference/approved.csv` on garonhome).
+  - It validates every row; any bad row means nothing is written.
+  - `--mode dry-run` prints what each code will get. `--mode sql` writes one transaction that aborts if
+    any code is unknown, then replaces only the listed codes' entries. Apply it with psql.
   - The licensed numbers never enter the repo. Test fixtures use made-up values.
 - **Price book page** (`apps/web/app/app/price-book`): a "Reference (Craftsman)" block under each code.
   - It shows each cited line: book, line, hours per unit, swap hours, includes, minimum.
@@ -67,12 +68,12 @@ Acceptance Criteria:
       negative hours.
 - [ ] Swap helper unit tests: install only; install + remove; quantity scaling (per LF/SF); minimum
       applied when the total is below it.
-- [ ] Load script, without `--apply`, writes nothing and prints the diff. With `--apply`, it replaces
-      only the codes in the CSV. An unknown code or invalid row fails the whole run.
+- [ ] Load script: dry run writes nothing; SQL mode replaces only the codes in the CSV in one
+      transaction. An unknown code or invalid row fails the whole run.
 - [ ] Price book page shows the reference block for a code that has entries, and nothing for a code
       without them.
-- [ ] Test proves estimate creation, Prepare Quote and the hourly baseline give identical results with
-      and without `reference_hours` set (reference never feeds pricing or hours).
+- [ ] Guard test proves only the price book page and its read API touch `reference_hours`, so it can
+      never feed estimate creation, Prepare Quote, the hourly baseline or AI.
 - [ ] No Craftsman figures in committed files outside `docs/working/craftsman-reference-pricebook.md`.
       Test fixtures are made up.
 - [ ] Owner loads the reviewed CSV on prod and spot-checks five codes on the price book page.
