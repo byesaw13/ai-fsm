@@ -21,6 +21,7 @@ Proposed 2026-10-27; owner approval required (table-freeze exception). Source sh
 `docs/working/craftsman-reference-pricebook.md`.
 
 - [TASK-218: Craftsman reference hours and parts beside the price book](TASK-218-craftsman-reference-hours.md) — reference only; never feeds price or hours.
+- [TASK-219: Owner review of production rates against Craftsman](TASK-219-production-rate-review.md) — owner decides each of the 21 rates; one guarded data migration.
 
 ## Hourly baseline and estimate audit (TASK-188 to TASK-206)
 
