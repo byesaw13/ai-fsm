@@ -169,8 +169,11 @@ checklist; the buy list shows it as "no checklist: add a code or add parts by ha
 
 ### Rare jobs: AI-drafted checklists
 
-When a code with no checklist is used, the AI drafts one. In v1 it drafts only from the code's
-Craftsman reference lines and "includes" text (TASK-218) and the owner's own catalog and receipts.
+When a code with no checklist is used, the AI drafts one. In v1 it drafts only from the owner's own
+catalog, receipts and job notes. The Craftsman reference (TASK-218) is **not** sent to the AI: the
+ROADMAP says it never feeds AI. Instead, the code's Craftsman lines and "includes" text are shown to
+the owner beside the draft, and the owner adds what they list by hand. Using Craftsman as an AI input
+would need an owner-approved change to the TASK-218 ROADMAP bullet first.
 Manufacturer guides and code reminders are later inputs. The draft is saved with status `draft`, the
 owner edits it on that job, and approving it makes it the code's current version. Next time, the
 approved version is used and the AI does not redraft it.
@@ -185,7 +188,7 @@ gets a separate backlog note once checklists exist.
 
 | Source | Gives | Limit |
 |---|---|---|
-| Craftsman (owner subscription) | Variant names (types, sizes, grades), what each line includes | Specs only; no store SKUs; no bulk import (ROADMAP exclusion) |
+| Craftsman (owner subscription) | Variant names (types, sizes, grades), what each line includes | Owner reads it while writing checklists; never an AI input (ROADMAP); no store SKUs; no bulk import |
 | Owner's receipts and catalog (1,304 items) | The actual parts bought, with SKUs and prices | Only covers what has been bought before |
 | Manufacturer install guides (later) | "You will need" accessory lists | One product at a time |
 | Electrical and plumbing code (later) | Required items (for example GFCI or tamper-resistant devices where required) | A reminder, not a code-compliance check |
@@ -212,10 +215,10 @@ gets a separate backlog note once checklists exist.
 - **Backlog gate:** needs a backlog task citing a ROADMAP phase before any build (CLAUDE.md rule).
   Fits Phase 3 estimating work next to TASK-218. If the checklist is seen as a new scope object, the
   ROADMAP or DOMAIN_MODEL may need a line first.
-- TASK-218 reference hours (loaded draft feeds the AI drafts).
+- TASK-218 reference hours (shown to the owner while writing checklists; not an AI input).
 - Existing kit table and buy-list build route; must not regress them.
-- ROADMAP excludes a licensed Craftsman import: checklist content uses Craftsman variant names and
-  "includes" text from the owner's reviewed lines, not copied price tables.
+- ROADMAP excludes a licensed Craftsman import: checklist content the owner writes may use Craftsman variant
+  names and "includes" text from the owner's reviewed lines, not copied price tables.
 
 ## The Assignment
 

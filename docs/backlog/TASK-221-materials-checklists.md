@@ -17,7 +17,8 @@ before build, the way TASK-218 had one.
 Depends on:
 - TASK-220 (price book refresh), for the codes the checklists hang on and for
   `estimate_line_items.price_book_id` being filled in.
-- TASK-218 reference lines (their "includes" text seeds AI-drafted checklists).
+- TASK-218 reference lines, shown to the owner beside a checklist being written (display only,
+  never sent to AI).
 
 Problem:
 Every kind of job comes in variants: a dimmer is single-pole, 3-way or 4-way; a toilet may need a new
@@ -31,8 +32,10 @@ Scope (from the approved design):
 - **Answers per unit of work** on the estimate, carried to the job; the job buy list build expands
   once per unit and sums the parts.
 - **AI pre-fill** of answers the notes state; uncertain answers are left blank, never guessed.
-- **AI-drafted checklists** for codes with none, from the Craftsman reference and the owner's
-  receipts; used only after the owner approves.
+- **AI-drafted checklists** for codes with none, from the owner's own catalog, receipts and job
+  notes only; used only after the owner approves. The Craftsman reference (TASK-218) is **not** an AI
+  input: ROADMAP says it never feeds AI. While editing a draft, the owner sees the code's Craftsman
+  lines on screen and adds what they list by hand.
 - **"Still to decide"** on the job buy list for unanswered questions.
 - **Changing an answer** rebuilds only `needed` lines from that unit; bought or on-truck lines are kept
   and flagged.
