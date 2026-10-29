@@ -22,6 +22,8 @@ Approved by the owner 2026-10-27 (TASK-218 table-freeze exception included). Sou
 
 - [TASK-218: Craftsman reference hours and parts beside the price book](TASK-218-craftsman-reference-hours.md) — reference only; never feeds price or hours.
 - [TASK-219: Owner review of production rates against Craftsman](TASK-219-production-rate-review.md) — owner decides each of the 21 rates; one guarded data migration.
+- [TASK-220: Price book refresh from job history and Craftsman](TASK-220-price-book-refresh.md) — proposed; review sheet `docs/working/price-book-refresh-review.md`; data migrations only.
+- [TASK-221: Materials checklists per job type](TASK-221-materials-checklists.md) — proposed; design approved, build needs a table-freeze exception.
 
 ## Hourly baseline and estimate audit (TASK-188 to TASK-206)
 

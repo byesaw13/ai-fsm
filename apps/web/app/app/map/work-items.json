@@ -44,6 +44,8 @@
   { "id": "TASK-216", "title": "More material formulas", "branch": "quote", "status": "deferred", "phase": "Phase 3", "fit": "Drywall, caulk, trim and supplies, after the paint pilot proves out." },
   { "id": "TASK-218", "title": "Craftsman hours beside your price book", "branch": "quote", "status": "progress", "phase": "Phase 3", "fit": "See Craftsman's hours and what each job includes next to your own, as a check. It never changes a price." },
   { "id": "TASK-219", "title": "Check your work rates against Craftsman", "branch": "quote", "status": "progress", "phase": "Phase 3", "fit": "The rates that turn square feet and fixtures into hours get a once-over against Craftsman; you decide each one." },
+  { "id": "TASK-220", "title": "Refresh your price book", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Prices from your hours and rate, per-foot pricing where size matters, and codes for the work you actually do." },
+  { "id": "TASK-221", "title": "Ask the right parts questions", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Each job asks which type, which kind and what accessories, so the buy list is right before the store run." },
 
   { "id": "TASK-102", "title": "Save quick materials onto the job", "branch": "job", "status": "backlog", "phase": "Phase 3", "fit": "Materials gathered outside a quote still have to land on the job." },
   { "id": "TASK-208", "title": "Change orders checked against your hourly rate", "branch": "job", "status": "backlog", "phase": "Phase 3", "fit": "Added work on a job should get the same hours check as the original quote." },
