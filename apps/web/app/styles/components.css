@@ -1367,6 +1367,76 @@
 .success-inline { color: #065f46; font-size: 13px; margin: 0 0 8px; }
 .error-message { background: var(--color-red-100); border: 1px solid #fecaca; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
 .line-items-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+
+.line-item-hours {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  align-items: center;
+}
+
+.line-item-hours-label,
+.line-item-hours-missing {
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.line-item-hours-label { color: var(--fg-muted); }
+.line-item-hours-missing { color: var(--color-danger); }
+.line-item-hours-input { width: 72px; }
+
+/* Quote line editor: one row per field on a phone, so price and remove stay on screen. */
+@media (max-width: 767px) {
+  .line-items-editor .line-item-hours { flex-wrap: wrap; }
+  .line-items-editor .line-item-hours-label,
+  .line-items-editor .line-item-hours-missing {
+    flex: 1 1 100%;
+  }
+  .line-items-editor .line-item-hours-input {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .line-items-editor { overflow-x: visible; }
+  .line-items-editor .line-items-table,
+  .line-items-editor thead,
+  .line-items-editor tbody,
+  .line-items-editor tr,
+  .line-items-editor td {
+    display: block;
+    width: auto;
+  }
+  .line-items-editor thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .line-items-editor tr {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+  .line-items-editor td {
+    border: 0;
+    padding: var(--space-2) 0;
+  }
+  .line-items-editor td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: var(--font-semibold);
+    color: var(--fg-muted);
+  }
+  .line-items-editor td:last-child {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-1);
+  }
+}
 .line-items-table th { text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border); font-weight: 600; font-size: 13px; color: var(--fg-muted); }
 .line-items-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
 .line-items-table tfoot td { border-bottom: none; padding-top: 10px; }
