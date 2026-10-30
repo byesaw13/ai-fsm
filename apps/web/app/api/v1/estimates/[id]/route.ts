@@ -18,6 +18,7 @@ import { logger } from "@/lib/logger";
 import { getPathId } from "@/lib/route-utils";
 import { linePriceMissing } from "@/lib/estimates/cost-split";
 import { HOUR_SOURCES } from "@/lib/estimates/stored-hours";
+import { assertQuoteVersion, quoteUpdatedAt } from "@/lib/estimates/quote-version";
 
 export const dynamic = "force-dynamic";
 
@@ -136,6 +137,7 @@ const patchEstimateSchema = z.object({
   scope_assumptions: z.string().nullable().optional(),
   room_specs: z.array(z.record(z.unknown())).optional(),
   shopping_list_json: z.record(z.unknown()).optional(),
+  updated_at: z.string().min(1).max(80).optional(),
 }).superRefine((input, ctx) => {
   if (
     input.labor_hours_low != null &&
@@ -178,13 +180,47 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     );
   }
 
-  try {
-    const result = await withEstimateContext(session, (client) =>
-      updateEstimateById(client, id, session, parseResult.data)
+  const { updated_at: loadedUpdatedAt, ...patch } = parseResult.data;
+  const replacesLines = patch.line_items !== undefined || patch.options !== undefined;
+  if (replacesLines && loadedUpdatedAt === undefined) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid request body", traceId: session.traceId } },
+      { status: 400 },
     );
+  }
+
+  try {
+    const result = await withEstimateContext(session, async (client) => {
+      if (loadedUpdatedAt !== undefined) {
+        const { rows } = await client.query<{ updated_at: Date }>(
+          `SELECT updated_at FROM estimates WHERE id = $1 AND account_id = $2 FOR UPDATE`,
+          [id, session.accountId],
+        );
+        if (!rows[0]) throw Object.assign(new Error("Not found"), { code: "NOT_FOUND" });
+        assertQuoteVersion(rows[0].updated_at, loadedUpdatedAt);
+      }
+      await updateEstimateById(client, id, session, patch);
+      const { rows } = await client.query<{ updated_at: Date }>(
+        `SELECT updated_at FROM estimates WHERE id = $1`,
+        [id],
+      );
+      return { updated: true, updated_at: quoteUpdatedAt(rows[0]?.updated_at) };
+    });
     return NextResponse.json(result);
   } catch (error) {
     const err = error as Error & { code?: string };
+    if (err.code === "STALE_QUOTE") {
+      return NextResponse.json(
+        { error: { code: "STALE_QUOTE", message: err.message, traceId: session.traceId } },
+        { status: 409 },
+      );
+    }
+    if (err.code === "VALIDATION_ERROR") {
+      return NextResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: err.message, traceId: session.traceId } },
+        { status: 400 },
+      );
+    }
     if (err.code === "NOT_FOUND") {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Estimate not found", traceId: session.traceId } },

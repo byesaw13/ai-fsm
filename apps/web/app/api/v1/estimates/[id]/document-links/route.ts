@@ -3,6 +3,7 @@ import { withRole } from "@/lib/auth/middleware";
 import { withEstimateContext } from "@/lib/estimates/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { quoteUpdatedAt } from "@/lib/estimates/quote-version";
 
 import {
   assertClientInAccount,
@@ -119,10 +120,11 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         return { updated: false, client_id: next.client_id, job_id: next.job_id, property_id: next.property_id };
       }
 
-      await client.query(
+      const saved = await client.query<{ updated_at: Date }>(
         `UPDATE estimates
          SET client_id = $1, job_id = $2, property_id = $3, updated_at = now()
-         WHERE id = $4 AND account_id = $5`,
+         WHERE id = $4 AND account_id = $5
+         RETURNING updated_at`,
         [next.client_id, next.job_id, next.property_id, id, session.accountId],
       );
 
@@ -141,7 +143,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         new_value: next,
       });
 
-      return { updated: true, ...next };
+      return { updated: true, ...next, updated_at: quoteUpdatedAt(saved.rows[0]?.updated_at) };
     });
 
     return NextResponse.json({ data: result });

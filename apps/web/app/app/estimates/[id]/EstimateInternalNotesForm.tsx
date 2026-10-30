@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 
 interface Props {
   estimateId: string;
@@ -10,6 +11,7 @@ interface Props {
 
 export function EstimateInternalNotesForm({ estimateId, initialNotes }: Props) {
   const router = useRouter();
+  const { setUpdatedAt } = useQuoteVersion();
   const [notes, setNotes] = useState(initialNotes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -32,10 +34,11 @@ export function EstimateInternalNotesForm({ estimateId, initialNotes }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ internal_notes: notes }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json();
         setError(data.error?.message ?? "Failed to save notes");
       } else {
+        rememberQuoteVersion(data, setUpdatedAt);
         setSaved(true);
         router.refresh();
       }

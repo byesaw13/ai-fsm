@@ -54,14 +54,18 @@ const RESULT = {
   summary_notes: "", total_cost_cents: 28900, assumptions: [], missing_measurements: [], excluded_customer_supplied_items: [],
 };
 
+const UPDATED_AT = "2026-10-29T12:00:00.000Z";
 let stored: PreparedScope = SCOPE;
-const post = (body: unknown) =>
-  new NextRequest(`http://localhost:3000/api/v1/estimates/${ID}/prepared-scope/materials`, { method: "POST", body: JSON.stringify(body) });
+const post = (body: Record<string, unknown>) =>
+  new NextRequest(`http://localhost:3000/api/v1/estimates/${ID}/prepared-scope/materials`, {
+    method: "POST",
+    body: JSON.stringify({ updated_at: UPDATED_AT, ...body }),
+  });
 
 beforeEach(() => {
   stored = SCOPE;
   mockQuery.mockReset().mockImplementation(async (sql: string, params?: unknown[]) => {
-    if (sql.includes("FROM estimates")) return { rows: [{ status: "draft", prepared_scope: stored }] };
+    if (sql.includes("FROM estimates")) return { rows: [{ status: "draft", prepared_scope: stored, updated_at: new Date(UPDATED_AT) }] };
     if (sql.startsWith("UPDATE estimates")) stored = JSON.parse(params![0] as string);
     return { rows: [] };
   });
@@ -96,7 +100,7 @@ describe("POST /estimates/[id]/prepared-scope/materials", () => {
 
   it("needs a work area, and refuses a sent quote", async () => {
     expect((await POST(post({ prepared_scope: SCOPE }))).status).toBe(400);
-    mockQuery.mockResolvedValue({ rows: [{ status: "sent", prepared_scope: SCOPE }] });
+    mockQuery.mockResolvedValue({ rows: [{ status: "sent", prepared_scope: SCOPE, updated_at: new Date(UPDATED_AT) }] });
     expect((await POST(post({ prepared_scope: SCOPE, group_keys: ["bath"] }))).status).toBe(422);
   });
 });

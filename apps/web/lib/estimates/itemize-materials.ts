@@ -92,7 +92,7 @@ export async function itemizeGroups(
  * The itemized lists as the standard shopping list (`estimates.shopping_list_json`,
  * the `ShoppingList` shape the buy list, the shopping-list page and the print page
  * read): one section per work area, each line a specified item. Null when nothing
- * is itemized. TASK-218: an earlier shape left out `specified_items`, which crashed
+ * is itemized. TASK-223: an earlier shape left out `specified_items`, which crashed
  * the print and shopping-list pages.
  */
 export function preparedShoppingList(scope: PreparedScope): ShoppingList | null {

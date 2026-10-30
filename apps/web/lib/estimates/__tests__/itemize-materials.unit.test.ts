@@ -81,7 +81,7 @@ describe("itemized materials (TASK-187)", () => {
     expect(summarizePreparedScope(scope).groups.find((g) => g.key === "bath")!.materials_cents).toBe(39900);
   });
 
-  it("writes the standard shopping list: one section per area, lines as specified items (TASK-218)", () => {
+  it("writes the standard shopping list: one section per area, lines as specified items (TASK-223)", () => {
     const scope = { ...SCOPE, materials: { bath: toMaterialList(RESULT, ["t1", "t2"]) } };
     const list = preparedShoppingList(scope)!;
     expect(list.sections).toHaveLength(1);

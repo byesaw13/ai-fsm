@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import {
   TRAVEL_CHARGE_MODE_LABELS,
   TRAVEL_POLICY_TIER_LABELS,
@@ -97,6 +98,7 @@ export function TravelPanel({
   initialSnapshot = null,
 }: Props) {
   const router = useRouter();
+  const { setUpdatedAt } = useQuoteVersion();
   const [snapshot, setSnapshot] = useState<SnapshotSummary | null>(initialSnapshot);
   const [preview, setPreview] = useState<Calculation | null>(null);
   const [origin, setOrigin] = useState("");
@@ -234,6 +236,7 @@ export function TravelPanel({
         setError(json.error?.message ?? "Failed to apply travel");
         return;
       }
+      if (entityType === "estimate") rememberQuoteVersion(json, setUpdatedAt);
       setSnapshot(json.data.snapshot ?? json.data.current ?? null);
       setPreview(json.data.calculation ?? null);
       router.refresh();

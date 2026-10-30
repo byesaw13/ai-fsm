@@ -21,6 +21,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { Client } from "pg";
+import { quoteStamp } from "./quote-stamp";
 
 // HTTP integration: requires both a running DB and a running web server.
 const RUN_INTEGRATION =
@@ -213,6 +214,7 @@ describe.skipIf(!RUN_INTEGRATION)("Estimates API integration", () => {
         `/api/v1/estimates/${testEstimateId}`,
         adminCookie,
         {
+          updated_at: await quoteStamp(testEstimateId),
           line_items: [
             { description: "New item", quantity: 1, unit_price_cents: 20000 },
           ],

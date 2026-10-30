@@ -28,6 +28,7 @@ import {
 } from "@ai-fsm/domain";
 import type { RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
 import type { OptionTier } from "@/lib/estimates/form-helpers";
+import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import {
   parseCents,
   lineTotal,
@@ -105,7 +106,7 @@ interface EstimateEditFormProps {
   initialMinimumServiceOverrideNote?: string | null;
   // Room-by-room painting
   initialRoomSpecs?: RoomSpec[] | null;
-  /** Built by Prepare Quote: priced from its prepared scope, so painting and fixed-bid modes are off (TASK-218). */
+  /** Built by Prepare Quote: priced from its prepared scope, so painting and fixed-bid modes are off (TASK-223). */
   hasPreparedScope?: boolean;
 }
 
@@ -184,6 +185,7 @@ function StandardEstimateEditForm({
 }: EstimateEditFormProps) {
   const router = useRouter();
   const toast = useToast();
+  const { updatedAt, setUpdatedAt } = useQuoteVersion();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -512,11 +514,12 @@ function StandardEstimateEditForm({
       const res = await fetch(`/api/v1/estimates/${estimateId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, updated_at: updatedAt }),
       });
 
+      const data = await res.json().catch(() => ({}));
+      rememberQuoteVersion(data, setUpdatedAt);
       if (!res.ok) {
-        const data = await res.json();
         setError(data.error?.message ?? "Failed to update estimate.");
         setPending(false);
         return;
@@ -646,7 +649,7 @@ function StandardEstimateEditForm({
           coordinationRequired={coordinationRequired} setCoordinationRequired={setCoordinationRequired}
         />
 
-        {/* Service Type Toggle — not on a prepared quote (TASK-218) */}
+        {/* Service Type Toggle — not on a prepared quote (TASK-223) */}
         {!hasPreparedScope && (
         <div>
           <SectionHeader title="Service Type" as="h3" />
@@ -937,6 +940,7 @@ function TierEditor({
   initialTaxRate: number;
 }) {
   const toast = useToast();
+  const { updatedAt, setUpdatedAt } = useQuoteVersion();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState(initialNotes ?? "");
@@ -1012,11 +1016,13 @@ function TierEditor({
           notes: notes.trim() || null,
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           tax_rate: initialTaxRate,
+          updated_at: updatedAt,
         }),
       });
 
+      const data = await res.json().catch(() => ({}));
+      rememberQuoteVersion(data, setUpdatedAt);
       if (!res.ok) {
-        const data = await res.json();
         setError(data.error?.message ?? "Failed to save");
         return;
       }

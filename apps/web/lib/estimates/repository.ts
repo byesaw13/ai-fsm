@@ -199,7 +199,7 @@ export async function updateEstimateById(
   // A quote built by Prepare Quote is priced from its prepared scope. Switching it to
   // the square-foot painting or flat-rate modes would replace its lines while the
   // scope stays, and the next Apply would add the scope's lines back on top:
-  // a double charge (TASK-218).
+  // a double charge (TASK-223).
   if (
     est.has_prepared_scope &&
     (patch.flat_rate_cents !== undefined || patch.sq_ft !== undefined || patch.room_specs !== undefined)
@@ -429,7 +429,7 @@ export async function updateEstimateById(
     if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined || has_painting_fields) {
       // Option lines belong to their options: replace them only when this save also
       // rewrites the options (below). Otherwise Apply to quote and other line-only
-      // saves would delete a Good/Better/Best quote's lines (TASK-218).
+      // saves would delete a Good/Better/Best quote's lines (TASK-223).
       await client.query(
         patch.options !== undefined
           ? `DELETE FROM estimate_line_items WHERE estimate_id = $1`

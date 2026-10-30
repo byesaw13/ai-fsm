@@ -5,7 +5,7 @@ re-keying, and keeping estimate structure consistent across jobs.
 
 ## Active tasks
 
-- [TASK-218: One authoritative estimate draft for prepared quotes](TASK-218-single-source-estimate.md) — two PRs; owner-approved 2026-10-27.
+- [TASK-223: One authoritative estimate draft for prepared quotes](TASK-223-single-source-estimate.md) — two PRs; owner-approved 2026-10-27.
 - [TASK-217: Trade-aware estimating methods in Prepare Quote](TASK-217-trade-aware-estimate-methods.md) — focused correction, owner-approved 2026-10-27.
 
 ## Estimating assistant, Phase 3 slice (TASK-209 to TASK-216)
@@ -15,6 +15,16 @@ Foundation plus paint pilot first; the four other formula families follow only
 after the pilot passes. Starts after PR #720 merges.
 
 - [TASK-209: Estimating assistant, Phase 3 slice (parent)](TASK-209-estimating-assistant-phase3.md) — children TASK-210 to TASK-216.
+
+## Craftsman reference hours (TASK-218)
+
+Approved by the owner 2026-10-27 (TASK-218 table-freeze exception included). Source sheet:
+`docs/working/craftsman-reference-pricebook.md`.
+
+- [TASK-218: Craftsman reference hours and parts beside the price book](TASK-218-craftsman-reference-hours.md) — reference only; never feeds price or hours.
+- [TASK-219: Owner review of production rates against Craftsman](TASK-219-production-rate-review.md) — owner decides each of the 21 rates; one guarded data migration.
+- [TASK-220: Price book refresh from job history and Craftsman](TASK-220-price-book-refresh.md) — proposed; review sheet `docs/working/price-book-refresh-review.md`; data migrations only.
+- [TASK-221: Materials checklists per job type](TASK-221-materials-checklists.md) — proposed; design approved, build needs a table-freeze exception.
 
 ## Hourly baseline and estimate audit (TASK-188 to TASK-206)
 

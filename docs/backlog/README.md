@@ -103,7 +103,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-219**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-224**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -200,7 +200,12 @@ closed in tests; owner-flow AC still open.
 | TASK-215 | [Estimated vs actual hours within matching categories](TASK-215-estimated-vs-actual-hours.md) | 002 | Proposed |
 | TASK-216 | [Remaining formula families](TASK-216-remaining-formula-families.md) | 002 | Deferred |
 | TASK-217 | [Trade-aware estimating methods in Prepare Quote](TASK-217-trade-aware-estimate-methods.md) | 002 | In Progress |
-| TASK-218 | [One authoritative estimate draft for prepared quotes](TASK-218-single-source-estimate.md) | 002 | In Progress |
+| TASK-218 | [Craftsman reference hours and parts beside the price book](TASK-218-craftsman-reference-hours.md) | 002 | In Progress |
+| TASK-219 | [Owner review of production rates against Craftsman](TASK-219-production-rate-review.md) | 002 | In Progress |
+| TASK-220 | [Price book refresh from job history and Craftsman](TASK-220-price-book-refresh.md) | 002 | Proposed |
+| TASK-221 | [Materials checklists per job type (ask before you buy)](TASK-221-materials-checklists.md) | 002 | Proposed |
+| TASK-222 | [A stale quote page can't overwrite newer work](TASK-222-stale-quote-save-guard.md) | 002 | In Progress |
+| TASK-223 | [One authoritative estimate draft for prepared quotes](TASK-223-single-source-estimate.md) | 002 | In Progress |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |

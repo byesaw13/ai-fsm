@@ -1,5 +1,5 @@
 /**
- * TASK-218 PR 1 regressions: itemized materials no longer crash the print and
+ * TASK-223 PR 1 regressions: itemized materials no longer crash the print and
  * shopping-list pages; Apply and other line replacements keep a multi-option
  * quote's option lines; a prepared quote cannot be switched to painting or
  * fixed-bid pricing (the double-charge path), while a manual quote still can.
@@ -9,10 +9,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
 import type { PreparedScope } from "@ai-fsm/domain";
+import { quoteStamp } from "./quote-stamp";
 
 const RUN = !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
 
-describe.skipIf(!RUN)("TASK-218 critical estimate fixes", () => {
+describe.skipIf(!RUN)("TASK-223 critical estimate fixes", () => {
   const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
   let cookie = "";
   let clientId = "";
@@ -70,12 +71,12 @@ describe.skipIf(!RUN)("TASK-218 critical estimate fixes", () => {
   beforeAll(async () => {
     const login = await fetch(`${BASE_URL}/api/v1/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-forwarded-for": "it-task-218-fixes" },
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "it-task-223-fixes" },
       body: JSON.stringify({ email: "owner@test.com", password: "password" }),
     });
     cookie = login.headers.get("set-cookie") ?? "";
     if (!cookie) throw new Error(`login failed: ${login.status}`);
-    clientId = (await api("POST", "/api/v1/clients", { name: "TASK-218 critical fixes test" })).data?.data?.id;
+    clientId = (await api("POST", "/api/v1/clients", { name: "TASK-223 critical fixes test" })).data?.data?.id;
   });
 
   afterAll(async () => {
@@ -94,7 +95,7 @@ describe.skipIf(!RUN)("TASK-218 critical estimate fixes", () => {
       },
     });
     const id = await preparedDraft(itemized);
-    expect((await api("PUT", `/api/v1/estimates/${id}/prepared-scope`, { prepared_scope: itemized, apply: true })).status).toBe(200);
+    expect((await api("PUT", `/api/v1/estimates/${id}/prepared-scope`, { prepared_scope: itemized, apply: true, updated_at: await quoteStamp(id) })).status).toBe(200);
 
     const print = await page(`/app/estimates/${id}/print`);
     expect(print.status).toBe(200);
@@ -120,7 +121,7 @@ describe.skipIf(!RUN)("TASK-218 critical estimate fixes", () => {
     );
     expect(before.map((l) => l.description)).toEqual(["Better work", "Good work"]);
 
-    expect((await api("PUT", `/api/v1/estimates/${id}/prepared-scope`, { prepared_scope: scope(), apply: true })).status).toBe(200);
+    expect((await api("PUT", `/api/v1/estimates/${id}/prepared-scope`, { prepared_scope: scope(), apply: true, updated_at: await quoteStamp(id) })).status).toBe(200);
 
     const after = await db<{ description: string; option_id: string | null; prepared_group_key: string | null }>(
       `SELECT description, option_id, prepared_group_key FROM estimate_line_items WHERE estimate_id = $1 ORDER BY description`,
@@ -133,7 +134,7 @@ describe.skipIf(!RUN)("TASK-218 critical estimate fixes", () => {
 
   it("a prepared quote refuses painting and fixed-bid pricing, and its lines are untouched", async () => {
     const id = await preparedDraft(scope());
-    await api("PUT", `/api/v1/estimates/${id}/prepared-scope`, { prepared_scope: scope(), apply: true });
+    await api("PUT", `/api/v1/estimates/${id}/prepared-scope`, { prepared_scope: scope(), apply: true, updated_at: await quoteStamp(id) });
     const lines = () => db<{ total_cents: number }>(`SELECT total_cents FROM estimate_line_items WHERE estimate_id = $1 ORDER BY sort_order`, [id]);
     const before = await lines();
     const total = async () => (await db<{ total_cents: number }>(`SELECT total_cents FROM estimates WHERE id = $1`, [id]))[0].total_cents;
@@ -142,18 +143,19 @@ describe.skipIf(!RUN)("TASK-218 critical estimate fixes", () => {
     const painting = await api("PATCH", `/api/v1/estimates/${id}`, {
       client_id: clientId, sq_ft: 400, prep_level: 3, includes_trim: false, includes_ceiling: false, labor_hours_estimate: 8,
       line_items: [{ description: "Painting labor", quantity: 1, unit_price_cents: 90000, line_item_type: "labor" }],
+      updated_at: await quoteStamp(id),
     });
     expect(painting.status).toBe(422);
     expect(painting.data.error.code).toBe("PREPARED_SCOPE_PRICING");
 
-    const fixed = await api("PATCH", `/api/v1/estimates/${id}`, { client_id: clientId, flat_rate_cents: 150000, line_items: [] });
+    const fixed = await api("PATCH", `/api/v1/estimates/${id}`, { client_id: clientId, flat_rate_cents: 150000, line_items: [], updated_at: await quoteStamp(id) });
     expect(fixed.status).toBe(422);
 
     expect(await lines()).toEqual(before);
     expect(await total()).toBe(totalBefore);
 
     // Applying again still yields one set of prepared lines: nothing doubled.
-    await api("PUT", `/api/v1/estimates/${id}/prepared-scope`, { prepared_scope: scope(), apply: true });
+    await api("PUT", `/api/v1/estimates/${id}/prepared-scope`, { prepared_scope: scope(), apply: true, updated_at: await quoteStamp(id) });
     expect(await lines()).toEqual(before);
   });
 
@@ -162,7 +164,7 @@ describe.skipIf(!RUN)("TASK-218 critical estimate fixes", () => {
       client_id: clientId,
       line_items: [{ description: "Repair", quantity: 1, unit_price_cents: 20000, line_item_type: "labor" }],
     })).data?.id as string;
-    const res = await api("PATCH", `/api/v1/estimates/${id}`, { client_id: clientId, flat_rate_cents: 150000, line_items: [] });
+    const res = await api("PATCH", `/api/v1/estimates/${id}`, { client_id: clientId, flat_rate_cents: 150000, line_items: [], updated_at: await quoteStamp(id) });
     expect(res.status).toBe(200);
     const [est] = await db<{ total_cents: number }>(`SELECT total_cents FROM estimates WHERE id = $1`, [id]);
     expect(est.total_cents).toBeGreaterThanOrEqual(150000);
