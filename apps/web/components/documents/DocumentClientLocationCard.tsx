@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
+import { QuoteSaveAlert } from "@/components/QuoteSaveAlert";
+import { quoteSaveOffersReload, rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import { Button, Card, ConfirmDialog, Input, Modal, SectionHeader, Select } from "@/components/ui";
 import {
   deriveLocationSource,
@@ -425,7 +426,11 @@ export function DocumentClientLocationCard({
             </ul>
           )}
         </div>
-        {error && <p style={{ color: "var(--color-danger)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>{error}</p>}
+        {error && quoteSaveOffersReload(error) ? (
+          <QuoteSaveAlert message={error} />
+        ) : error ? (
+          <p style={{ color: "var(--color-danger)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>{error}</p>
+        ) : null}
       </Modal>
 
       <Modal
@@ -532,7 +537,11 @@ export function DocumentClientLocationCard({
             <strong>Preview:</strong> {previewLocation()}
           </div>
         </div>
-        {error && <p style={{ color: "var(--color-danger)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>{error}</p>}
+        {error && quoteSaveOffersReload(error) ? (
+          <QuoteSaveAlert message={error} />
+        ) : error ? (
+          <p style={{ color: "var(--color-danger)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>{error}</p>
+        ) : null}
       </Modal>
 
       <ConfirmDialog

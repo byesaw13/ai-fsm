@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
+import { QuoteSaveAlert } from "@/components/QuoteSaveAlert";
+import { quoteSaveOffersReload, rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 
 interface Props {
   estimateId: string;
@@ -62,7 +63,11 @@ export function EstimateInternalNotesForm({ estimateId, initialNotes }: Props) {
           data-testid="internal-notes-input"
         />
       </div>
-      {error && <p className="error-inline">{error}</p>}
+      {error && quoteSaveOffersReload(error) ? (
+        <QuoteSaveAlert message={error} />
+      ) : error ? (
+        <p className="error-inline">{error}</p>
+      ) : null}
       {saved && <p className="success-inline" data-testid="notes-saved-msg">Saved.</p>}
       <button
         type="submit"

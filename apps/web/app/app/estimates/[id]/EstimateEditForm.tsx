@@ -28,7 +28,8 @@ import {
 } from "@ai-fsm/domain";
 import type { RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
 import type { OptionTier } from "@/lib/estimates/form-helpers";
-import { quoteSaveOffersReload, rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
+import { QuoteSaveAlert } from "@/components/QuoteSaveAlert";
+import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import {
   parseCents,
   lineTotal,
@@ -113,24 +114,6 @@ interface EstimateEditFormProps {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function QuoteSaveAlert({ message }: { message: string }) {
-  return (
-    <div className="p7-card-danger" role="alert">
-      <p style={{ margin: 0 }} data-testid="edit-form-error">{message}</p>
-      {quoteSaveOffersReload(message) ? (
-        <Button
-          type="button"
-          variant="primary"
-          onClick={() => window.location.reload()}
-          style={{ marginTop: "var(--space-2)" }}
-        >
-          Reload
-        </Button>
-      ) : null}
-    </div>
-  );
-}
 
 function formatDollars(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
