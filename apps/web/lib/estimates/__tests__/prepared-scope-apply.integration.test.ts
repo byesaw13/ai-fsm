@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
 import type { PreparedScope } from "@ai-fsm/domain";
+import { quoteStamp } from "./quote-stamp";
 
 const RUN = !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
 
@@ -80,7 +81,7 @@ describe.skipIf(!RUN)("prepared scope Apply to quote", () => {
   });
 
   it("apply builds typed, grouped lines from the scope", async () => {
-    const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: scope, apply: true });
+    const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: scope, apply: true, updated_at: await quoteStamp(estimateId) });
     expect(res.status).toBe(200);
     expect(await lines()).toEqual([
       expect.objectContaining({ line_item_type: "labor", prepared_group_key: "bath" }),
@@ -105,7 +106,7 @@ describe.skipIf(!RUN)("prepared scope Apply to quote", () => {
       })),
       { description: "Haul-away", quantity: 1, unit_price_cents: 7500, sort_order: current.length },
     ];
-    const res = await api("PATCH", `/api/v1/estimates/${estimateId}`, { client_id: clientId, tax_rate: 0, line_items: payload });
+    const res = await api("PATCH", `/api/v1/estimates/${estimateId}`, { client_id: clientId, tax_rate: 0, line_items: payload, updated_at: await quoteStamp(estimateId) });
     expect(res.status).toBe(200);
     expect((await lines()).map((l) => [l.line_item_type, l.prepared_group_key])).toEqual([
       ["labor", "bath"],
@@ -117,7 +118,7 @@ describe.skipIf(!RUN)("prepared scope Apply to quote", () => {
   it("applying again replaces only prepared lines and keeps the owner line once", async () => {
     const edited = structuredClone(scope);
     edited.tasks[0].hours_high = 5; // mid 3.5 h
-    const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: edited, apply: true });
+    const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: edited, apply: true, updated_at: await quoteStamp(estimateId) });
     expect(res.status).toBe(200);
     const after = await lines();
     expect(after.map((l) => l.description)).toEqual([
@@ -134,7 +135,7 @@ describe.skipIf(!RUN)("prepared scope Apply to quote", () => {
       ...structuredClone(scope),
       pricing: { mode: "fixed", fixed_price_cents: 60_000, expected_hours: 4, overhead_cents: 0, reserve_pct: 0 },
     };
-    const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: fixed, apply: true });
+    const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: fixed, apply: true, updated_at: await quoteStamp(estimateId) });
     expect(res.status).toBe(200);
     const [est] = await db<{ total_cents: number; pricing_mode: string; internal_labor_cost_cents: number; internal_material_cost_cents: number; notes: string | null }>(
       `SELECT total_cents, pricing_mode, internal_labor_cost_cents, internal_material_cost_cents, notes FROM estimates WHERE id = $1`,
@@ -154,7 +155,7 @@ describe.skipIf(!RUN)("prepared scope Apply to quote", () => {
 
   it("a sent quote can no longer be changed from its scope", async () => {
     await db(`UPDATE estimates SET status = 'sent' WHERE id = $1`, [estimateId]);
-    const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: scope, apply: true });
+    const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: scope, apply: true, updated_at: await quoteStamp(estimateId) });
     expect(res.status).toBe(422);
   });
 });

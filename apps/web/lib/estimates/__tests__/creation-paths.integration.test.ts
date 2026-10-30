@@ -14,6 +14,7 @@ import {
   priceBookHourRange,
   withHourEdit,
 } from "../stored-hours";
+import { quoteStamp } from "./quote-stamp";
 
 const RUN = !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
 
@@ -132,6 +133,7 @@ describe.skipIf(!RUN)("creation paths store person-hours", () => {
     const applied = await api("PUT", `/api/v1/estimates/${created.data.id}/prepared-scope`, {
       prepared_scope: scope,
       apply: true,
+      updated_at: await quoteStamp(created.data.id),
     });
     expect(applied.status).toBe(200);
     const sums = await db<{ low: string; high: string }>(
@@ -343,6 +345,7 @@ describe.skipIf(!RUN)("creation paths store person-hours", () => {
     const patched = await api("PATCH", `/api/v1/estimates/${res.data.id}`, {
       line_items: [rowToLineItemPayload(edited, 0)],
       tax_rate: 0,
+      updated_at: await quoteStamp(res.data.id),
     });
     expect(patched.status).toBe(200);
     const after = await lineHours(res.data.id);

@@ -28,6 +28,7 @@ import {
 } from "@ai-fsm/domain";
 import type { RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
 import type { OptionTier } from "@/lib/estimates/form-helpers";
+import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import {
   parseCents,
   lineTotal,
@@ -181,6 +182,7 @@ function StandardEstimateEditForm({
 }: EstimateEditFormProps) {
   const router = useRouter();
   const toast = useToast();
+  const { updatedAt, setUpdatedAt } = useQuoteVersion();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -509,11 +511,12 @@ function StandardEstimateEditForm({
       const res = await fetch(`/api/v1/estimates/${estimateId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, updated_at: updatedAt }),
       });
 
+      const data = await res.json().catch(() => ({}));
+      rememberQuoteVersion(data, setUpdatedAt);
       if (!res.ok) {
-        const data = await res.json();
         setError(data.error?.message ?? "Failed to update estimate.");
         setPending(false);
         return;
@@ -930,6 +933,7 @@ function TierEditor({
   initialTaxRate: number;
 }) {
   const toast = useToast();
+  const { updatedAt, setUpdatedAt } = useQuoteVersion();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState(initialNotes ?? "");
@@ -1005,11 +1009,13 @@ function TierEditor({
           notes: notes.trim() || null,
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           tax_rate: initialTaxRate,
+          updated_at: updatedAt,
         }),
       });
 
+      const data = await res.json().catch(() => ({}));
+      rememberQuoteVersion(data, setUpdatedAt);
       if (!res.ok) {
-        const data = await res.json();
         setError(data.error?.message ?? "Failed to save");
         return;
       }

@@ -56,12 +56,16 @@ const OUTPUT = {
   alternatives_add: [],
 };
 
-const post = (body: unknown) =>
-  new NextRequest(`http://localhost:3000/api/v1/estimates/${ID}/prepared-scope/revise`, { method: "POST", body: JSON.stringify(body) });
+const UPDATED_AT = "2026-10-29T12:00:00.000Z";
+const post = (body: Record<string, unknown>) =>
+  new NextRequest(`http://localhost:3000/api/v1/estimates/${ID}/prepared-scope/revise`, {
+    method: "POST",
+    body: JSON.stringify({ updated_at: UPDATED_AT, ...body }),
+  });
 
 function queueDraft(stored: PreparedScope = SCOPE) {
   mockQuery.mockImplementation(async (sql: string) => {
-    if (sql.includes("FROM estimates")) return { rows: [{ status: "draft", prepared_scope: stored }] };
+    if (sql.includes("FROM estimates")) return { rows: [{ status: "draft", prepared_scope: stored, updated_at: new Date(UPDATED_AT) }] };
     return { rows: [] };
   });
 }
@@ -114,7 +118,7 @@ describe("POST /estimates/[id]/prepared-scope/revise", () => {
   });
 
   it("refuses a sent quote and an invalid revision", async () => {
-    mockQuery.mockResolvedValue({ rows: [{ status: "sent", prepared_scope: SCOPE }] });
+    mockQuery.mockResolvedValue({ rows: [{ status: "sent", prepared_scope: SCOPE, updated_at: new Date(UPDATED_AT) }] });
     expect((await POST(post({ prepared_scope: SCOPE, instruction: "x" }))).status).toBe(422);
     queueDraft();
     expect((await POST(post({ prepared_scope: SCOPE, accept: { output: { changes: "bad" } } }))).status).toBe(400);

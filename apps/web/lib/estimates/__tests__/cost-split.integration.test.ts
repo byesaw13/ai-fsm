@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
+import { quoteStamp } from "./quote-stamp";
 
 const RUN = !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
 
@@ -176,6 +177,7 @@ describe.skipIf(!RUN)("itemized internal cost split", () => {
     const res = await api("PATCH", `/api/v1/estimates/${id}`, {
       client_id: clientId,
       tax_rate: 0,
+      updated_at: await quoteStamp(id),
       line_items: [
         {
           description: "Paint",

@@ -17,6 +17,7 @@ import { Button, useToast } from "@/components/ui";
 import { formatCents } from "@/lib/money";
 import type { RevisionChange } from "@/lib/estimates/revise-quote";
 import { hoursSourceLabel, kindLabel, methodLabel, quantityLabel, tmRangeLabel, workAreaFlags, workAreaRows } from "@/lib/estimates/prepared-scope-display";
+import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 
 interface Props {
   estimateId: string;
@@ -84,6 +85,7 @@ const label: React.CSSProperties = { fontSize: "var(--text-xs)", color: "var(--f
 export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborRateCents, laborCostCents, editable, showInternal }: Props) {
   const router = useRouter();
   const toast = useToast();
+  const { updatedAt, setUpdatedAt } = useQuoteVersion();
   const [scope, setScope] = useState(initialScope);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState<"save" | "apply" | null>(null);
@@ -149,9 +151,10 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
       const res = await fetch(`/api/v1/estimates/${estimateId}/prepared-scope/materials`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prepared_scope: scope, group_keys: groupKeys, clear }),
+        body: JSON.stringify({ prepared_scope: scope, group_keys: groupKeys, clear, updated_at: updatedAt }),
       });
       const data = await res.json();
+      rememberQuoteVersion(data, setUpdatedAt);
       if (!res.ok) {
         toast.error(data.error?.message ?? "Materials could not be listed");
         return;
@@ -187,9 +190,11 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
           prepared_scope: scope,
           instruction: note,
           ...(accept && proposal ? { accept: { output: proposal.output } } : {}),
+          updated_at: updatedAt,
         }),
       });
       const data = await res.json();
+      rememberQuoteVersion(data, setUpdatedAt);
       if (!res.ok) {
         toast.error(data.error?.message ?? "Revision failed");
         return;
@@ -216,9 +221,10 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
       const res = await fetch(`/api/v1/estimates/${estimateId}/prepared-scope`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prepared_scope: scope, apply }),
+        body: JSON.stringify({ prepared_scope: scope, apply, updated_at: updatedAt }),
       });
       const data = await res.json();
+      rememberQuoteVersion(data, setUpdatedAt);
       if (!res.ok) {
         toast.error(data.error?.message ?? "Save failed");
         return;
