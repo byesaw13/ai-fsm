@@ -1149,8 +1149,9 @@
    Detail utilities — card-danger + key-value list used in hub sidebars
    ---------------------------------------------------------------------- */
 .p7-card-danger {
-  background: var(--bg-card);
-  border: 1px solid var(--color-red-200);
+  background: var(--color-red-50);
+  border: 1px solid var(--color-red-100);
+  color: var(--color-red-600);
   border-radius: var(--radius-md);
   padding: var(--space-4);
 }

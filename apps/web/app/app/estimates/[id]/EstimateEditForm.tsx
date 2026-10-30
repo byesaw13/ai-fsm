@@ -28,7 +28,7 @@ import {
 } from "@ai-fsm/domain";
 import type { RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
 import type { OptionTier } from "@/lib/estimates/form-helpers";
-import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
+import { quoteSaveOffersReload, rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import {
   parseCents,
   lineTotal,
@@ -113,6 +113,24 @@ interface EstimateEditFormProps {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function QuoteSaveAlert({ message }: { message: string }) {
+  return (
+    <div className="p7-card-danger" role="alert">
+      <p style={{ margin: 0 }} data-testid="edit-form-error">{message}</p>
+      {quoteSaveOffersReload(message) ? (
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => window.location.reload()}
+          style={{ marginTop: "var(--space-2)" }}
+        >
+          Reload
+        </Button>
+      ) : null}
+    </div>
+  );
+}
 
 function formatDollars(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
@@ -537,11 +555,7 @@ function StandardEstimateEditForm({
     <Card data-testid="estimate-edit-form">
       <SectionHeader title="Edit Estimate" as="h2" />
       <form onSubmit={handleSubmit} className="p7-form-stack">
-        {error && (
-          <Card className="p7-card-danger" padding="sm" role="alert">
-            <p style={{ margin: 0 }} data-testid="edit-form-error">{error}</p>
-          </Card>
-        )}
+        {error && <QuoteSaveAlert message={error} />}
 
         <div className="p7-form-grid p7-form-grid-2">
           <Select
@@ -1039,7 +1053,7 @@ function TierEditor({
     <Card>
       <SectionHeader title="Edit Tiers" />
       <form onSubmit={handleSave} className="p7-form-stack">
-        {error && <div className="p7-card-danger" role="alert">{error}</div>}
+        {error && <QuoteSaveAlert message={error} />}
 
         <EstimateTierEditor
           tiers={tiers as unknown as OptionTier[]}
