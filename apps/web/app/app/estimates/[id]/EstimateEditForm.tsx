@@ -746,9 +746,9 @@ function StandardEstimateEditForm({
         {/* Generic Pricing */}
         {serviceType === "generic" && (
         <div style={{ marginTop: "var(--space-4)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
+          <div className="estimate-mode-bar">
             <SectionHeader
-              title={mode === "flat_rate" ? "Fixed Bid" : "Line Items"}
+              title={mode === "flat_rate" ? "Fixed Bid" : "Change the lines"}
               count={mode === "itemized" ? lineItems.length : undefined}
               as="h3"
             />
