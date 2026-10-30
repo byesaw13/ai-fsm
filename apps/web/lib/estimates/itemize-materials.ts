@@ -91,13 +91,15 @@ export async function itemizeGroups(
 /**
  * The itemized lists as the standard shopping list (`estimates.shopping_list_json`,
  * the `ShoppingList` shape the buy list, the shopping-list page and the print page
- * read): one section per work area, each line a specified item. Null when nothing
- * is itemized. TASK-223: an earlier shape left out `specified_items`, which crashed
- * the print and shopping-list pages.
+ * read): one section per work area, each line a specified item. Null only when
+ * the quote was never itemized, so another list is kept; once itemized, zeroed or
+ * cleared materials give an empty list that replaces the old one. TASK-223: an
+ * earlier shape left out `specified_items`, which crashed the print and
+ * shopping-list pages.
  */
 export function preparedShoppingList(scope: PreparedScope): ShoppingList | null {
-  const lists = Object.entries(scope.materials ?? {}).filter(([, l]) => l.lines.some((line) => line.quantity > 0));
-  if (lists.length === 0) return null;
+  if (!scope.materials) return null;
+  const lists = Object.entries(scope.materials).filter(([, l]) => l.lines.some((line) => line.quantity > 0));
   const labels = new Map(scope.groups.map((g) => [g.key, g.label]));
   const sections = lists.map(([key, list]) => {
     const specified_items = list.lines

@@ -94,6 +94,16 @@ describe("itemized materials (TASK-187)", () => {
     expect(preparedShoppingList(SCOPE)).toBeNull();
   });
 
+  it("an itemized quote whose materials are all zeroed writes an empty list, so the old one is replaced", () => {
+    const zeroed = toMaterialList(RESULT, ["t1", "t2"]);
+    zeroed.lines = zeroed.lines.map((l) => ({ ...l, quantity: 0 }));
+    const list = preparedShoppingList({ ...SCOPE, materials: { bath: zeroed } })!;
+    expect(list).not.toBeNull();
+    expect(list.sections).toEqual([]);
+    expect(list.total_specified_cost_cents).toBe(0);
+    expect(preparedShoppingList({ ...SCOPE, materials: {} })!.sections).toEqual([]);
+  });
+
   it("is readable by every page that reads a shopping list (the print page crashed on the old shape)", () => {
     const list = preparedShoppingList({ ...SCOPE, materials: { bath: toMaterialList(RESULT, ["t1", "t2"]) } })!;
     const stored = JSON.parse(JSON.stringify(list));
