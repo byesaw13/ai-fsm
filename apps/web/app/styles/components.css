@@ -1368,6 +1368,13 @@
 .error-message { background: var(--color-red-100); border: 1px solid #fecaca; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
 .line-items-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 
+.estimate-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
 .line-item-hours {
   display: flex;
   gap: var(--space-2);
@@ -1387,6 +1394,15 @@
 
 /* Quote line editor: one row per field on a phone, so price and remove stay on screen. */
 @media (max-width: 767px) {
+  .estimate-mode-bar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+  .estimate-mode-bar > .p7-section-header {
+    flex: 1 1 100%;
+    margin-bottom: 0;
+  }
   .line-items-editor .line-item-hours { flex-wrap: wrap; }
   .line-items-editor .line-item-hours-label,
   .line-items-editor .line-item-hours-missing {
