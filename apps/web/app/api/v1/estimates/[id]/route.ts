@@ -227,9 +227,9 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
         { status: 404 }
       );
     }
-    if (err.code === "IMMUTABLE_ENTITY") {
+    if (err.code === "IMMUTABLE_ENTITY" || err.code === "PREPARED_SCOPE_PRICING") {
       return NextResponse.json(
-        { error: { code: "IMMUTABLE_ENTITY", message: err.message, traceId: session.traceId } },
+        { error: { code: err.code, message: err.message, traceId: session.traceId } },
         { status: 422 }
       );
     }

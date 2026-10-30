@@ -3,6 +3,8 @@ import { buildAssessmentSummary, summarizePreparedScope, type PreparedScope, typ
 import { groupMaterialsScope, itemizeGroups, preparedShoppingList, toMaterialList } from "../itemize-materials";
 import { applyScopeEdits } from "../prepare-quote";
 import type { MaterialsResult } from "../materials-generator";
+import { shoppingListToMaterialsBySection } from "../shopping-list-display";
+import { mapShoppingListJsonToLines } from "@/lib/jobs/buy-list";
 
 function task(t: Partial<PreparedTask> & Pick<PreparedTask, "id" | "group_key" | "description">): PreparedTask {
   return {
@@ -79,21 +81,47 @@ describe("itemized materials (TASK-187)", () => {
     expect(summarizePreparedScope(scope).groups.find((g) => g.key === "bath")!.materials_cents).toBe(39900);
   });
 
-  it("writes one buy-list section per itemized area", () => {
+  it("writes the standard shopping list: one section per area, lines as specified items (TASK-223)", () => {
     const scope = { ...SCOPE, materials: { bath: toMaterialList(RESULT, ["t1", "t2"]) } };
-    expect(preparedShoppingList(scope)).toEqual({
-      source: "prepared_scope",
-      sections: [
-        {
-          section: "Bathroom",
-          computed_items: [
-            { material: { name: "American Standard Toilet, elongated", unit: "each" }, quantity: 1 },
-            { material: { name: "Interior paint", unit: "gallon" }, quantity: 2 },
-          ],
-        },
-      ],
-    });
+    const list = preparedShoppingList(scope)!;
+    expect(list.sections).toHaveLength(1);
+    expect(list.sections[0]).toMatchObject({ section: "Bathroom", computed_items: [], section_total_cents: 28900 + 11000 });
+    expect(list.sections[0].specified_items.map((i) => [i.name, i.units_to_order, i.unit_label, i.unit_cost_cents])).toEqual([
+      ["American Standard Toilet, elongated", 1, "each", 28900],
+      ["Interior paint", 2, "gallon", 5500],
+    ]);
+    expect(list.total_specified_cost_cents).toBe(39900);
     expect(preparedShoppingList(SCOPE)).toBeNull();
+  });
+
+  it("an itemized quote whose materials are all zeroed writes an empty list, so the old one is replaced", () => {
+    const zeroed = toMaterialList(RESULT, ["t1", "t2"]);
+    zeroed.lines = zeroed.lines.map((l) => ({ ...l, quantity: 0 }));
+    const list = preparedShoppingList({ ...SCOPE, materials: { bath: zeroed } })!;
+    expect(list).not.toBeNull();
+    expect(list.sections).toEqual([]);
+    expect(list.total_specified_cost_cents).toBe(0);
+    expect(preparedShoppingList({ ...SCOPE, materials: {} })!.sections).toEqual([]);
+  });
+
+  it("is readable by every page that reads a shopping list (the print page crashed on the old shape)", () => {
+    const list = preparedShoppingList({ ...SCOPE, materials: { bath: toMaterialList(RESULT, ["t1", "t2"]) } })!;
+    const stored = JSON.parse(JSON.stringify(list));
+    // Shopping-list page
+    const bySection = shoppingListToMaterialsBySection(stored);
+    expect(bySection[0].items.map((i) => [i.material.material_name, i.quantity])).toEqual([
+      ["American Standard Toilet, elongated", 1],
+      ["Interior paint", 2],
+    ]);
+    // Buy list seed
+    expect(mapShoppingListJsonToLines(stored).map((l) => [l.name, l.quantity])).toEqual([
+      ["American Standard Toilet, elongated", 1],
+      ["Interior paint", 2],
+    ]);
+    // Print page reads both arrays on every section
+    for (const sec of stored.sections) {
+      expect(Array.isArray(sec.specified_items) && Array.isArray(sec.computed_items)).toBe(true);
+    }
   });
 
   it("keeps the owner's quantity, price and removals, and nothing else from the client", () => {

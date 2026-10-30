@@ -170,10 +170,15 @@ describe("PUT /estimates/[id]/prepared-scope pricing (TASK-180)", () => {
     expect(res.status).toBe(200);
     const params = finalUpdate();
     expect(params[2]).toBe(9000);
-    expect(JSON.parse(params[6] as string)).toEqual({
-      source: "prepared_scope",
-      sections: [{ section: "Bathroom", computed_items: [{ material: { name: "Ceiling paint", unit: "gallon" }, quantity: 2 }] }],
-    });
+    const list = JSON.parse(params[6] as string);
+    expect(list.sections).toEqual([
+      expect.objectContaining({
+        section: "Bathroom",
+        computed_items: [],
+        specified_items: [expect.objectContaining({ name: "Ceiling paint", units_to_order: 2, unit_label: "gallon", unit_cost_cents: 4500 })],
+        section_total_cents: 9000,
+      }),
+    ]);
   });
 
   it("leaves the buy list alone when nothing is itemized", async () => {

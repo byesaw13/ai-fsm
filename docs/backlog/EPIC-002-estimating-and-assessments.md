@@ -5,6 +5,7 @@ re-keying, and keeping estimate structure consistent across jobs.
 
 ## Active tasks
 
+- [TASK-223: One authoritative estimate draft for prepared quotes](TASK-223-single-source-estimate.md) — two PRs; owner-approved 2026-10-27.
 - [TASK-217: Trade-aware estimating methods in Prepare Quote](TASK-217-trade-aware-estimate-methods.md) — focused correction, owner-approved 2026-10-27.
 
 ## Estimating assistant, Phase 3 slice (TASK-209 to TASK-216)

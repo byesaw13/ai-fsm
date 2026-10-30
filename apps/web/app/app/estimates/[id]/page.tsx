@@ -339,6 +339,7 @@ export default async function EstimateDetailPage({
           initialMinimumServiceOverrideReason={estimate.minimum_service_override_reason}
           initialMinimumServiceOverrideNote={estimate.minimum_service_override_note}
           initialRoomSpecs={estimate.room_specs ? (estimate.room_specs as RoomSpec[]) : null}
+          hasPreparedScope={preparedScope !== null}
         />
       )}
 

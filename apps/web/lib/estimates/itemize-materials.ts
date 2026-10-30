@@ -1,4 +1,4 @@
-import type { AssessmentSummary, PreparedMaterialList, PreparedScope } from "@ai-fsm/domain";
+import type { AssessmentSummary, PreparedMaterialList, PreparedScope, ShoppingList } from "@ai-fsm/domain";
 import {
   MaterialsGenerationError,
   type GenerateMaterialsInput,
@@ -89,20 +89,45 @@ export async function itemizeGroups(
 }
 
 /**
- * The buy-list shape (`estimates.shopping_list_json`) from the itemized lists:
- * one section per work area. Null when nothing is itemized.
+ * The itemized lists as the standard shopping list (`estimates.shopping_list_json`,
+ * the `ShoppingList` shape the buy list, the shopping-list page and the print page
+ * read): one section per work area, each line a specified item. Null only when
+ * the quote was never itemized, so another list is kept; once itemized, zeroed or
+ * cleared materials give an empty list that replaces the old one. TASK-223: an
+ * earlier shape left out `specified_items`, which crashed the print and
+ * shopping-list pages.
  */
-export function preparedShoppingList(scope: PreparedScope): Record<string, unknown> | null {
-  const lists = Object.entries(scope.materials ?? {}).filter(([, l]) => l.lines.length > 0);
-  if (lists.length === 0) return null;
+export function preparedShoppingList(scope: PreparedScope): ShoppingList | null {
+  if (!scope.materials) return null;
+  const lists = Object.entries(scope.materials).filter(([, l]) => l.lines.some((line) => line.quantity > 0));
   const labels = new Map(scope.groups.map((g) => [g.key, g.label]));
-  return {
-    source: "prepared_scope",
-    sections: lists.map(([key, list]) => ({
+  const sections = lists.map(([key, list]) => {
+    const specified_items = list.lines
+      .filter((l) => l.quantity > 0)
+      .map((l) => ({
+        name: l.name,
+        sku: null,
+        coverage_per_unit: null,
+        unit_label: l.unit,
+        unit_cost_cents: l.unit_cost_cents,
+        quantity_needed: l.quantity,
+        waste_factor: 1,
+        units_to_order: l.quantity,
+        store_section: labels.get(key) ?? key,
+        service_code: "prepared_scope",
+        notes: l.notes || null,
+      }));
+    return {
       section: labels.get(key) ?? key,
-      computed_items: list.lines
-        .filter((l) => l.quantity > 0)
-        .map((l) => ({ material: { name: l.name, unit: l.unit }, quantity: l.quantity })),
-    })),
+      computed_items: [],
+      specified_items,
+      section_total_cents: specified_items.reduce((s, i) => s + Math.round((i.unit_cost_cents ?? 0) * i.units_to_order), 0),
+    };
+  });
+  return {
+    sections,
+    total_catalog_cost_cents: 0,
+    total_specified_cost_cents: sections.reduce((s, sec) => s + sec.section_total_cents, 0),
+    generated_at: new Date().toISOString(),
   };
 }

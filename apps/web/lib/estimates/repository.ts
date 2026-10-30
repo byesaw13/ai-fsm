@@ -170,8 +170,10 @@ export async function updateEstimateById(
     deposit_type: "none" | "materials" | "percentage" | "fixed";
     deposit_percentage: number | null;
     deposit_fixed_cents: number | null;
+    has_prepared_scope: boolean;
   }>(
     `SELECT id, status, subtotal_cents, tax_cents, total_cents,
+            prepared_scope IS NOT NULL AS has_prepared_scope,
             travel_surcharge_cents, risk_adjustment_cents,
             old_house_risk, difficult_access, trip_count,
             requires_drying_or_curing, coordination_required,
@@ -191,6 +193,20 @@ export async function updateEstimateById(
     throw Object.assign(
       new Error(`Estimate in ${est.status} state is immutable`),
       { code: "IMMUTABLE_ENTITY" }
+    );
+  }
+
+  // A quote built by Prepare Quote is priced from its prepared scope. Switching it to
+  // the square-foot painting or flat-rate modes would replace its lines while the
+  // scope stays, and the next Apply would add the scope's lines back on top:
+  // a double charge (TASK-223).
+  if (
+    est.has_prepared_scope &&
+    (patch.flat_rate_cents !== undefined || patch.sq_ft !== undefined || patch.room_specs !== undefined)
+  ) {
+    throw Object.assign(
+      new Error("This quote is priced from its prepared scope. Change the work there, not with painting or flat-rate pricing."),
+      { code: "PREPARED_SCOPE_PRICING" },
     );
   }
 
@@ -411,7 +427,15 @@ export async function updateEstimateById(
     if (new_internal_material !== null) { setClauses.push(`internal_material_cost_cents = $${idx++}`); params.push(new_internal_material); }
 
     if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined || has_painting_fields) {
-      await client.query(`DELETE FROM estimate_line_items WHERE estimate_id = $1`, [id]);
+      // Option lines belong to their options: replace them only when this save also
+      // rewrites the options (below). Otherwise Apply to quote and other line-only
+      // saves would delete a Good/Better/Best quote's lines (TASK-223).
+      await client.query(
+        patch.options !== undefined
+          ? `DELETE FROM estimate_line_items WHERE estimate_id = $1`
+          : `DELETE FROM estimate_line_items WHERE estimate_id = $1 AND option_id IS NULL`,
+        [id],
+      );
 
       for (let i = 0; i < itemsToInsert.length; i++) {
         const item = itemsToInsert[i];
