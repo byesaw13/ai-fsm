@@ -22,12 +22,15 @@ import { preparedShoppingList } from "@/lib/estimates/itemize-materials";
 import { loadPricingSettings } from "@/lib/pricing/settings";
 import { modelPreparedProfit, parsePreparedScope } from "@ai-fsm/domain";
 import { parseHourInput, storedHourSource } from "@/lib/estimates/stored-hours";
+import { assertQuoteVersion, quoteUpdatedAt } from "@/lib/estimates/quote-version";
 
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   prepared_scope: z.unknown(),
   apply: z.boolean().default(false),
+  /** updated_at from the page load, or from the previous save in this tab. */
+  updated_at: z.string().min(1).max(80),
 });
 
 function errorResponse(session: AuthSession, status: number, code: string, message: string) {
@@ -55,8 +58,9 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
         notes: string | null;
         prepared_scope: unknown;
         property_state: string | null;
+        updated_at: Date;
       }>(
-        `SELECT e.status, e.subtotal_cents, e.tax_cents, e.notes, e.prepared_scope, p.state AS property_state
+        `SELECT e.status, e.subtotal_cents, e.tax_cents, e.notes, e.prepared_scope, e.updated_at, p.state AS property_state
          FROM estimates e
          LEFT JOIN properties p ON p.id = e.property_id
          WHERE e.id = $1 AND e.account_id = $2
@@ -65,6 +69,7 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
       );
       const est = rows[0];
       if (!est) throw Object.assign(new Error("Estimate not found"), { code: "NOT_FOUND" });
+      assertQuoteVersion(est.updated_at, body.updated_at);
       if (est.status !== "draft") {
         throw Object.assign(new Error("Only a draft quote can be changed from its prepared scope"), { code: "IMMUTABLE_ENTITY" });
       }
@@ -72,8 +77,12 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
       if (!stored) throw Object.assign(new Error("This quote has no prepared scope"), { code: "NO_PREPARED_SCOPE" });
 
       const merged = applyScopeEdits(stored, incoming);
-      await client.query(`UPDATE estimates SET prepared_scope = $1 WHERE id = $2`, [JSON.stringify(merged), id]);
-      if (!body.apply) return { prepared_scope: merged, applied: false };
+      const saved = await client.query<{ updated_at: Date }>(
+        `UPDATE estimates SET prepared_scope = $1 WHERE id = $2 RETURNING updated_at`,
+        [JSON.stringify(merged), id],
+      );
+      let updatedAt = quoteUpdatedAt(saved?.rows[0]?.updated_at);
+      if (!body.apply) return { prepared_scope: merged, applied: false, updated_at: updatedAt };
 
       const settings = await loadPricingSettings(client, session.accountId);
       const { labor_rate_cents } = resolveLaborRateCents(est.property_state, settings);
@@ -132,7 +141,7 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
       const proposal = notesAreOurs ? buildProposalNotes(merged, labor_rate_cents) : null;
       const final = { ...merged, proposal_notes: proposal ?? merged.proposal_notes ?? null };
       const shopping = preparedShoppingList(merged);
-      await client.query(
+      const priced = await client.query<{ updated_at: Date }>(
         `UPDATE estimates
          SET pricing_mode = $1,
              internal_labor_cost_cents = $2,
@@ -140,7 +149,8 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
              notes = COALESCE($4, notes),
              prepared_scope = $5,
              shopping_list_json = COALESCE($7, shopping_list_json)
-         WHERE id = $6`,
+         WHERE id = $6
+         RETURNING updated_at`,
         [
           merged.pricing?.mode === "fixed" ? "flat_rate" : "hourly_internal",
           profit.labor_cost_cents,
@@ -152,12 +162,15 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
           shopping ? JSON.stringify(shopping) : null,
         ],
       );
-      return { prepared_scope: final, applied: true };
+      updatedAt = quoteUpdatedAt(priced?.rows[0]?.updated_at) || updatedAt;
+      return { prepared_scope: final, applied: true, updated_at: updatedAt };
     });
     return NextResponse.json(result);
   } catch (error) {
     const err = error as Error & { code?: string };
     if (err.code === "NOT_FOUND") return errorResponse(session, 404, "NOT_FOUND", err.message);
+    if (err.code === "STALE_QUOTE") return errorResponse(session, 409, "STALE_QUOTE", err.message);
+    if (err.code === "VALIDATION_ERROR") return errorResponse(session, 400, "VALIDATION_ERROR", err.message);
     if (err.code === "IMMUTABLE_ENTITY") return errorResponse(session, 422, "IMMUTABLE_ENTITY", err.message);
     if (err.code === "NO_PREPARED_SCOPE") return errorResponse(session, 400, "NO_PREPARED_SCOPE", err.message);
     if (err.code === "INVALID_PRICE") return errorResponse(session, 400, "INVALID_PRICE", err.message);

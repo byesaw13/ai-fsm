@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
+import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import { Button, Card, ConfirmDialog, Input, Modal, SectionHeader, Select } from "@/components/ui";
 import {
   deriveLocationSource,
@@ -91,6 +92,7 @@ export function DocumentClientLocationCard({
   clientBillingAddress,
 }: DocumentClientLocationCardProps) {
   const router = useRouter();
+  const { setUpdatedAt } = useQuoteVersion();
   const [segment, setSegment] = useState<EditSegment>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -271,12 +273,13 @@ export function DocumentClientLocationCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { error?: { message?: string } };
+      const data = (await res.json()) as { error?: { message?: string }; data?: { updated_at?: unknown } };
       if (!res.ok) {
         setError(data.error?.message ?? "Failed to save");
         setConfirmOpen(false);
         return;
       }
+      if (entityType === "estimate" && data.data) rememberQuoteVersion(data.data, setUpdatedAt);
       setConfirmOpen(false);
       closeEditor();
       router.refresh();

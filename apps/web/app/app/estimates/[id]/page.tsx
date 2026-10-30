@@ -34,6 +34,8 @@ import { EstimateSummaryCard } from "./sections/EstimateSummaryCard";
 import { EstimateLineItems } from "./sections/EstimateLineItems";
 import { ApprovedHandoff } from "./sections/ApprovedHandoff";
 import { TravelPanel } from "@/components/travel/TravelPanel";
+import { QuoteVersionProvider } from "@/components/QuoteVersion";
+import { quoteUpdatedAt } from "@/lib/estimates/quote-version";
 import { MarkEntityAttentionRead } from "@/components/attention/MarkEntityAttentionRead";
 
 export const dynamic = "force-dynamic";
@@ -226,6 +228,7 @@ export default async function EstimateDetailPage({
         </div>
       )}
 
+      <QuoteVersionProvider initialUpdatedAt={quoteUpdatedAt(estimate.updated_at)}>
       {preparedScope && (
         <PreparedScopePanel
           estimateId={estimate.id}
@@ -444,6 +447,7 @@ export default async function EstimateDetailPage({
           />
         </div>
       )}
+      </QuoteVersionProvider>
     </PageContainer>
   );
 }

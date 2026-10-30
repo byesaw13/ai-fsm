@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
+import { quoteStamp } from "./quote-stamp";
 
 const RUN = !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
 
@@ -148,6 +149,7 @@ describe.skipIf(!RUN)("stored person-hours", () => {
     const patched = await api("PATCH", `/api/v1/estimates/${created.data.id}`, {
       client_id: clientId,
       tax_rate: 0,
+      updated_at: await quoteStamp(created.data.id),
       line_items: [{
         description: "On site",
         quantity: 1,

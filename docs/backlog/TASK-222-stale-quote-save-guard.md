@@ -1,7 +1,7 @@
 # TASK-222: A stale quote page can't overwrite newer work
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -36,6 +36,9 @@ Scope:
 - After a save succeeds, the page uses the returned `updated_at` so the owner's next save works without
   a reload.
 - "Itemize materials" (`prepared-scope/materials`) and "Revise" (`prepared-scope/revise`) also write the scope, so they send the same check.
+- Other saves on the same page (internal notes, travel, the client/job/property card) change `updated_at`
+  too. They return the new value and the page keeps it, so the owner's own save there doesn't make the
+  next quote save fail.
 
 Out of scope:
 - Merging two people's edits. One owner edits a quote at a time; a reload is enough.
@@ -46,6 +49,8 @@ Acceptance Criteria:
       the stored scope is what tab A saved.
 - [ ] The same holds for Apply to quote and for the edit form's Save.
 - [ ] Saving twice from one tab without reloading works.
+- [ ] Saving internal notes, travel, or the client/job/property card, then saving the quote from the same
+      tab, works without a reload.
 - [ ] A change made outside the page (script or data fix) also makes an open tab's next Save fail.
 
 Test Plan:

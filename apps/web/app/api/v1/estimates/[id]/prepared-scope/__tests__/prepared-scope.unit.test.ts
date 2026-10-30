@@ -33,13 +33,15 @@ vi.mock("@/lib/estimates/tm-briefing", () => ({
 }));
 
 import { PUT } from "../route";
+import { STALE_QUOTE_MESSAGE } from "@/lib/estimates/quote-version";
 
 const EST = "00000000-0000-0000-0000-0000000000ee";
-const put = (body: unknown) =>
+const UPDATED_AT = "2026-10-29T12:00:00.000Z";
+const put = (body: Record<string, unknown>) =>
   new NextRequest(`http://localhost:3000/api/v1/estimates/${EST}/prepared-scope`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ updated_at: UPDATED_AT, ...body }),
   });
 
 const SCOPE: PreparedScope = {
@@ -59,7 +61,7 @@ const SCOPE: PreparedScope = {
 };
 
 function estimateRow(status = "draft", notes: string | null = null, scope: PreparedScope = SCOPE) {
-  return { rows: [{ status, subtotal_cents: 100_000, tax_cents: 6_250, notes, prepared_scope: scope, property_state: "NH" }] };
+  return { rows: [{ status, subtotal_cents: 100_000, tax_cents: 6_250, notes, prepared_scope: scope, property_state: "NH", updated_at: new Date(UPDATED_AT) }] };
 }
 
 const HAND_LINE = {
@@ -121,6 +123,15 @@ describe("PUT /estimates/[id]/prepared-scope", () => {
     expect((await PUT(put({ prepared_scope: { version: 2 } }))).status).toBe(400);
     mockQuery.mockResolvedValueOnce({ rows: [] });
     expect((await PUT(put({ prepared_scope: SCOPE }))).status).toBe(404);
+  });
+
+  it("rejects a stale updated_at and does not write", async () => {
+    mockQuery.mockResolvedValueOnce(estimateRow());
+    const res = await PUT(put({ prepared_scope: SCOPE, updated_at: "2026-10-29T11:00:00.000Z" }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.message).toBe(STALE_QUOTE_MESSAGE);
+    expect(mockQuery.mock.calls.some((call) => String(call[0]).startsWith("UPDATE"))).toBe(false);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 

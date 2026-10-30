@@ -8,6 +8,7 @@ import { logger } from "@/lib/logger";
 import { calculateTravelForAccount } from "@/lib/travel/calculate";
 import { applyTravelToEstimate, insertTravelSnapshot } from "@/lib/travel/snapshots";
 import { loadTravelSettings } from "@/lib/travel/settings";
+import { quoteUpdatedAt } from "@/lib/estimates/quote-version";
 
 export const dynamic = "force-dynamic";
 
@@ -204,8 +205,14 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       },
     });
 
+    // TASK-222: the estimate page keeps this so its next quote save still matches.
+    const stamp = await client.query<{ updated_at: Date }>(
+      `SELECT updated_at FROM estimates WHERE id = $1`,
+      [estimateId]
+    );
     await client.query("COMMIT");
     return NextResponse.json({
+      updated_at: quoteUpdatedAt(stamp.rows[0]?.updated_at),
       data: {
         snapshot,
         calculation: calc.calculation,
