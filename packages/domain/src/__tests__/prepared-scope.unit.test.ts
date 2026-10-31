@@ -214,6 +214,11 @@ describe("wallPaintHours (TASK-184)", () => {
     expect(wallPaintHours(214, 18, RATE)).toEqual({ low: 6.25, high: 8.25 }); // ×1.69
   });
 
+  it("uses the hours-per-day setting (TASK-193)", () => {
+    // 466 sq ft at 400/day over a 10-hour day = 11.65 h
+    expect(wallPaintHours(466, 8, { ...RATE, hours_per_day: 10 })).toEqual({ low: 10, high: 13.5 });
+  });
+
   it("is null without an area or a pace", () => {
     expect(wallPaintHours(null, 8, RATE)).toBeNull();
     expect(wallPaintHours(0, 8, RATE)).toBeNull();

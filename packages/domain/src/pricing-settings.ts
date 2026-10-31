@@ -32,6 +32,8 @@ export interface BusinessPricingSettings {
   material_handling_pct: number;
   /** Percent added when a customer pays by card. 0 means no card fee. */
   card_fee_pct: number;
+  /** Working hours in a day, for per-day production rates (TASK-193; owner default 8). */
+  hours_per_day: number;
 }
 
 /** Seed / fallback when no DB row exists. Cost default $50 matches solo owner pay. */
@@ -45,6 +47,7 @@ export const DEFAULT_PRICING_SETTINGS: BusinessPricingSettings = {
   full_day_rate_cents: FULL_DAY_RATE_CENTS,
   material_handling_pct: Math.round(MATERIAL_HANDLING_CLIENT_RATE * 100),
   card_fee_pct: 0,
+  hours_per_day: 8,
 };
 
 /** Customer bill rate for a job state (NH baseline or MA premium). */

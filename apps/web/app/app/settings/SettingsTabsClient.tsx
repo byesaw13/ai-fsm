@@ -14,6 +14,7 @@ import { WorkspaceModeSetting } from "./WorkspaceModeSetting";
 import { LocationDaySettings, type LocationDayValues } from "./LocationDaySettings";
 import { TravelSettingsForm } from "./TravelSettingsForm";
 import { PricingSettingsForm } from "./PricingSettingsForm";
+import { ProductionRatesPanel } from "@/components/features/estimates/ProductionRatesPanel";
 
 interface Props {
   role: "owner" | "admin" | "tech";
@@ -126,6 +127,10 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
             </p>
             <Card padding="default">
               <PricingSettingsForm />
+            </Card>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: "24px 0 8px 0" }}>Production rates</h3>
+            <Card padding="default">
+              <ProductionRatesPanel />
             </Card>
           </section>
         )}
