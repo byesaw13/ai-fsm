@@ -45,6 +45,8 @@ export interface InvoiceMoneyInput {
   drafted_lines: { total_cents: number }[];
   /** Itemized snapshot travel inserted after the draft. Multi-option only. */
   snapshot_travel_cents?: number;
+  /** Add-ons the customer chose when approving; their lines are in drafted_lines (TASK-225). */
+  add_on_cents?: number;
 }
 
 export interface InvoiceMoney {
@@ -140,6 +142,24 @@ export function invoiceLinesFor(
   return drafted;
 }
 
+/** One bill line per add-on the customer chose when approving (TASK-225). */
+export function addOnLines(
+  addOns: { label: string; price_cents: number }[],
+  drafted: { sort_order: number }[],
+): InvoiceDraftLine[] {
+  const start = nextSort(drafted);
+  return addOns.map((a, i) => ({
+    estimate_line_item_id: null,
+    description: `${a.label} (added option)`,
+    quantity: 1,
+    unit_price_cents: a.price_cents,
+    total_cents: a.price_cents,
+    sort_order: start + i,
+    unit_cost_cents: null,
+    line_item_type: "labor" as const,
+  }));
+}
+
 /**
  * Standard invoices keep stored money when the drafted lines already equal
  * that subtotal. When the lines already include engine adjustments, their sum
@@ -148,6 +168,13 @@ export function invoiceLinesFor(
  */
 export function invoiceMoneyFor(input: InvoiceMoneyInput): InvoiceMoney {
   const draftedSum = input.drafted_lines.reduce((sum, line) => sum + line.total_cents, 0);
+  const addOn = input.add_on_cents ?? 0;
+  if (input.presentation_mode !== "multi_option" && addOn > 0) {
+    // The quote's stored money plus the chosen add-ons, taxed at the quote's rate.
+    const subtotal = input.subtotal_cents + addOn;
+    const tax = input.subtotal_cents > 0 ? Math.round((subtotal * input.tax_cents) / input.subtotal_cents) : 0;
+    return { subtotal_cents: subtotal, tax_cents: tax, total_cents: input.total_cents - input.tax_cents + addOn + tax };
+  }
   if (input.presentation_mode !== "multi_option") {
     if (draftedSum === input.subtotal_cents) {
       return {

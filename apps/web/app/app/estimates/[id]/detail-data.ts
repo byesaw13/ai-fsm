@@ -1,4 +1,5 @@
 import { withEstimateContext } from "@/lib/estimates/db";
+import type { ApprovedAddOn } from "@/lib/estimates/add-on-choice";
 import { getPool } from "@/lib/db";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import type { SessionPayload } from "@/lib/auth/session";
@@ -63,6 +64,8 @@ export interface EstimateRow {
   room_specs: unknown | null;
   source_visit_id: string | null;
   prepared_scope: unknown | null;
+  /** Add-ons the customer ticked when approving (TASK-225). */
+  approved_add_ons: ApprovedAddOn[] | null;
   labor_hours_low: number | string | null;
   labor_hours_high: number | string | null;
   labor_hours_source: HourSource | null;
