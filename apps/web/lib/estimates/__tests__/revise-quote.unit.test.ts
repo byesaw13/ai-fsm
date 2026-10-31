@@ -7,7 +7,7 @@ const ROOMS: AssessmentRoom[] = [
   { id: "s1", name: "Son's room", length_ft: 16, width_ft: 17.5, height_ft: 8, notes: "", door_count: 2, window_count: 2 },
 ];
 const SUMMARY = buildAssessmentSummary({ visitId: "v1", assessmentId: "a1", rooms: ROOMS });
-const CTX = { summary: SUMMARY, priceBook: [], wallPaintRate: { sqft_per_day: 400, tall_wall_modifier_pct: -0.15 } };
+const CTX = { summary: SUMMARY, priceBook: [], wallPaintRate: { sqft_per_day: 400 } };
 
 function task(t: Partial<PreparedTask> & Pick<PreparedTask, "id" | "group_key" | "description">): PreparedTask {
   return {

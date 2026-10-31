@@ -21,6 +21,7 @@ import { ChangeOrdersClient } from "./ChangeOrdersClient";
 import { DecomposeWorkPanel } from "./DecomposeWorkPanel";
 import { loadEstimateDetail } from "./detail-data";
 import { PreparedScopePanel } from "./sections/PreparedScopePanel";
+import { ApprovedAddOnsCard } from "@/components/features/estimates/ApprovedAddOnsCard";
 import { parsePreparedScope } from "@ai-fsm/domain";
 import { loadAssessmentSummary } from "@/lib/estimates/assessment-summary-loader";
 import { resolveLaborRateCents } from "@/lib/estimates/tm-briefing";
@@ -227,6 +228,8 @@ export default async function EstimateDetailPage({
           />
         </div>
       )}
+
+      <ApprovedAddOnsCard addOns={estimate.approved_add_ons} />
 
       <QuoteVersionProvider initialUpdatedAt={quoteUpdatedAt(estimate.updated_at)}>
       {preparedScope && (

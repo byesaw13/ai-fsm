@@ -27,7 +27,7 @@ const PRICE_BOOK: PriceBookHours[] = [
   { code: "5022", name: "Room painting – walls + ceiling + trim", labor_hours_low: 10, labor_hours_typical: 12, labor_hours_high: 15 },
 ];
 const RATES = {
-  wallPaintRate: { sqft_per_day: 400, tall_wall_modifier_pct: -0.15 },
+  wallPaintRate: { sqft_per_day: 400 },
   trimPaintRate: { linear_ft_per_day: 120 },
 };
 const SOURCE = { visitId: "v1", assessmentUpdatedAt: null, ...RATES };
@@ -64,10 +64,12 @@ describe("TASK-217 acceptance room", () => {
 
   it("wall painting uses the wall-painting method: rate 5012, paint from 400 sq ft", () => {
     expect(t("Paint walls")).toMatchObject({
-      method: "wall_paint", hours_low: 6.75, hours_high: 9.25, hours_source: "production_rate", price_book_code: null,
+      // 400 sq ft at 400/day = 8 h, ×1.23 for 10 ft walls (TASK-228)
+      method: "wall_paint", hours_low: 8.25, hours_high: 11.25, hours_source: "production_rate", price_book_code: null,
       materials_cents: 3 * 5500,
     });
     expect(t("Paint walls").quantity).toMatchObject({ key: "net_wall_sqft", value: 400 });
+    expect(t("Paint walls").estimate_notes).toContainEqual({ kind: "assumption", text: "Walls up to 10 ft: 1.23× the hours (Craftsman height factor, 9–13 ft)." });
   });
 
   it("ceiling painting uses the ceiling method: price book 5021 with its limitation, paint from 100 sq ft", () => {
@@ -102,17 +104,17 @@ describe("TASK-217 acceptance room", () => {
     expect(t("Set up, protect floors and clean up")).toMatchObject({ hours_low: 1, hours_high: 2, hours_source: "ai_allowance", materials_cents: 3000 });
   });
 
-  it("totals: 12–17.25 h and $305 materials, worked out without a selling rate", () => {
+  it("totals: 13.5–19.25 h and $305 materials, worked out without a selling rate", () => {
     const s = summarizePreparedScope(scope);
-    expect(s).toMatchObject({ hours_low: 12, hours_high: 17.25, materials_cents: 30500 });
+    expect(s).toMatchObject({ hours_low: 13.5, hours_high: 19.25, materials_cents: 30500 });
   });
 
   it("one room package: one labor line and one materials line; only the price changes with the rate", () => {
     const at85 = preparedScopeToLineItems(scope, 8500).lineItems;
     const at115 = preparedScopeToLineItems(scope, 11500).lineItems;
     expect(at85.map((l) => l.description)).toEqual(["Bedroom — labor", "Bedroom — materials allowance"]);
-    expect(at85.map((l) => [l.quantity, l.unit_price_cents])).toEqual([[14.75, 8500], [1, 30500]]);
-    expect(at115.map((l) => [l.quantity, l.unit_price_cents])).toEqual([[14.75, 11500], [1, 30500]]);
+    expect(at85.map((l) => [l.quantity, l.unit_price_cents])).toEqual([[16.5, 8500], [1, 30500]]);
+    expect(at115.map((l) => [l.quantity, l.unit_price_cents])).toEqual([[16.5, 11500], [1, 30500]]);
     expect(buildProposalNotes(scope, 8500)).not.toMatch(/rate 5003|uncalibrated|price book/);
   });
 
@@ -201,7 +203,7 @@ describe("TASK-217 no double-counted labor", () => {
   it("shared setup is its own task; rate-based hours are not reduced for it", () => {
     const withSetup = toPreparedScope(output(ACCEPTANCE.slice(0, 2)), SUMMARY, PRICE_BOOK, SOURCE);
     const without = toPreparedScope(output([ACCEPTANCE[1]]), SUMMARY, PRICE_BOOK, SOURCE);
-    expect(byDescription(withSetup.tasks, "Paint walls")).toMatchObject({ hours_low: 6.75, hours_high: 9.25 });
-    expect(byDescription(without.tasks, "Paint walls")).toMatchObject({ hours_low: 6.75, hours_high: 9.25 });
+    expect(byDescription(withSetup.tasks, "Paint walls")).toMatchObject({ hours_low: 8.25, hours_high: 11.25 });
+    expect(byDescription(without.tasks, "Paint walls")).toMatchObject({ hours_low: 8.25, hours_high: 11.25 });
   });
 });

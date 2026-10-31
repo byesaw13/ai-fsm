@@ -45,6 +45,8 @@ export interface InvoiceMoneyInput {
   drafted_lines: { total_cents: number }[];
   /** Itemized snapshot travel inserted after the draft. Multi-option only. */
   snapshot_travel_cents?: number;
+  /** Add-ons the customer chose when approving; their lines are in drafted_lines (TASK-225). */
+  add_on_cents?: number;
 }
 
 export interface InvoiceMoney {
@@ -140,6 +142,52 @@ export function invoiceLinesFor(
   return drafted;
 }
 
+/** An add-on amount's tax at the quote's own rate (TASK-225). */
+function addOnTaxCents(addOnCents: number, quote: { subtotal_cents: number; tax_cents: number }): number {
+  return quote.subtotal_cents > 0 ? Math.round((addOnCents * quote.tax_cents) / quote.subtotal_cents) : 0;
+}
+
+/**
+ * What the customer approves with add-ons: the quote total plus the add-ons
+ * and their tax. The portal, the deposit and both bill paths use this, so the
+ * approved amount is the billed amount (TASK-225).
+ */
+export function totalWithAddOns(
+  quote: { subtotal_cents: number; tax_cents: number; total_cents: number },
+  addOnCents: number,
+): number {
+  return quote.total_cents + addOnCents + addOnTaxCents(addOnCents, quote);
+}
+
+/** Add-ons as work items, so the crew's work order lists them (TASK-225). */
+export function addOnWorkLines(addOns: { label: string; price_cents: number }[]) {
+  return addOns.map((a) => ({
+    description: `${a.label} (added option)`,
+    line_item_type: "labor",
+    quantity: 1,
+    unit_price_cents: a.price_cents,
+    total_cents: a.price_cents,
+  }));
+}
+
+/** One bill line per add-on the customer chose when approving (TASK-225). */
+export function addOnLines(
+  addOns: { label: string; price_cents: number }[],
+  drafted: { sort_order: number }[],
+): InvoiceDraftLine[] {
+  const start = nextSort(drafted);
+  return addOns.map((a, i) => ({
+    estimate_line_item_id: null,
+    description: `${a.label} (added option)`,
+    quantity: 1,
+    unit_price_cents: a.price_cents,
+    total_cents: a.price_cents,
+    sort_order: start + i,
+    unit_cost_cents: null,
+    line_item_type: "labor" as const,
+  }));
+}
+
 /**
  * Standard invoices keep stored money when the drafted lines already equal
  * that subtotal. When the lines already include engine adjustments, their sum
@@ -148,6 +196,15 @@ export function invoiceLinesFor(
  */
 export function invoiceMoneyFor(input: InvoiceMoneyInput): InvoiceMoney {
   const draftedSum = input.drafted_lines.reduce((sum, line) => sum + line.total_cents, 0);
+  const addOn = input.add_on_cents ?? 0;
+  if (input.presentation_mode !== "multi_option" && addOn > 0) {
+    // The quote's stored money plus the chosen add-ons, taxed at the quote's rate.
+    return {
+      subtotal_cents: input.subtotal_cents + addOn,
+      tax_cents: input.tax_cents + addOnTaxCents(addOn, input),
+      total_cents: totalWithAddOns(input, addOn),
+    };
+  }
   if (input.presentation_mode !== "multi_option") {
     if (draftedSum === input.subtotal_cents) {
       return {

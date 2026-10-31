@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { totalWithAddOns } from "@/lib/estimates/approved-lines";
 
 interface LineItem {
   id: string;
@@ -181,6 +182,18 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
   );
 
   const canRespond = status === "sent" && !readOnly;
+  // TASK-225: priced add-ons the customer can tick when approving.
+  const tickable = isMultiOption ? [] : addOns.filter((a) => a.price_cents != null);
+  const [addOnIds, setAddOnIds] = useState<Set<string>>(() => new Set());
+  const addOnCents = tickable.filter((a) => addOnIds.has(a.id)).reduce((sum, a) => sum + (a.price_cents ?? 0), 0);
+  function toggleAddOn(id: string) {
+    setAddOnIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   const isExpired = estimate.expires_at && new Date(estimate.expires_at) < new Date();
 
   async function respond(action: "approve" | "decline") {
@@ -207,6 +220,7 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
           name: name.trim() || undefined,
           signature_svg: signatureSvg || undefined,
           option_id: action === "approve" && isMultiOption ? optionId : undefined,
+          add_on_ids: action === "approve" && addOnIds.size > 0 ? [...addOnIds] : undefined,
         }),
       });
       const data = await res.json();
@@ -358,7 +372,7 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
           >
             <h2 id="add-ons-heading" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#13263c" }}>Optional add-ons</h2>
             <p style={{ margin: "4px 0 12px", fontSize: 13, color: "#57534e" }}>
-              Not included in the total above. Tell us if you would like any of these added.
+              Not included in the total above. {tickable.length > 0 && canRespond ? "You can add any of these when you approve." : "Tell us if you would like any of these added."}
             </p>
             <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
               {addOns.map((a) => (
@@ -444,6 +458,22 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
                     </span>
                   </label>
                 ))}
+              </fieldset>
+            )}
+            {tickable.length > 0 && (
+              <fieldset style={{ border: "2px solid #d2672a", background: "#fdf4ec", borderRadius: 8, padding: "10px 12px", margin: "0 0 12px" }}>
+                <legend style={{ fontSize: 13, fontWeight: 600, padding: "0 4px", color: "#13263c" }}>Add any of the optional add-ons?</legend>
+                {tickable.map((a) => (
+                  <label key={a.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "6px 0", fontSize: 15 }}>
+                    <input type="checkbox" checked={addOnIds.has(a.id)} onChange={() => toggleAddOn(a.id)} style={{ marginTop: 4 }} />
+                    <span>
+                      {a.label} <strong style={{ color: "#b3541f", whiteSpace: "nowrap" }}>+{cents(a.price_cents ?? 0)}</strong>
+                    </span>
+                  </label>
+                ))}
+                <div style={{ marginTop: 6, fontWeight: 700 }} aria-live="polite">
+                  Total with your choices: {cents(totalWithAddOns(estimate, addOnCents))}
+                </div>
               </fieldset>
             )}
             <div style={{ marginBottom: 12 }}>

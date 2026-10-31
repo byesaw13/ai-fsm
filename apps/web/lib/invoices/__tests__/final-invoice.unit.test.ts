@@ -198,6 +198,36 @@ describe("createDraftFinalInvoiceForJob", () => {
     expect(depositCentsArg).toBe(15000);
   });
 
+  it("bills the add-ons the customer chose at approval, with tax at the quote's rate (TASK-225)", async () => {
+    const { createDraftFinalInvoiceForJob } = await import("../final-invoice");
+
+    const client = makeClient([
+      { rows: [], rowCount: 0 },
+      {
+        rows: [{
+          client_id: "client-1", property_id: "prop-1", estimate_id: "est-1", presentation_mode: "standard",
+          pricing_mode: "flat_rate", booking_pricing_mode: null,
+          subtotal_cents: 100_000, tax_cents: 5_000, total_cents: 105_000,
+          estimate_notes: null, deposit_cents: 0, travel_snapshot_id: null,
+          approved_add_ons: [{ id: "a2", label: "Foyer stairwell", price_cents: 20_000 }],
+        }],
+        rowCount: 1,
+      },
+      { rows: [{ description: "Paint foyer", quantity: "1", unit_price_cents: 100_000, line_item_type: "labor", sort_order: 0 }], rowCount: 1 },
+      { rows: [], rowCount: 0 },
+      { rows: [{ id: "new-inv-id" }], rowCount: 1 },
+    ]);
+
+    const result = await createDraftFinalInvoiceForJob({ client, jobId: "job-1", accountId: "acct-1", userId: "user-1" });
+    expect(result?.lineItemCount).toBe(2);
+    const calls = (client.query as ReturnType<typeof vi.fn>).mock.calls as unknown[][];
+    const insert = calls.find((c) => typeof c[0] === "string" && (c[0] as string).includes("INSERT INTO invoices"))!;
+    const args = insert[1] as unknown[];
+    expect([args[6], args[7], args[8]]).toEqual([120_000, 6_000, 126_000]);
+    const lineArgs = calls.filter((c) => typeof c[0] === "string" && (c[0] as string).includes("INSERT INTO invoice_line_items")).map((c) => (c[1] as unknown[]).slice(1, 4));
+    expect(lineArgs).toContainEqual(["Foyer stairwell (added option)", 1, 20_000]);
+  });
+
   it("skips estimate items for multi_option estimates and uses visit parts instead", async () => {
     const { createDraftFinalInvoiceForJob } = await import("../final-invoice");
 

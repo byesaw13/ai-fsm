@@ -4,6 +4,7 @@ import {
   parsePreparedScope,
   pickStartingHours,
   wallPaintHours,
+  wallHeightTimeFactor,
   trimPaintHours,
   materialLineCents,
   materialListStale,
@@ -182,18 +183,35 @@ describe("parsePreparedScope", () => {
   });
 });
 
+describe("wallHeightTimeFactor (TASK-228, Craftsman, owner-approved 2026-10-31)", () => {
+  it("is 1 up to 9 ft, then rises by height band", () => {
+    expect([8, 9, 9.5, 13, 13.5, 17, 18, 19, 20, 21].map((h) => wallHeightTimeFactor(h).factor)).toEqual([
+      1, 1, 1.23, 1.23, 1.46, 1.46, 1.69, 1.69, 1.92, 1.92,
+    ]);
+  });
+
+  it("stays at the top band above 21 ft and says the staging needs its own price", () => {
+    expect(wallHeightTimeFactor(24)).toMatchObject({ factor: 1.92, band: "19–21 ft", aboveTable: true });
+  });
+
+  it("is 1 when the height is unknown", () => {
+    expect(wallHeightTimeFactor(null)).toMatchObject({ factor: 1, band: null });
+  });
+});
+
 describe("wallPaintHours (TASK-184)", () => {
-  const RATE = { sqft_per_day: 400, tall_wall_modifier_pct: -0.15 };
+  const RATE = { sqft_per_day: 400 };
 
   it("is the area over the daily pace, plus or minus 15%", () => {
     // 466 sq ft at 50 sq ft/h = 9.32 h
     expect(wallPaintHours(466, 8, RATE)).toEqual({ low: 8, high: 10.75 });
   });
 
-  it("slows down walls taller than 10 ft", () => {
-    // 214 sq ft at 340 sq ft/day = 5.04 h
-    expect(wallPaintHours(214, 18, RATE)).toEqual({ low: 4.25, high: 5.75 });
-    expect(wallPaintHours(214, 10, RATE)).toEqual({ low: 3.75, high: 5 });
+  it("takes longer on taller walls, by the Craftsman height factor (TASK-228)", () => {
+    // 214 sq ft at 400 sq ft/day = 4.28 h before height
+    expect(wallPaintHours(214, 9, RATE)).toEqual({ low: 3.75, high: 5 });
+    expect(wallPaintHours(214, 10, RATE)).toEqual({ low: 4.5, high: 6 }); // ×1.23
+    expect(wallPaintHours(214, 18, RATE)).toEqual({ low: 6.25, high: 8.25 }); // ×1.69
   });
 
   it("is null without an area or a pace", () => {

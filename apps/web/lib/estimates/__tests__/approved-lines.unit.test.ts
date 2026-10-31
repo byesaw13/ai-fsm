@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { approvedLines, invoiceLinesFor, invoiceMoneyFor, type ConvertSourceLine } from "../approved-lines";
+import { seedCompletionCriteriaFromLineItems } from "@ai-fsm/domain";
+import { addOnLines, addOnWorkLines, approvedLines, totalWithAddOns, invoiceLinesFor, invoiceMoneyFor, type ConvertSourceLine } from "../approved-lines";
 
 function line(over: Partial<ConvertSourceLine> & Pick<ConvertSourceLine, "id" | "description" | "total_cents">): ConvertSourceLine {
   return {
@@ -217,3 +218,70 @@ describe("invoiceMoneyFor", () => {
     expect(money).toEqual({ subtotal_cents: 112_000, tax_cents: 7_000, total_cents: 119_000 });
   });
 });
+
+describe("add-ons on the final bill (TASK-225)", () => {
+  const addOns = [
+    { id: "a1", label: "Son's room, whole room", price_cents: 75_000 },
+    { id: "a2", label: "Foyer stairwell", price_cents: 105_000 },
+  ];
+
+  it("one line per add-on the customer chose, after the drafted lines", () => {
+    expect(addOnLines(addOns, [{ sort_order: 0 }, { sort_order: 4 }])).toEqual([
+      { estimate_line_item_id: null, description: "Son's room, whole room (added option)", quantity: 1, unit_price_cents: 75_000, total_cents: 75_000, sort_order: 5, unit_cost_cents: null, line_item_type: "labor" },
+      { estimate_line_item_id: null, description: "Foyer stairwell (added option)", quantity: 1, unit_price_cents: 105_000, total_cents: 105_000, sort_order: 6, unit_cost_cents: null, line_item_type: "labor" },
+    ]);
+  });
+
+  it("a standard bill's money is the stored quote plus the add-ons, tax at the quote's rate", () => {
+    expect(
+      invoiceMoneyFor({
+        presentation_mode: "standard",
+        subtotal_cents: 875_000,
+        tax_cents: 0,
+        total_cents: 875_000,
+        option: null,
+        drafted_lines: [{ total_cents: 875_000 }, { total_cents: 105_000 }],
+        add_on_cents: 105_000,
+      }),
+    ).toEqual({ subtotal_cents: 980_000, tax_cents: 0, total_cents: 980_000 });
+    expect(
+      invoiceMoneyFor({
+        presentation_mode: "standard",
+        subtotal_cents: 100_000,
+        tax_cents: 5_000,
+        total_cents: 105_000,
+        option: null,
+        drafted_lines: [{ total_cents: 100_000 }, { total_cents: 20_000 }],
+        add_on_cents: 20_000,
+      }),
+    ).toEqual({ subtotal_cents: 120_000, tax_cents: 6_000, total_cents: 126_000 });
+  });
+});
+
+describe("add-on totals are the same everywhere (TASK-225)", () => {
+  it("what the customer approves includes the add-on's tax at the quote's rate", () => {
+    expect(totalWithAddOns({ subtotal_cents: 100_000, tax_cents: 5_000, total_cents: 105_000 }, 20_000)).toBe(126_000);
+    expect(totalWithAddOns({ subtotal_cents: 875_000, tax_cents: 0, total_cents: 875_000 }, 105_000)).toBe(980_000);
+    expect(totalWithAddOns({ subtotal_cents: 0, tax_cents: 0, total_cents: 0 }, 5_000)).toBe(5_000);
+  });
+
+  it("matches the bill's money", () => {
+    const quote = { subtotal_cents: 100_000, tax_cents: 5_000, total_cents: 105_000 };
+    const bill = invoiceMoneyFor({ presentation_mode: "standard", ...quote, option: null, drafted_lines: [], add_on_cents: 20_000 });
+    expect(bill.total_cents).toBe(totalWithAddOns(quote, 20_000));
+  });
+
+  it("add-on work items survive the crew checklist filter", () => {
+    const criteria = seedCompletionCriteriaFromLineItems(
+      addOnWorkLines([{ label: "Foyer stairwell: paint the tall walls along the staircase", price_cents: 105_000 }]),
+    );
+    expect(criteria.map((c) => c.label)).toEqual(["Foyer stairwell: paint the tall walls along the staircase (added option)"]);
+  });
+
+  it("add-ons become labor work items for the crew", () => {
+    expect(addOnWorkLines([{ label: "Foyer stairwell", price_cents: 105_000 }])).toEqual([
+      { description: "Foyer stairwell (added option)", line_item_type: "labor", quantity: 1, unit_price_cents: 105_000, total_cents: 105_000 },
+    ]);
+  });
+});
+

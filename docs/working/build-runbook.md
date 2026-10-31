@@ -22,21 +22,13 @@ docs-only commit when there is no PR).
 Last step           : D0 backlog for Track D (customer quote and letterhead),
                       2026-10-31. B3 (TASK-192) was the last runbook code step
                       verified (2026-10-27, squash 2842780e, #728).
-In-flight PR        : D0 (branch docs/quote-options-backlog) and D1 (branch
-                      task/224-customer-quote-options, stacked on D0). Both
-                      committed locally on 2026-10-31; NOT pushed: the agent's
-                      push was blocked by the session's permission check.
-                      Push both, open PRs (D1 based on D0 or on main after D0
-                      merges), wait for CI incl. integration tests.
-                      D2 (branch task/226-letterhead, stacked on D1) and D4
-                      (branch task/227-pool-paint, stacked on D2) also
-                      committed locally, not pushed.
-Next step           : push D0/D1/D2 and take them through CI, merge, deploy;
-                      then D1 and D2 production follow-ups (see Plan: Track D).
-                      Next build step: D3 (TASK-225, G6 approved), then D5
-                      (TASK-228, G7 approved).
+In-flight PR        : #741 (D3+D5, branch task/225-228-addons-height,
+                      migration 213).
+Next step           : #741 through CI, merge, then deploy WITH a verified
+                      backup first (migration 213). Owner allowed the agent
+                      to run scripts/deploy-garonhome.sh (2026-10-31).
 Blocked on          : nothing
-Last known-good     : 8441846a (branch deploy-good/8441846a); previous 7490a24c
+Last known-good     : 0e1b9921 (deploy-good/0e1b9921); previous 8441846a
 Notes               : Off-runbook work 2026-10-31 on prod data (Dowd
                       EST-2026-0026): switched to fixed $8,750 via the app's
                       Apply code; options a1 (son's room, $750) and a2 (foyer
@@ -144,11 +136,11 @@ docs-only commit after the event. Planned tests are not passing tests.
 | F9 | TASK-200 | | | | |
 | F10 | TASK-201 | | | | |
 | F11 | TASK-208 | | | | |
-| D0 | Backlog TASK-224..228 | | | n/a | n/a |
-| D1 | TASK-224 | | | | |
-| D2 | TASK-226 | | | | |
+| D0 | Backlog TASK-224..228 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | n/a | n/a |
+| D1 | TASK-224 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
+| D2 | TASK-226 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
 | D3 | TASK-225 | | | | |
-| D4 | TASK-227 | | | | |
+| D4 | TASK-227 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
 | D5 | TASK-228 | | | | |
 
 ## Operating rules
@@ -614,6 +606,14 @@ owner chose: D4 next, then D3 and D5.
 
 ## Log
 
+- 2026-10-31 · D2 · Data · logo: logo-dovetails-horizontal-2026.png (site repo dovetails-horizontal-color-1200.png) copied into /app/uploads/account/aaaaaaaa…0001/ and settings.logo_filename set (was logo-e680679f.png, file kept; reversal: set logo_filename back)
+- 2026-10-31 · D1 · Data · Dowd EST-2026-0026: option prices moved from labels to price_cents (a1 75000, a2 105000), labels cleaned, foyer line says "(see Optional add-ons)", notes rebuilt with buildProposalNotes (no allowances sentence, no options list). Dry run first; total stayed 875000
+- 2026-10-31 · D1/D2/D4 · Verified · 0e1b9921 deployed ~16:05 UTC (no migration, no backup needed); health ok, /login HTTP/2 200; Dowd portal shows the add-ons box with prices
+- 2026-10-31 · D0/D1/D2/D4 · Merged · #740 · squash 0e1b9921 (Codex threads resolved by the agent after the owner allowed gh api graphql). Deploy pending
+- 2026-10-31 · D1 · Codex review on #740: option ids reused after delete (Revise counted, now max suffix, shared lastAlternativeNumber) and PDF add-ons box overflowing one page (now continues per page); fixed in 3f041ae1, replies posted
+- 2026-10-31 · D5 · In progress · local branch task/228-height-factors · Craftsman height factors replace the vaulted_ceilings pace modifier in Prepare Quote; note on each wall task. Local: lint, typecheck, unit (domain 542, web 2328), knip
+- 2026-10-31 · D3 · In progress · local branch task/225-add-on-approval · migration 213 approved_add_ons (applied + reversed on the dev DB in a rolled-back transaction), portal checkboxes with running total, deposit on base + add-ons, final bill add-on lines, staff card. Local: lint, typecheck, web unit 2328, knip, migration prefixes; integration test add-on-choice.integration.test.ts for CI
+- 2026-10-31 · D0–D4 · PR #740 opened (one PR for the four stacked commits)
 - 2026-10-31 · D4 · In progress · local branch task/227-pool-paint · owner toggle pool_paint; pooledPaint in domain (pails, gallons, quarts under 1 gal; shares by need); buy list "Paint (bought together)". Local: lint, typecheck, unit (domain 539, web 2320) green, knip no failures
 - 2026-10-31 · G6/G7 · Approved in session: "approve both, use craftsman factors, start TASK-227"
 - 2026-10-31 · D2 · Data · prod account aaaaaaaa…0001 settings.company_address removed (was "85R Rockingham Rd Derry, NH 03038"; reversal: UPDATE accounts SET settings = settings || '{"company_address":"85R Rockingham Rd Derry, NH 03038"}' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'). Owner asked for it in session. Logo upload waits for D2's deploy (old code would print the name twice)

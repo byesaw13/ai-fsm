@@ -386,7 +386,7 @@ describe("toPreparedScope — wall painting at the owner's pace (TASK-184)", () 
   };
   const summary = buildAssessmentSummary({ visitId: "v2", assessmentId: "a2", rooms: [BEDROOM, FOYER], scopeNotes: "High quality paint" });
   const priceBook: PriceBookHours[] = [{ code: "5020", name: "Paint room", labor_hours_low: 7, labor_hours_typical: 9, labor_hours_high: 11 }];
-  const rate = { sqft_per_day: 400, tall_wall_modifier_pct: -0.15 };
+  const rate = { sqft_per_day: 400 };
   const output: PreparationOutput = {
     groups: [{ key: "bed", label: "Bedroom" }, { key: "foyer", label: "Foyer" }],
     tasks: [
@@ -407,9 +407,9 @@ describe("toPreparedScope — wall painting at the owner's pace (TASK-184)", () 
     expect(bed).toMatchObject({ hours_low: 8, hours_high: 10.75, hours_source: "production_rate" });
     // 466 x 2 coats / 350 x 1.1 = 2.93 → 3 gal premium at $75
     expect(bed.materials_cents).toBe(22500);
-    // The foyer's listed 13 ft wall at 18 ft, tall-wall pace
+    // The foyer's listed 13 ft wall at 18 ft: 4.28 h ×1.69 (Craftsman 17–19 ft, TASK-228)
     expect(foyer.quantity).toMatchObject({ key: "net_wall_sqft", value: 214 });
-    expect(foyer).toMatchObject({ hours_low: 4.25, hours_high: 5.75, hours_source: "production_rate", count: null });
+    expect(foyer).toMatchObject({ hours_low: 6.25, hours_high: 8.25, hours_source: "production_rate", count: null });
     expect(foyer.materials_cents).toBe(15000);
     // Other work is untouched
     expect(patch).toMatchObject({ hours_low: 1, hours_high: 2, hours_source: "ai_allowance", materials_cents: 1500 });
