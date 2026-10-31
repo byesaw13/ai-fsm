@@ -22,16 +22,13 @@ docs-only commit when there is no PR).
 Last step           : D0 backlog for Track D (customer quote and letterhead),
                       2026-10-31. B3 (TASK-192) was the last runbook code step
                       verified (2026-10-27, squash 2842780e, #728).
-In-flight PR        : D3+D5 PR (branch task/225-228-addons-height, rebased
-                      on main 0e1b9921; migration 213).
-Next step           : deploy main 0e1b9921 (D1, D2, D4; no migration), verify,
-                      then the D1/D2 production follow-ups (logo upload, Dowd
-                      option prices to price_cents). Then CI/merge/deploy the
-                      D3+D5 PR (migration 213: backup first).
-Blocked on          : the agent's run of scripts/deploy-garonhome.sh was blocked
-                      by the session's permission check (2026-10-31); the owner
-                      runs the deploy or allows it.
-Last known-good     : 8441846a (branch deploy-good/8441846a); previous 7490a24c
+In-flight PR        : #741 (D3+D5, branch task/225-228-addons-height,
+                      migration 213).
+Next step           : #741 through CI, merge, then deploy WITH a verified
+                      backup first (migration 213). Owner allowed the agent
+                      to run scripts/deploy-garonhome.sh (2026-10-31).
+Blocked on          : nothing
+Last known-good     : 0e1b9921 (deploy-good/0e1b9921); previous 8441846a
 Notes               : Off-runbook work 2026-10-31 on prod data (Dowd
                       EST-2026-0026): switched to fixed $8,750 via the app's
                       Apply code; options a1 (son's room, $750) and a2 (foyer
@@ -140,10 +137,10 @@ docs-only commit after the event. Planned tests are not passing tests.
 | F10 | TASK-201 | | | | |
 | F11 | TASK-208 | | | | |
 | D0 | Backlog TASK-224..228 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | n/a | n/a |
-| D1 | TASK-224 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | | |
-| D2 | TASK-226 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | | |
+| D1 | TASK-224 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
+| D2 | TASK-226 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
 | D3 | TASK-225 | | | | |
-| D4 | TASK-227 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | | |
+| D4 | TASK-227 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
 | D5 | TASK-228 | | | | |
 
 ## Operating rules
@@ -609,6 +606,9 @@ owner chose: D4 next, then D3 and D5.
 
 ## Log
 
+- 2026-10-31 · D2 · Data · logo: logo-dovetails-horizontal-2026.png (site repo dovetails-horizontal-color-1200.png) copied into /app/uploads/account/aaaaaaaa…0001/ and settings.logo_filename set (was logo-e680679f.png, file kept; reversal: set logo_filename back)
+- 2026-10-31 · D1 · Data · Dowd EST-2026-0026: option prices moved from labels to price_cents (a1 75000, a2 105000), labels cleaned, foyer line says "(see Optional add-ons)", notes rebuilt with buildProposalNotes (no allowances sentence, no options list). Dry run first; total stayed 875000
+- 2026-10-31 · D1/D2/D4 · Verified · 0e1b9921 deployed ~16:05 UTC (no migration, no backup needed); health ok, /login HTTP/2 200; Dowd portal shows the add-ons box with prices
 - 2026-10-31 · D0/D1/D2/D4 · Merged · #740 · squash 0e1b9921 (Codex threads resolved by the agent after the owner allowed gh api graphql). Deploy pending
 - 2026-10-31 · D1 · Codex review on #740: option ids reused after delete (Revise counted, now max suffix, shared lastAlternativeNumber) and PDF add-ons box overflowing one page (now continues per page); fixed in 3f041ae1, replies posted
 - 2026-10-31 · D5 · In progress · local branch task/228-height-factors · Craftsman height factors replace the vaulted_ceilings pace modifier in Prepare Quote; note on each wall task. Local: lint, typecheck, unit (domain 542, web 2328), knip
