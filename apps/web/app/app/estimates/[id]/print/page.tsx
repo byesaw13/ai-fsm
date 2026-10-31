@@ -12,8 +12,10 @@ import {
 } from "@ai-fsm/domain";
 import type { EstimateStatus, RoomSpec } from "@ai-fsm/domain";
 import { PrintButton } from "./PrintButton";
+import { Letterhead } from "@/components/features/documents/Letterhead";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 import { resolveCompanyBranding, type CompanyProfileSettings } from "@/lib/company/branding";
+import { customerAddOns, showsQuantityAndRate } from "@/lib/estimates/customer-quote";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +50,7 @@ interface EstimateRow {
   job_title: string | null;
   shopping_list_json: unknown | null;
   room_specs: unknown | null;
+  prepared_scope: unknown;
 }
 
 interface LineItemRow {
@@ -58,6 +61,7 @@ interface LineItemRow {
   total_cents: number;
   sort_order: number;
   visible_to_customer: boolean;
+  line_item_type: string | null;
 }
 
 function fmtDate(iso: string | null | undefined): string {
@@ -90,7 +94,7 @@ export default async function EstimatePrintPage({
          COALESCE(e.balance_cents, 0) AS balance_cents,
          e.notes, e.scope_assumptions, e.sent_at, e.expires_at, e.created_at,
          e.sq_ft, e.prep_level, e.includes_trim, e.includes_ceiling,
-         e.shopping_list_json, e.room_specs,
+         e.shopping_list_json, e.room_specs, e.prepared_scope,
          c.name   AS client_name,
          c.email  AS client_email,
          c.phone  AS client_phone,
@@ -114,7 +118,7 @@ export default async function EstimatePrintPage({
     if (estResult.rowCount === 0) return null;
 
     const liResult = await client.query(
-      `SELECT id, description, quantity, unit_price_cents, total_cents,
+      `SELECT id, description, line_item_type, quantity, unit_price_cents, total_cents,
               sort_order, visible_to_customer
        FROM estimate_line_items
        WHERE estimate_id = $1
@@ -147,6 +151,7 @@ export default async function EstimatePrintPage({
 
   // Only show customer-visible line items
   const customerItems = lineItems.filter((i) => i.visible_to_customer);
+  const addOns = customerAddOns(estimate.prepared_scope);
 
   const estimateNumber = `EST-${estimate.id.slice(0, 8).toUpperCase()}`;
   const issuedDate = fmtDate(estimate.sent_at ?? estimate.created_at);
@@ -192,8 +197,14 @@ export default async function EstimatePrintPage({
         .standard-grid h3 { font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.06em; }
         .standard-grid p { font-size: 13px; color: #444; margin: 0; }
         .section-block { margin-top: 24px; }
+        .add-ons { background: #fdf4ec; border: 2px solid #d2672a; border-radius: 8px; padding: 14px 16px; }
+        .add-ons h2 { margin: 0; color: #b3541f; }
+        .add-ons-intro { margin: 4px 0 10px; font-size: 13px; color: #57534e; }
+        .add-ons ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+        .add-ons li { display: flex; justify-content: space-between; gap: 16px; background: #fff; border: 1px solid #f0d3bd; border-radius: 6px; padding: 8px 12px; }
+        .add-ons li p { margin: 2px 0 0; font-size: 13px; color: #57534e; }
+        .add-on-price { font-weight: 700; color: #b3541f; white-space: nowrap; }
         .header-row { display: flex; justify-content: space-between; align-items: flex-start; }
-        .company-name { font-size: 20px; font-weight: 700; }
         .meta-label { color: #666; font-size: 12px; }
         .print-btn { position: fixed; top: 16px; right: 16px; padding: 8px 20px;
                      background: #111; color: #fff; border: none; border-radius: 6px;
@@ -205,10 +216,10 @@ export default async function EstimatePrintPage({
       <div className="wrap">
         {/* Header */}
         <div className="header-row">
-          <div>
-            <div className="company-name">{branding.name}</div>
-            <p style={{ color: "#666", fontSize: 13 }}>{branding.tagline ?? "Licensed & Insured"}</p>
-          </div>
+          <Letterhead
+            branding={branding}
+            logoSrc={branding.logoPath ? `/api/v1/account/logo?t=${encodeURIComponent(account?.settings?.logo_filename ?? "")}` : null}
+          />
           <div style={{ textAlign: "right" }}>
             <h1>Quote</h1>
             <p className="meta-label">{estimateNumber}</p>
@@ -357,8 +368,8 @@ export default async function EstimatePrintPage({
                 {customerItems.map((item) => (
                   <tr key={item.id}>
                     <td>{item.description}</td>
-                    <td>{item.quantity}</td>
-                    <td className="amt">{formatCents(item.unit_price_cents)}</td>
+                    <td>{showsQuantityAndRate(item.line_item_type) ? item.quantity : ""}</td>
+                    <td className="amt">{showsQuantityAndRate(item.line_item_type) ? formatCents(item.unit_price_cents) : ""}</td>
                     <td className="amt">{formatCents(item.total_cents)}</td>
                   </tr>
                 ))}
@@ -421,6 +432,25 @@ export default async function EstimatePrintPage({
                 )}
               </tfoot>
             </table>
+          </div>
+        )}
+
+        {/* Optional add-ons (TASK-224): set apart from the scope and the total */}
+        {addOns.length > 0 && (
+          <div className="section-block add-ons">
+            <h2>Optional add-ons</h2>
+            <p className="add-ons-intro">Not included in the total above. Tell us if you would like any of these added.</p>
+            <ul>
+              {addOns.map((a) => (
+                <li key={a.id}>
+                  <div>
+                    <strong>{a.label}</strong>
+                    {a.note && <p>{a.note}</p>}
+                  </div>
+                  <span className="add-on-price">{a.price_cents != null ? `+${formatCents(a.price_cents)}` : "Price on request"}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

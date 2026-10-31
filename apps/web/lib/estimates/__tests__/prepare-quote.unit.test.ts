@@ -188,7 +188,7 @@ describe("preparedScopeToLineItems", () => {
 
   it("makes a labor line at mid hours and a materials line per group", () => {
     expect(lineItems[0]).toMatchObject({
-      description: "Room 1 repairs, ceiling, baseboard and plates — labor, est. 5–8 h",
+      description: "Room 1 repairs, ceiling, baseboard and plates — labor",
       quantity: 6.5,
       unit_price_cents: 8500,
       line_item_type: "labor",
@@ -287,32 +287,83 @@ describe("fixed price lines (TASK-180)", () => {
 
   it("a fixed quote without a price falls back to T&M lines", () => {
     const noPrice = { ...base, pricing: { ...fixed.pricing, fixed_price_cents: null } };
-    expect(preparedScopeToLineItems(noPrice, TEST_RATE_CENTS).lineItems[0].description).toMatch(/labor, est\. 5–8 h/);
+    expect(preparedScopeToLineItems(noPrice, TEST_RATE_CENTS).lineItems[0]).toMatchObject({
+      description: "Room 1 repairs, ceiling, baseboard and plates — labor",
+      hours_low: 5,
+      hours_high: 8,
+    });
   });
 });
 
 describe("buildProposalNotes", () => {
   const scope = toPreparedScope(OUTPUT, SUMMARY, [], SOURCE);
 
-  it("lists included work by group, options and the T&M range, without hours or cost", () => {
+  it("lists included work by group and the T&M range, without hours or cost", () => {
     const text = buildProposalNotes(scope, TEST_RATE_CENTS);
     expect(text).toMatch(/^What's included\n\nRoom 1 repairs, ceiling, baseboard and plates\n- Patch picture-hanger pinholes/);
-    expect(text).toContain("Options (not included unless you choose them)\n- Vinyl plank instead of sheet vinyl");
     expect(text).toContain("Materials are allowances.");
     expect(text).toContain("Pricing: time and materials, estimated $4,025–$5,640.");
     expect(text).not.toMatch(/\d+(\.\d+)?\s*h\b|hours|\/h|margin|labor cost|remainder|reserve|overhead/i);
   });
 
-  it("states the fixed price when the quote is fixed", () => {
+  it("states the fixed price when the quote is fixed, without the allowances sentence (TASK-224)", () => {
     const text = buildProposalNotes({ ...scope, pricing: { mode: "fixed", fixed_price_cents: 550_000, expected_hours: null, overhead_cents: 0, reserve_pct: 0 } }, TEST_RATE_CENTS);
     expect(text).toContain("Pricing: fixed price of $5,500 for the work above.");
     expect(text).not.toContain("time and materials");
+    expect(text).not.toContain("allowances");
+  });
+
+  it("leaves options out of the notes when the quote has alternatives; the add-ons block shows them (TASK-224)", () => {
+    const text = buildProposalNotes(scope, TEST_RATE_CENTS);
+    expect(scope.alternatives).toHaveLength(1);
+    expect(text).not.toContain("Options");
+    expect(text).not.toContain("Vinyl plank");
+  });
+
+  it("still lists unchecked work as options when there are no alternatives", () => {
+    const s = { ...structuredClone(scope), alternatives: [] };
+    s.tasks[0].confirmed = false;
+    expect(buildProposalNotes(s, TEST_RATE_CENTS)).toContain("Options (not included unless you choose them)\n- Patch picture-hanger pinholes");
   });
 
   it("leaves out unchecked tasks from the included work", () => {
     const s = structuredClone(scope);
     s.tasks[0].confirmed = false;
     expect(buildProposalNotes(s, TEST_RATE_CENTS).split("Options")[0]).not.toContain("Patch picture-hanger pinholes");
+  });
+});
+
+describe("applyScopeEdits options (TASK-224)", () => {
+  const stored = toPreparedScope(OUTPUT, SUMMARY, [], SOURCE);
+
+  it("keeps the stored id and tasks, and takes the owner's label, price and note", () => {
+    const incoming = structuredClone(stored);
+    incoming.alternatives[0] = { ...incoming.alternatives[0], label: "  Vinyl plank floor  ", price_cents: 75_000, note: "Warmer underfoot", task_ids: ["t1"] };
+    expect(applyScopeEdits(stored, incoming).alternatives).toEqual([
+      { id: stored.alternatives[0].id, label: "Vinyl plank floor", task_ids: stored.alternatives[0].task_ids, note: "Warmer underfoot", price_cents: 75_000 },
+    ]);
+  });
+
+  it("adds a new option with a server id and no tasks, and skips one without a label", () => {
+    const incoming = structuredClone(stored);
+    incoming.alternatives.push(
+      { id: "new-1", label: "Foyer stairwell", task_ids: ["t1"], note: null, price_cents: 105_000 },
+      { id: "new-2", label: "   ", task_ids: [], note: null, price_cents: 10 },
+    );
+    const merged = applyScopeEdits(stored, incoming);
+    expect(merged.alternatives).toHaveLength(2);
+    expect(merged.alternatives[1]).toEqual({ id: "a2", label: "Foyer stairwell", task_ids: [], note: null, price_cents: 105_000 });
+  });
+
+  it("removes an option the owner deleted", () => {
+    const incoming = { ...structuredClone(stored), alternatives: [] };
+    expect(applyScopeEdits(stored, incoming).alternatives).toEqual([]);
+  });
+
+  it("an empty note or a bad price is stored as null", () => {
+    const incoming = structuredClone(stored);
+    incoming.alternatives[0] = { ...incoming.alternatives[0], note: "  ", price_cents: -5 };
+    expect(applyScopeEdits(stored, incoming).alternatives[0]).toMatchObject({ note: null, price_cents: null });
   });
 });
 

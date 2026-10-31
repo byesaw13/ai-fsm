@@ -6,6 +6,7 @@ import {
   DEFAULT_PREPARED_PRICING,
   materialLineCents,
   modelPreparedProfit,
+  pooledPaint,
   summarizePreparedScope,
   type PreparedMaterialLine,
   type PreparedMaterialList,
@@ -18,6 +19,7 @@ import { formatCents } from "@/lib/money";
 import type { RevisionChange } from "@/lib/estimates/revise-quote";
 import { hoursSourceLabel, kindLabel, methodLabel, quantityLabel, tmRangeLabel, workAreaFlags, workAreaRows } from "@/lib/estimates/prepared-scope-display";
 import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
+import { PreparedOptionsEditor } from "@/components/features/estimates/PreparedOptionsEditor";
 
 interface Props {
   estimateId: string;
@@ -96,6 +98,8 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
     [scope, laborRateCents, laborCostCents],
   );
   const areas = useMemo(() => workAreaRows(scope, laborRateCents), [scope, laborRateCents]);
+  // Paint more than one room lists, which could be bought together (TASK-227).
+  const poolable = useMemo(() => pooledPaint({ ...scope, pool_paint: true }), [scope]);
   // Work areas start collapsed (TASK-185); the owner opens one to edit its tasks.
   const [openAreas, setOpenAreas] = useState<Set<string>>(() => new Set());
   function toggleArea(key: string) {
@@ -391,6 +395,33 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
           <span style={{ textAlign: "right" }}>{formatCents(areas.materials_cents)}</span>
           <span style={{ textAlign: "right" }} data-testid="work-area-total">{formatCents(areas.total_cents)}</span>
         </div>
+        {poolable.length > 0 && (
+          <div style={{ padding: "var(--space-2) 0" }} data-testid="pool-paint">
+            <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-start" }}>
+              <input
+                type="checkbox"
+                checked={!!scope.pool_paint}
+                disabled={!editable}
+                onChange={(e) => {
+                  setScope((s) => ({ ...s, pool_paint: e.target.checked }));
+                  setDirty(true);
+                }}
+              />
+              <span>
+                One color everywhere: buy paint together
+                <span style={{ ...label, display: "block" }}>
+                  {poolable
+                    .map((p) => {
+                      const parts = [p.pails ? `${p.pails} × 5-gal pail` : null, p.gallons ? `${p.gallons} gal` : null, p.quarts ? `${p.quarts} qt` : null].filter(Boolean);
+                      return `${p.name}: ${p.needed} gal across ${Object.keys(p.shares).length} rooms → ${parts.join(" + ")}, ${formatCents(p.cost_cents)}`;
+                    })
+                    .join(" · ")}
+                  . Each room&apos;s materials carry its share. A pail is priced as 5 gallons; edit the price on the buy list if yours is lower.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
         {editable && areas.rows.some((r) => !r.materials_itemized) && (
           <Button variant="secondary" onClick={() => itemize(areas.rows.filter((r) => !r.materials_itemized).map((r) => r.key))} disabled={itemizing !== null || revising}>
             {itemizing === "all" ? "Listing materials…" : "Itemize materials for every area"}
@@ -452,14 +483,14 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
         </div>
       )}
 
-      {scope.alternatives.length > 0 && (
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }}>
-          <h3 style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-sm)" }}>Options</h3>
-          <ul style={{ margin: 0, paddingLeft: "var(--space-4)" }}>
-            {scope.alternatives.map((a) => <li key={a.id}>{a.label}{a.note ? ` — ${a.note}` : ""}</li>)}
-          </ul>
-        </div>
-      )}
+      <PreparedOptionsEditor
+        options={scope.alternatives}
+        editable={editable}
+        onChange={(alternatives) => {
+          setScope((s) => ({ ...s, alternatives }));
+          setDirty(true);
+        }}
+      />
       {scope.exclusions.length > 0 && (
         <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }}>
           <h3 style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-sm)" }}>Not included</h3>

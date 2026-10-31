@@ -66,3 +66,43 @@ describe("PreparedScopePanel with no work listed", () => {
     expect(html).toContain("for Kitchen, Hall");
   });
 });
+
+describe("PreparedScopePanel options (TASK-224)", () => {
+  const html = renderToStaticMarkup(
+    createElement(PreparedScopePanel, {
+      estimateId: "e1",
+      initialScope: { ...SCOPE, alternatives: [{ id: "a1", label: "Foyer stairwell", task_ids: [], note: "Same room", price_cents: 105_000 }] },
+      roomNames: {}, laborRateCents: 8500, laborCostCents: 5000, editable: true, showInternal: false,
+    }),
+  );
+
+  it("lets the owner edit each option's name, price and note, and add another", () => {
+    expect(html).toContain('value="Foyer stairwell"');
+    expect(html).toContain('value="1050.00"');
+    expect(html).toContain('value="Same room"');
+    expect(html).toContain("Add option");
+    expect(html).toContain("apart from the quote total");
+  });
+});
+
+describe("PreparedScopePanel paint pooling (TASK-227)", () => {
+  const paint = (id: string, quantity: number) => ({
+    task_ids: [], customer_supplied: [], assumptions: [],
+    lines: [{ id, name: "Wall paint", quantity, unit: "gallon", unit_cost_cents: 8500, source: "ai_estimate" as const, price_book_id: null, notes: "" }],
+  });
+  const render = (scope: PreparedScope) =>
+    renderToStaticMarkup(createElement(PreparedScopePanel, {
+      estimateId: "e1", initialScope: scope, roomNames: {}, laborRateCents: 8500, laborCostCents: 5000, editable: true, showInternal: false,
+    }));
+
+  it("offers buying shared paint together and shows the containers", () => {
+    const html = render({ ...SCOPE, materials: { kitchen: paint("m1", 4), hall: paint("m1", 2.5) } });
+    expect(html).toContain("One color everywhere: buy paint together");
+    expect(html).toContain("6.5 gal across 2 rooms → 1 × 5-gal pail + 2 gal");
+  });
+
+  it("does not offer it when only one room lists the paint", () => {
+    expect(render({ ...SCOPE, materials: { kitchen: paint("m1", 4) } })).not.toContain("buy paint together");
+  });
+});
+

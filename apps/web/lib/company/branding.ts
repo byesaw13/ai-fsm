@@ -38,6 +38,8 @@ export interface ResolvedCompanyBranding {
   depositTerms: string;
   /** Absolute path on disk when logo exists, else null. */
   logoPath: string | null;
+  /** The logo is a wide lockup that already carries the company name (TASK-226). */
+  logoIsWordmark: boolean;
 }
 
 const DEFAULT_WEBSITE = "mydovetails.com";
@@ -60,6 +62,35 @@ export function resolveLogoPath(accountId: string, filename: string | undefined)
   return null;
 }
 
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+/** Wider than this (width ÷ height) and the logo is a name lockup, not a mark. */
+const WORDMARK_MIN_ASPECT = 2.5;
+
+/** Reads a PNG's size from its IHDR chunk. JPEGs and unreadable files are not wordmarks. */
+export function isWordmarkPng(bytes: Uint8Array): boolean {
+  if (bytes.length < 24 || PNG_SIGNATURE.some((b, i) => bytes[i] !== b)) return false;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const width = view.getUint32(16);
+  const height = view.getUint32(20);
+  return height > 0 && width / height >= WORDMARK_MIN_ASPECT;
+}
+
+function logoFileIsWordmark(logoPath: string | null): boolean {
+  if (!logoPath) return false;
+  try {
+    const fd = fs.openSync(logoPath, "r");
+    try {
+      const head = Buffer.alloc(24);
+      fs.readSync(fd, head, 0, 24, 0);
+      return isWordmarkPng(head);
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return false;
+  }
+}
+
 /** Merge account name + settings into a consistent branding object for documents. */
 export function resolveCompanyBranding(
   accountName: string,
@@ -68,6 +99,7 @@ export function resolveCompanyBranding(
 ): ResolvedCompanyBranding {
   const s = settings ?? {};
   const deposit = resolveDepositPolicy(s);
+  const logoPath = accountId ? resolveLogoPath(accountId, s.logo_filename) : null;
   return {
     name: accountName.trim() || "Dovetails Services LLC",
     tagline: s.company_tagline?.trim() || DEFAULT_TAGLINE,
@@ -87,7 +119,8 @@ export function resolveCompanyBranding(
     ),
     depositPercent: deposit.percent,
     depositTerms: deposit.terms,
-    logoPath: accountId ? resolveLogoPath(accountId, s.logo_filename) : null,
+    logoPath,
+    logoIsWordmark: logoFileIsWordmark(logoPath),
   };
 }
 

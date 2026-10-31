@@ -18,6 +18,7 @@ import {
   documentLocationSelect,
   resolveServiceLocation,
 } from "@/lib/documents/service-location";
+import { customerAddOns, showsQuantityAndRate } from "@/lib/estimates/customer-quote";
 import {
   buildInvoicePdf,
   buildEstimatePdf,
@@ -51,6 +52,13 @@ function mapLineItems(rows: Array<Record<string, unknown>>): PdfLineItem[] {
   }));
 }
 
+/** Quote lines: labor shows its amount only (TASK-224). */
+function mapQuoteLineItems(rows: Array<Record<string, unknown>>): PdfLineItem[] {
+  return mapLineItems(rows).map((item, i) =>
+    showsQuantityAndRate(rows[i].line_item_type as string | null) ? item : { ...item, hideQuantityAndRate: true },
+  );
+}
+
 function brandingFromAccount(
   accountName: string,
   settings: unknown,
@@ -69,6 +77,7 @@ function brandingFromAccount(
     email: b.email,
     website: b.website,
     logoPath: b.logoPath,
+    logoIsWordmark: b.logoIsWordmark,
     invoiceTerms: b.invoiceTerms,
     estimateTerms: b.estimateTerms,
     depositTerms: b.depositTerms,
@@ -245,6 +254,7 @@ export async function loadEstimatePdf(
   const { rows, rowCount } = await client.query(
     `SELECT e.id, e.status, e.presentation_mode, e.subtotal_cents, e.tax_cents, e.total_cents,
             e.deposit_cents, e.expires_at, e.notes, e.sent_at, e.created_at, e.client_id,
+            e.prepared_scope,
             j.title AS job_title,
             a.name AS account_name, a.settings AS account_settings,
             ${documentLocationSelect()}
@@ -258,7 +268,7 @@ export async function loadEstimatePdf(
   const est = rows[0];
 
   const lineItems = await client.query(
-    `SELECT description, quantity, unit_price_cents, total_cents
+    `SELECT description, line_item_type, quantity, unit_price_cents, total_cents
      FROM estimate_line_items WHERE estimate_id = $1
        AND coalesce(visible_to_customer, true) = true
      ORDER BY sort_order ASC, created_at ASC`,
@@ -279,7 +289,7 @@ export async function loadEstimatePdf(
     options = await Promise.all(
       optRows.rows.map(async (o) => {
         const optItems = await client.query(
-          `SELECT description, quantity, unit_price_cents, total_cents
+          `SELECT description, line_item_type, quantity, unit_price_cents, total_cents
            FROM estimate_line_items
            WHERE estimate_id = $1 AND option_id = $2
              AND coalesce(visible_to_customer, true) = true
@@ -291,7 +301,7 @@ export async function loadEstimatePdf(
           description: (o.description as string | null) ?? null,
           isRecommended: Boolean(o.is_recommended),
           totalCents: Number(o.total_cents ?? 0),
-          lineItems: mapLineItems(optItems.rows),
+          lineItems: mapQuoteLineItems(optItems.rows),
         };
       }),
     );
@@ -327,8 +337,9 @@ export async function loadEstimatePdf(
     totalCents: Number(est.total_cents ?? 0),
     depositCents: Number(est.deposit_cents ?? 0),
     notes: est.notes as string | null,
-    lineItems: mapLineItems(lineItems.rows),
+    lineItems: mapQuoteLineItems(lineItems.rows),
     options,
+    addOns: customerAddOns(est.prepared_scope).map((a) => ({ label: a.label, note: a.note, priceCents: a.price_cents })),
     branding,
   });
 

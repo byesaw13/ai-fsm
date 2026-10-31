@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { buildInvoicePdf, buildEstimatePdf } from "../document-pdf";
 import { pdfDrawnText } from "./pdf-text";
+import { writeFileSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { testPng } from "../../company/__tests__/test-png";
 
 /** A valid PDF byte stream begins with the "%PDF-" magic header. */
 function isPdf(bytes: Uint8Array): boolean {
@@ -229,6 +233,36 @@ describe("PDF voice", () => {
 });
 
 describe("buildEstimatePdf", () => {
+  it("shows labor as an amount without quantity or rate, and lists add-ons apart from the total (TASK-224)", async () => {
+    const bytes = await buildEstimatePdf({
+      estimateRef: "EST-2026-0026",
+      status: "draft",
+      clientName: "Pat Client",
+      issueDate: "2026-10-31",
+      subtotalCents: 146_971 + 29_750,
+      totalCents: 146_971 + 29_750,
+      lineItems: [
+        { description: "Living room — labor", quantity: 16.25, unitPriceCents: 9045, totalCents: 146_971, hideQuantityAndRate: true },
+        { description: "Living room — materials allowance", quantity: 1, unitPriceCents: 29_750, totalCents: 29_750 },
+      ],
+      addOns: [
+        { label: "Foyer stairwell", note: "Same open space as the foyer", priceCents: 105_000 },
+        { label: "Trim touch-ups", note: null, priceCents: null },
+      ],
+    });
+    const lines = pdfDrawnText(bytes).split("\n");
+    expect(lines).not.toContain("16.25");
+    expect(lines).not.toContain("$90.45");
+    expect(lines).toContain("$1,469.71");
+    expect(lines).toContain("$297.50");
+    expect(lines).toContain("OPTIONAL ADD-ONS");
+    expect(lines).toContain("Foyer stairwell");
+    expect(lines).toContain("Same open space as the foyer");
+    expect(lines).toContain("+$1,050.00");
+    expect(lines).toContain("Price on request");
+    expect(lines.some((l) => l.startsWith("Not included in the total above."))).toBe(true);
+  });
+
   it("renders multi-option estimates from option groups (parent total is 0)", async () => {
     const bytes = await buildEstimatePdf({
       estimateRef: "MULTI001",
@@ -277,5 +311,85 @@ describe("buildEstimatePdf", () => {
     });
     expect(isPdf(bytes)).toBe(true);
     expect(bytes.length).toBeGreaterThan(1000);
+  });
+});
+
+describe("add-ons that fill more than a page (TASK-224)", () => {
+  it("continues the box on the next page and keeps every option on the page", async () => {
+    const addOns = Array.from({ length: 50 }, (_, i) => ({
+      label: `Option number ${i + 1} with a description long enough to take most of the line`,
+      note: "Why you might want this, in a sentence that wraps onto a second line in the customer's quote PDF.",
+      priceCents: 10_000 + i,
+    }));
+    const bytes = await buildEstimatePdf({
+      estimateRef: "Q-LONG", status: "draft", clientName: "Pat", issueDate: "2026-10-31", subtotalCents: 1000, totalCents: 1000,
+      lineItems: [{ description: "Work", quantity: 1, unitPriceCents: 1000, totalCents: 1000 }],
+      addOns,
+    });
+    const { PDFDocument } = await import("pdf-lib");
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThanOrEqual(4);
+    const lines = pdfDrawnText(bytes).split("\n");
+    for (let i = 1; i <= 50; i++) expect(lines.some((l) => l.startsWith(`Option number ${i} with`))).toBe(true);
+    expect(lines).toContain("+$100.49");
+  });
+
+  it("draws every text line inside the page margins", async () => {
+    const addOns = Array.from({ length: 30 }, (_, i) => ({ label: `Add-on ${i + 1}`, note: "A note.", priceCents: 5000 }));
+    const bytes = await buildEstimatePdf({
+      estimateRef: "Q-LONG2", status: "draft", clientName: "Pat", issueDate: "2026-10-31", subtotalCents: 1000, totalCents: 1000,
+      lineItems: [{ description: "Work", quantity: 1, unitPriceCents: 1000, totalCents: 1000 }],
+      addOns,
+    });
+    // Every text placement (1 0 0 1 x y Tm) must sit above the bottom margin.
+    const raw = (await import("node:zlib")).inflateSync;
+    const buf = Buffer.from(bytes);
+    const ys: number[] = [];
+    let from = 0;
+    while (true) {
+      const s = buf.indexOf("stream\n", from);
+      if (s < 0) break;
+      const e = buf.indexOf("\nendstream", s);
+      try {
+        for (const m of raw(buf.subarray(s + 7, e)).toString("latin1").matchAll(/1 0 0 1 (-?[\d.]+) (-?[\d.]+) Tm/g)) ys.push(Number(m[2]));
+      } catch { /* not a content stream */ }
+      from = e + 10;
+    }
+    expect(ys.length).toBeGreaterThan(30);
+    expect(Math.min(...ys)).toBeGreaterThan(40);
+  });
+});
+
+describe("letterhead (TASK-226)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "letterhead-"));
+  const wide = join(dir, "wide.png");
+  const square = join(dir, "square.png");
+  writeFileSync(wide, testPng(1200, 315));
+  writeFileSync(square, testPng(170, 170));
+  const invoice = (logoPath: string, logoIsWordmark: boolean) =>
+    buildInvoicePdf({
+      invoiceNumber: "INV-1",
+      status: "sent",
+      clientName: "Pat Client",
+      issueDate: "2026-10-31",
+      subtotalCents: 10000,
+      totalCents: 10000,
+      paidCents: 0,
+      lineItems: [{ description: "Work", quantity: 1, unitPriceCents: 10000, totalCents: 10000 }],
+      branding: { name: "Dovetails Home Services", tagline: "Fully Insured", phone: "(603) 479-1094", logoPath, logoIsWordmark },
+    });
+
+  it("a wordmark logo carries the name, so the name text is not printed again", async () => {
+    const lines = pdfDrawnText(await invoice(wide, true)).split("\n");
+    expect(lines).not.toContain("Dovetails Home Services");
+    expect(lines).toContain("Fully Insured");
+    expect(lines).toContain("(603) 479-1094");
+  });
+
+  it("a square logo keeps the name beside it", async () => {
+    expect(pdfDrawnText(await invoice(square, false)).split("\n")).toContain("Dovetails Home Services");
+  });
+
+  it("prints no address when none is set", async () => {
+    expect(pdfDrawnText(await invoice(wide, true))).not.toMatch(/Rockingham|Derry/);
   });
 });

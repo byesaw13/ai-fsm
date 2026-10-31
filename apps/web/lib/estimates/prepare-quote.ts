@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 // The SDK's zodOutputFormat helper requires Zod 4 schemas; zod 3.25 ships them at "zod/v4".
 import { z } from "zod/v4";
 import {
+  lastAlternativeNumber,
   allocateFixedPrice,
   bindQuantities,
   computeAssessmentRoomGeometry,
@@ -362,7 +363,8 @@ export function preparedScopeToLineItems(
     if (mid > 0) {
       const hours = laborHoursForGroup(scope, g.key);
       lineItems.push({
-        description: `${g.label} — labor, est. ${fmtHours(g.hours_low)}–${fmtHours(g.hours_high)} h`,
+        // Customers see labor, not hours (TASK-224); the range stays on the line for staff.
+        description: `${g.label} — labor`,
         quantity: mid,
         unit_price_cents: laborRateCents,
         line_item_type: "labor",
@@ -471,6 +473,34 @@ function mergeMaterialEdits(
 }
 
 /**
+ * Owner edits to options (TASK-224): label, price and note of stored options,
+ * new options (server id, no tasks) and removals. Task links only come from
+ * the server; an option without a label is dropped.
+ */
+function mergeAlternativeEdits(
+  stored: PreparedScope["alternatives"],
+  incoming: PreparedScope["alternatives"] | undefined,
+): PreparedScope["alternatives"] {
+  if (!incoming) return stored;
+  const byId = new Map(stored.map((a) => [a.id, a]));
+  let next = lastAlternativeNumber(stored) + 1;
+  const out: PreparedScope["alternatives"] = [];
+  for (const e of incoming) {
+    const label = e.label.trim().slice(0, 200);
+    if (!label) continue;
+    const price = e.price_cents;
+    const fields = {
+      label,
+      note: e.note?.trim() ? e.note.trim().slice(0, 500) : null,
+      price_cents: typeof price === "number" && Number.isInteger(price) && price >= 0 ? price : null,
+    };
+    const kept = byId.get(e.id);
+    out.push(kept ? { ...kept, ...fields } : { id: `a${next++}`, task_ids: [], ...fields });
+  }
+  return out;
+}
+
+/**
  * Merge the owner's edits into the stored scope. Only hours, materials,
  * confirmation and answers can change; rooms, quantities, source and task text
  * come from the stored copy, and unknown task or question ids are ignored.
@@ -498,6 +528,8 @@ export function applyScopeEdits(stored: PreparedScope, incoming: PreparedScope):
       };
     }),
     pricing: incoming.pricing ?? stored.pricing,
+    alternatives: mergeAlternativeEdits(stored.alternatives, incoming.alternatives),
+    pool_paint: incoming.pool_paint ?? stored.pool_paint,
     materials: mergeMaterialEdits(stored.materials, incoming.materials),
     // Server-managed: only Apply sets it.
     proposal_notes: stored.proposal_notes ?? null,
@@ -525,17 +557,17 @@ export function buildProposalNotes(scope: PreparedScope, laborRateCents: number)
     if (included.length === 0) continue;
     sections.push(`${labels.get(key) ?? key}\n${included.map((t) => `- ${t.description}`).join("\n")}`);
   }
-  const options = scope.alternatives.length
-    ? scope.alternatives.map((a) => a.label)
-    : scope.tasks.filter((t) => !t.confirmed).map((t) => t.description);
+  // With alternatives, the customer views show them in their own priced block (TASK-224).
+  const options = scope.alternatives.length ? [] : scope.tasks.filter((t) => !t.confirmed).map((t) => t.description);
   if (options.length) {
     sections.push(`Options (not included unless you choose them)\n${options.map((o) => `- ${o}`).join("\n")}`);
   }
-  if (scope.tasks.some((t) => t.confirmed && t.materials_cents !== null && t.materials_cents > 0)) {
+  const fixed = scope.pricing?.mode === "fixed" && !!scope.pricing.fixed_price_cents;
+  if (!fixed && scope.tasks.some((t) => t.confirmed && t.materials_cents !== null && t.materials_cents > 0)) {
     sections.push("Materials are allowances. The final cost follows the products chosen.");
   }
   const dollars = (c: number) => `$${Math.round(c / 100).toLocaleString("en-US")}`;
-  if (scope.pricing?.mode === "fixed" && scope.pricing.fixed_price_cents) {
+  if (fixed && scope.pricing?.fixed_price_cents) {
     sections.push(`Pricing: fixed price of ${dollars(scope.pricing.fixed_price_cents)} for the work above.`);
   } else if (summary.hours_high > 0) {
     const low = summary.hours_low * laborRateCents + summary.materials_cents;

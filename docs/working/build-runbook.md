@@ -19,29 +19,31 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : B3 (TASK-192) verified on production at 2026-10-27
-                      02:33 UTC. Squash 2842780e (#728). Health ok, /login
-                      HTTP/2 200, no redirect to 0.0.0.0:3000. A $100
-                      materials line and a $120 equipment line stored
-                      material cost 10000. The rental line type was
-                      equipment. Probe estimate f75410c8 and its client
-                      were deleted.
-In-flight PR        : none
-Next step           : B4 (TASK-193)
+Last step           : D0 backlog for Track D (customer quote and letterhead),
+                      2026-10-31. B3 (TASK-192) was the last runbook code step
+                      verified (2026-10-27, squash 2842780e, #728).
+In-flight PR        : D0 (branch docs/quote-options-backlog) and D1 (branch
+                      task/224-customer-quote-options, stacked on D0). Both
+                      committed locally on 2026-10-31; NOT pushed: the agent's
+                      push was blocked by the session's permission check.
+                      Push both, open PRs (D1 based on D0 or on main after D0
+                      merges), wait for CI incl. integration tests.
+                      D2 (branch task/226-letterhead, stacked on D1) and D4
+                      (branch task/227-pool-paint, stacked on D2) also
+                      committed locally, not pushed.
+Next step           : push D0/D1/D2 and take them through CI, merge, deploy;
+                      then D1 and D2 production follow-ups (see Plan: Track D).
+                      Next build step: D3 (TASK-225, G6 approved), then D5
+                      (TASK-228, G7 approved).
 Blocked on          : nothing
-Last known-good     : 7490a24c (branch deploy-good/7490a24c); previous 25deb3e2
-                      (branch deploy-good/25deb3e2)
-Notes               : Migration 210 applied. Backup ai_fsm_20261027T022524Z.dump
-                      was verified before deploy (1388 TOC entries). The worker
-                      container was left running. Staff type screens were not
-                      opened in a browser.
-                      Off-runbook deploy 2026-10-28 01:53 UTC of 7490a24c:
-                      TASK-218 (#733, mig 211 price_book.reference_hours) and
-                      TASK-219 (#734, mig 212 eight owner-decided production
-                      rates). Backup ai_fsm_20261028T014359Z.dump verified
-                      (1399 TOC entries). Health ok, /login HTTP/2 200, no
-                      redirect to 0.0.0.0:3000; rates and column checked in
-                      prod. Worker container was left running.
+Last known-good     : 8441846a (branch deploy-good/8441846a); previous 7490a24c
+Notes               : Off-runbook work 2026-10-31 on prod data (Dowd
+                      EST-2026-0026): switched to fixed $8,750 via the app's
+                      Apply code; options a1 (son's room, $750) and a2 (foyer
+                      stairwell, $1,050) added with the price in the label.
+                      D1's follow-up moves those prices into price_cents.
+                      Earlier notes: migration 210 applied 2026-10-27;
+                      TASK-218/219 deployed 2026-10-28 (mig 211, 212).
 ```
 
 ## Owner approvals
@@ -63,6 +65,8 @@ this one, as an approval.
 | G2 | Paint pilot passed its success criteria (before TASK-216) | Pending (after the pilot) | |
 | G3 | Closing each stale "sent" estimate (TASK-206) | Per estimate, non-blocking | |
 | G4 | Any database restore or data repair on production | Ask every time | |
+| G6 | TASK-225 table-freeze exception (one nullable column for chosen add-ons) | Approved 2026-10-31 | Owner in session: "approve both, use craftsman factors, start TASK-227", answering (1) TASK-225's one new column and (2) TASK-228's factors. |
+| G7 | TASK-228 height factors: Craftsman ×1.23 (9–13 ft), ×1.46 (13–17 ft), ×1.69 (17–19 ft), ×1.92 (19–21 ft) | Approved 2026-10-31 | Same session answer as G6. |
 
 **Without G0 active** the agent works in "PRs only" mode: it builds, tests and
 opens PRs, gets them ready to merge, then stops and asks the owner to merge.
@@ -140,6 +144,12 @@ docs-only commit after the event. Planned tests are not passing tests.
 | F9 | TASK-200 | | | | |
 | F10 | TASK-201 | | | | |
 | F11 | TASK-208 | | | | |
+| D0 | Backlog TASK-224..228 | | | n/a | n/a |
+| D1 | TASK-224 | | | | |
+| D2 | TASK-226 | | | | |
+| D3 | TASK-225 | | | | |
+| D4 | TASK-227 | | | | |
+| D5 | TASK-228 | | | | |
 
 ## Operating rules
 
@@ -336,6 +346,23 @@ F1 TASK-204, F2 TASK-203, F3 TASK-198, F4 TASK-202, F5 TASK-205 (needs C1),
 F6 TASK-206, F7 TASK-207, F8 TASK-199 (needs B4), F9 TASK-200, F10 TASK-201,
 F11 TASK-208 (needs B5).
 
+### Track D: customer quote and letterhead (owner 2026-10-31; plan: "Plan: Track D")
+
+Requested by the owner in session 2026-10-31 while finishing the Angela
+Dowd quote (EST-2026-0026): "fix the backlogs and then build it correctly
+leaving breadcrumbs along the way ... so that I can have another ai finish
+it if needed." Track D runs ahead of the remaining B, C and F steps.
+
+- **D0** Backlog and roadmap entries for TASK-224 to TASK-228 (docs only).
+- **D1** TASK-224 Customer quote: labor as an amount, priced options block,
+  owner edits options.
+- **D2** TASK-226 New letterhead (code), then the settings change (logo
+  upload, clear the address) after Verified.
+- **D3** TASK-225 Customer ticks add-ons when approving (needs D1; column
+  approved, G6).
+- **D4** TASK-227 Pool paint across rooms that share a color.
+- **D5** TASK-228 Tall-wall height factors (factors approved, G7).
+
 Not in this runbook: TASK-183 (deferred until Good/Better/Best is used) and
 the Phase 4 items in `docs/canonical/ROADMAP.md`.
 
@@ -525,7 +552,74 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 - **F11 TASK-208:** reuse `computeHourlyBaseline` for change orders; plan the
   file list from the change-order code once B5 is Verified.
 
+## Plan: Track D
+
+Breadcrumbs for whoever continues. Each step lists the files, the tests and
+the production follow-up. Record progress in "Current state" and "Log".
+
+### D1 · TASK-224 · Customer quote shows labor as an amount and options that stand out
+
+- Domain: `packages/domain/src/prepared-scope.ts` — `PreparedAlternative`
+  gains `price_cents: number | null` (schema `.nullable().optional()`, so old
+  scopes parse).
+- Notes and lines: `apps/web/lib/estimates/prepare-quote.ts`.
+  - `preparedScopeToLineItems`: the T&M description becomes
+    `${label} — labor`.
+  - `buildProposalNotes`: no Options section when alternatives exist, and no
+    allowances sentence in fixed mode.
+  - `applyScopeEdits`: merge alternatives. Keep stored ids, take
+    label/price/note from incoming, add new ones with server ids `a<n>`, and
+    drop removed ones.
+- Customer views:
+  - Portal: `app/portal/estimates/[token]/page.tsx` loads
+    `prepared_scope->'alternatives'`. `EstimatePortalClient.tsx` hides Qty and
+    Unit for labor rows and renders the add-ons block.
+  - PDF: `lib/pdf/load.ts` passes the alternatives. `lib/pdf/document-pdf.ts`
+    leaves the Qty and Unit cells blank for labor and draws the add-ons box
+    after the totals.
+  - Print page: `app/app/estimates/[id]/print/page.tsx`, same as the portal.
+- Owner UI: `app/app/estimates/[id]/sections/PreparedScopePanel.tsx`, the
+  Options list becomes editable (label, price, note, add, remove).
+- Production follow-up after Verified: Dowd EST-2026-0026 has prices in its
+  option labels ("(add $750)", "(add $1,050)"). Move them to `price_cents`,
+  strip them from the labels, and rebuild the notes with `buildProposalNotes`.
+  Dry run first, total stays 875000. The script pattern used on 2026-10-31
+  (pg Pool to the postgres container IP, a transaction, an `updated_at`
+  check) is described in the owner's agent memory; `option-stairs.ts` was its
+  last use.
+
+### D2 · TASK-226 · New letterhead
+
+- `apps/web/lib/company/branding.ts`: `logoIsWordmark`, read from the PNG
+  IHDR (width ≥ 2.5 × height).
+- `apps/web/lib/pdf/document-pdf.ts`: the wordmark branch (bigger logo, no
+  name text).
+- Invoice print page: `app/app/invoices/[id]/print/page.tsx`. The estimate
+  print page gets the same header.
+- Logo source: `~/mydovetails-site` `origin/master`,
+  `public/brand/png/dovetails-horizontal-color-1200.png`.
+- Production follow-up after Verified (owner-approved 2026-10-31):
+  - Address: DONE 2026-10-31 (removed before deploy; see Log).
+  - Upload the logo. Use the Settings → Company logo upload, or
+    `docker cp` it into `/app/uploads/account/aaaaaaaa-0000-0000-0000-000000000001/`
+    and set `settings.logo_filename`. First check the uploads dir is a
+    mounted volume.
+  - Set `settings.company_address` to empty.
+  - Check by eye one invoice PDF.
+
+### D3 to D5
+
+See the task files. Owner questions answered 2026-10-31 (G6, G7). Order the
+owner chose: D4 next, then D3 and D5.
+
 ## Log
+
+- 2026-10-31 · D4 · In progress · local branch task/227-pool-paint · owner toggle pool_paint; pooledPaint in domain (pails, gallons, quarts under 1 gal; shares by need); buy list "Paint (bought together)". Local: lint, typecheck, unit (domain 539, web 2320) green, knip no failures
+- 2026-10-31 · G6/G7 · Approved in session: "approve both, use craftsman factors, start TASK-227"
+- 2026-10-31 · D2 · Data · prod account aaaaaaaa…0001 settings.company_address removed (was "85R Rockingham Rd Derry, NH 03038"; reversal: UPDATE accounts SET settings = settings || '{"company_address":"85R Rockingham Rd Derry, NH 03038"}' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'). Owner asked for it in session. Logo upload waits for D2's deploy (old code would print the name twice)
+- 2026-10-31 · D2 · In progress · local branch task/226-letterhead · wordmark detection from PNG IHDR, PDF + shared Letterhead on invoice and quote print pages. Local: lint, typecheck, web unit 2316 green, knip no failures; sample PDF checked by eye
+- 2026-10-31 · D1 · In progress · local branch task/224-customer-quote-options · labor amount only on portal/PDF/print, add-ons block, option editor, notes without options/allowances on fixed. Local: lint, typecheck, unit (web 2307, domain 532) green, knip no failures; integration test added (prepared-scope-apply), not run locally (no test server)
+- 2026-10-31 · D0 · In progress · backlog TASK-224..228, ROADMAP Phase 3 slice, map rows, Track D plan
 
 One line per state change: date, step, state, PR, evidence.
 

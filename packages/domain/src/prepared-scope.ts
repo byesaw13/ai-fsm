@@ -92,11 +92,18 @@ export interface PreparedQuestion {
   answer: string | null;
 }
 
+/** Highest `a<n>` number in use, so a new option never reuses an id after one is deleted (TASK-224). */
+export function lastAlternativeNumber(alternatives: { id: string }[]): number {
+  return Math.max(0, ...alternatives.map((a) => Number(/^a(\d+)$/.exec(a.id)?.[1] ?? 0)));
+}
+
 export interface PreparedAlternative {
   id: string;
   label: string;
   task_ids: string[];
   note: string | null;
+  /** Owner-set add-on price shown to the customer; null or absent = no price yet (TASK-224). */
+  price_cents?: number | null;
 }
 
 /** How the owner prices the prepared quote, and the inputs for modeling profit (TASK-180). */
@@ -139,6 +146,8 @@ export interface PreparedScope {
   revisions?: PreparedRevision[];
   /** Itemized materials by group key (TASK-187). A listed group's materials come from its lines, not task allowances. */
   materials?: Record<string, PreparedMaterialList>;
+  /** Owner: one color everywhere, so paint shared by rooms is bought together (TASK-227). */
+  pool_paint?: boolean;
 }
 
 /** Where a material line's price came from. */
@@ -169,6 +178,92 @@ export interface PreparedMaterialList {
 /** Cost of one material line, or null when it has no price. */
 export function materialLineCents(line: PreparedMaterialLine): number | null {
   return line.unit_cost_cents === null ? null : Math.round(line.unit_cost_cents * line.quantity);
+}
+
+/** One product bought for several rooms in whole containers (TASK-227). */
+export interface PooledPaint {
+  name: string;
+  /** Per gallon. A pail is priced as 5 gallons and a quart as a quarter; the owner edits the line price. */
+  unit_cost_cents: number;
+  /** Gallons the rooms need together. */
+  needed: number;
+  pails: number;
+  gallons: number;
+  quarts: number;
+  cost_cents: number;
+  /** Each room's share of cost_cents, by its need; adds up exactly. */
+  shares: Record<string, number>;
+  /** The itemized lines this replaces, as `${groupKey}/${lineId}`. */
+  line_refs: string[];
+}
+
+const PAIL_GALLONS = 5;
+
+function isGallons(unit: string): boolean {
+  return /^gal(lon)?s?$/i.test(unit.trim());
+}
+
+/**
+ * Paint shared by rooms, bought together: a priced gallon product listed in
+ * two or more rooms becomes 5-gal pails, then whole gallons; quarts only when
+ * the whole need is under a gallon. Off unless the owner turns it on.
+ */
+export function pooledPaint(scope: PreparedScope): PooledPaint[] {
+  if (!scope.pool_paint || !scope.materials) return [];
+  const byName = new Map<string, { name: string; cost: number; need: Map<string, number>; refs: string[] }>();
+  for (const [key, list] of Object.entries(scope.materials)) {
+    for (const line of list.lines) {
+      if (!isGallons(line.unit) || !line.unit_cost_cents || line.quantity <= 0) continue;
+      const id = `${line.name.trim().toLowerCase()}|${line.unit_cost_cents}`;
+      const entry = byName.get(id) ?? { name: line.name, cost: line.unit_cost_cents, need: new Map<string, number>(), refs: [] as string[] };
+      entry.need.set(key, (entry.need.get(key) ?? 0) + line.quantity);
+      entry.refs.push(`${key}/${line.id}`);
+      byName.set(id, entry);
+    }
+  }
+  const out: PooledPaint[] = [];
+  for (const e of byName.values()) {
+    if (e.need.size < 2) continue;
+    const needed = Math.round([...e.need.values()].reduce((a, b) => a + b, 0) * 100) / 100;
+    let pails = Math.floor(needed / PAIL_GALLONS);
+    let gallons = Math.ceil(needed - pails * PAIL_GALLONS - 1e-9);
+    let quarts = 0;
+    if (pails === 0 && needed < 1) {
+      quarts = Math.ceil(needed * 4 - 1e-9);
+      gallons = 0;
+    }
+    if (gallons === PAIL_GALLONS) {
+      pails += 1;
+      gallons = 0;
+    }
+    const cost_cents = Math.round(e.cost * (pails * PAIL_GALLONS + gallons + quarts / 4));
+    out.push({
+      name: e.name,
+      unit_cost_cents: e.cost,
+      needed,
+      pails,
+      gallons,
+      quarts,
+      cost_cents,
+      shares: splitByWeight(cost_cents, e.need),
+      line_refs: e.refs,
+    });
+  }
+  return out;
+}
+
+/** Split whole cents by weight, largest remainder first, so the parts add up exactly. */
+function splitByWeight(total: number, weights: Map<string, number>): Record<string, number> {
+  const sum = [...weights.values()].reduce((a, b) => a + b, 0);
+  const raw = [...weights.entries()].map(([k, w]) => [k, (total * w) / sum] as const);
+  const shares: Record<string, number> = Object.fromEntries(raw.map(([k, v]) => [k, Math.floor(v)]));
+  let left = total - Object.values(shares).reduce((a, b) => a + b, 0);
+  for (const [k] of [...raw].sort((a, b) => (b[1] % 1) - (a[1] % 1))) {
+    if (left <= 0) break;
+    shares[k] += 1;
+    left -= 1;
+  }
+  return shares;
 }
 
 /** The group's included tasks no longer match the ones its list was made for. */
@@ -335,10 +430,20 @@ export function summarizePreparedScope(scope: PreparedScope): PreparedScopeSumma
     if (t.materials_cents !== null && !itemized[t.group_key]) g.materials_cents += t.materials_cents;
   }
   let unpricedLines = 0;
+  // Paint bought together (TASK-227): each room carries its share of the real purchase.
+  const pooled = pooledPaint(scope);
+  const pooledRefs = new Set(pooled.flatMap((p) => p.line_refs));
+  for (const p of pooled) {
+    for (const [key, cents] of Object.entries(p.shares)) {
+      const g = groups.get(key);
+      if (g) g.materials_cents += cents;
+    }
+  }
   for (const [key, list] of Object.entries(itemized)) {
     const g = groups.get(key);
     if (!g) continue;
     for (const line of list.lines) {
+      if (pooledRefs.has(`${key}/${line.id}`)) continue;
       const cents = materialLineCents(line);
       if (cents === null) unpricedLines += 1;
       else g.materials_cents += cents;
@@ -412,7 +517,13 @@ export const preparedScopeSchema = z.object({
     .array(z.object({ id: z.string(), task_ids: z.array(z.string()), text: z.string().max(500), answer: z.string().max(1000).nullable() }))
     .max(100),
   alternatives: z
-    .array(z.object({ id: z.string(), label: z.string().max(200), task_ids: z.array(z.string()), note: z.string().max(500).nullable() }))
+    .array(z.object({
+        id: z.string(),
+        label: z.string().max(200),
+        task_ids: z.array(z.string()),
+        note: z.string().max(500).nullable(),
+        price_cents: z.number().int().min(0).max(100_000_000).nullable().optional(),
+      }))
     .max(50),
   exclusions: z.array(z.string().max(500)).max(50),
   pricing: z
@@ -453,6 +564,7 @@ export const preparedScopeSchema = z.object({
       }),
     )
     .optional(),
+  pool_paint: z.boolean().optional(),
 });
 
 /** Read a stored prepared scope. Null when absent or not a valid version-1 scope. */

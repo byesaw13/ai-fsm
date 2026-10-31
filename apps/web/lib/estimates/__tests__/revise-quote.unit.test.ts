@@ -42,6 +42,12 @@ const ADD_TASK = {
 };
 
 describe("applyRevision (TASK-186)", () => {
+  it("a new option never reuses an id after the owner deleted an earlier one (TASK-224)", () => {
+    const kept = { ...SCOPE, alternatives: [{ id: "a2", label: "Kept", task_ids: [], note: null }] };
+    const { scope } = applyRevision(kept, { summary: "s", changes: [], alternatives_add: [{ label: "New", task_refs: [], note: null }] }, CTX);
+    expect(scope.alternatives.map((a) => a.id)).toEqual(["a2", "a3"]);
+  });
+
   it("excludes a task an answer rules out, without deleting it", () => {
     const { scope, changes } = applyRevision(SCOPE, { summary: "s", changes: [change({ action: "exclude", task_id: "t5", reason: "You said no." })], alternatives_add: [] }, CTX);
     expect(scope.tasks.find((t) => t.id === "t5")).toMatchObject({ confirmed: false, description: "Paint pantry shelves/cabinets" });

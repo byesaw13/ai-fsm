@@ -122,7 +122,7 @@ describe.skipIf(!RUN)("prepared scope Apply to quote", () => {
     expect(res.status).toBe(200);
     const after = await lines();
     expect(after.map((l) => l.description)).toEqual([
-      "Bathroom — labor, est. 2–5 h",
+      "Bathroom — labor",
       "Bathroom — materials allowance",
       "Haul-away",
     ]);
@@ -151,6 +151,34 @@ describe.skipIf(!RUN)("prepared scope Apply to quote", () => {
     expect(est.internal_labor_cost_cents).toBe(4 * labor_cost_cents_per_hour);
     expect(est.internal_material_cost_cents).toBe(4000);
     expect(est.notes).toMatch(/^What's included[\s\S]*Pricing: fixed price of \$600 for the work above\.$/);
+  });
+
+  it("saves the owner's options with prices, gives new ones server ids, and leaves the total alone (TASK-224)", async () => {
+    const [{ total_cents: before }] = await db<{ total_cents: number }>(`SELECT total_cents FROM estimates WHERE id = $1`, [estimateId]);
+    const withOptions: PreparedScope = {
+      ...structuredClone(scope),
+      pricing: { mode: "fixed", fixed_price_cents: 60_000, expected_hours: 4, overhead_cents: 0, reserve_pct: 0 },
+      alternatives: [{ id: "new-1", label: "Paint the stairwell", task_ids: ["t1"], note: "Same room as the foyer", price_cents: 105_000 }],
+    };
+    const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: withOptions, apply: true, updated_at: await quoteStamp(estimateId) });
+    expect(res.status).toBe(200);
+    const [est] = await db<{ total_cents: number; notes: string; prepared_scope: PreparedScope }>(
+      `SELECT total_cents, notes, prepared_scope FROM estimates WHERE id = $1`,
+      [estimateId],
+    );
+    expect(est.prepared_scope.alternatives).toEqual([
+      { id: "a1", label: "Paint the stairwell", task_ids: [], note: "Same room as the foyer", price_cents: 105_000 },
+    ]);
+    expect(est.total_cents).toBe(before);
+    expect(est.notes).not.toContain("stairwell");
+    expect(est.notes).not.toContain("allowances");
+
+    const priced = structuredClone(est.prepared_scope);
+    priced.alternatives[0].price_cents = 95_000;
+    const again = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: priced, apply: false, updated_at: await quoteStamp(estimateId) });
+    expect(again.status).toBe(200);
+    const [{ prepared_scope: saved }] = await db<{ prepared_scope: PreparedScope }>(`SELECT prepared_scope FROM estimates WHERE id = $1`, [estimateId]);
+    expect(saved.alternatives).toEqual([{ ...est.prepared_scope.alternatives[0], price_cents: 95_000 }]);
   });
 
   it("a sent quote can no longer be changed from its scope", async () => {

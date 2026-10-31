@@ -4,11 +4,11 @@ import { withInvoiceContext } from "@/lib/invoices/db";
 import { buildClientDocumentFilename } from "@ai-fsm/domain";
 import { DOCUMENT_STANDARD_VERSION, STANDARD_INVOICE_TERMS } from "@ai-fsm/domain";
 import {
-  brandingContactLines,
   resolveCompanyBranding,
   type CompanyProfileSettings,
 } from "@/lib/company/branding";
 import { DocumentPrintBar } from "@/components/documents/DocumentPrintBar";
+import { Letterhead } from "@/components/features/documents/Letterhead";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
 import { formatLineQuantityDisplay } from "@/lib/invoices/quantity";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
@@ -129,8 +129,6 @@ export default async function InvoicePrintPage({
     invoice.account_settings,
     session.accountId,
   );
-  const contactLines = brandingContactLines(branding);
-  const hasLogo = !!branding.logoPath;
   const depositCredit = Math.max(0, invoice.deposit_cents ?? 0);
   const balance = amountDueCents(invoice.total_cents, invoice.paid_cents, depositCredit);
   const invoicePaid =
@@ -210,10 +208,7 @@ export default async function InvoicePrintPage({
         .section-block { margin-top: 28px; }
         .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 28px;
                       padding-bottom: 20px; border-bottom: 1.5px solid #c1540f; margin-bottom: 8px; }
-        .letterhead { display: flex; gap: 16px; align-items: flex-start; }
-        .company-name { font-size: 20px; font-weight: 700; color: #c1540f; }
         .meta-label { color: #57534e; font-size: 12px; }
-        .company-logo { max-height: 56px; max-width: 160px; object-fit: contain; }
         .bill-row { display: flex; gap: 48px; margin-top: 28px; }
         .footer-thanks { margin-top: 44px; font-size: 12px; color: #78716c; }
       `}</style>
@@ -223,23 +218,10 @@ export default async function InvoicePrintPage({
       <div className="wrap">
         {isPaid && <PaidStamp paidAt={invoice.paid_at} />}
         <div className="header-row">
-          <div className="letterhead">
-            {hasLogo && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={`/api/v1/account/logo?t=${encodeURIComponent(invoice.account_settings.logo_filename ?? "")}`}
-                alt=""
-                className="company-logo"
-              />
-            )}
-            <div>
-              <div className="company-name">{branding.name}</div>
-              {branding.tagline && <p style={{ color: "#57534e", fontSize: 13, margin: "2px 0 0" }}>{branding.tagline}</p>}
-              {contactLines.map((line) => (
-                <p key={line} style={{ color: "#57534e", fontSize: 12, margin: "2px 0 0" }}>{line}</p>
-              ))}
-            </div>
-          </div>
+          <Letterhead
+            branding={branding}
+            logoSrc={branding.logoPath ? `/api/v1/account/logo?t=${encodeURIComponent(invoice.account_settings.logo_filename ?? "")}` : null}
+          />
           <div style={{ textAlign: "right" }}>
             <h1>Invoice</h1>
             <p className="meta-label">{invoice.invoice_number}</p>

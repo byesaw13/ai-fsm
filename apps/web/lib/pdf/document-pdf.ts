@@ -28,12 +28,22 @@ const RULE_STRONG = rgb(0.16, 0.15, 0.14); // near ink for table header/totals
 const ACCENT = rgb(0.757, 0.329, 0.059); // burnt-orange #c1540f
 const ROW_RULE = rgb(0.91, 0.9, 0.89); // slate-200-ish
 const PAID_RED = rgb(0.725, 0.11, 0.11); // #b91c1c — matches PaidStamp
+const ADD_ON_FILL = rgb(0.992, 0.957, 0.925); // #fdf4ec — add-ons box (portal match)
 
 export interface PdfLineItem {
   description: string;
   quantity: number;
   unitPriceCents: number;
   totalCents: number;
+  /** Labor on a quote: show the amount only, not hours times a rate (TASK-224). */
+  hideQuantityAndRate?: boolean;
+}
+
+/** A priced option the customer can ask to add; not in the total (TASK-224). */
+interface PdfAddOn {
+  label: string;
+  note?: string | null;
+  priceCents: number | null;
 }
 
 export interface EstimateOptionGroup {
@@ -54,6 +64,8 @@ export interface PdfBranding {
   website?: string | null;
   /** Absolute path to a PNG/JPEG logo on disk. */
   logoPath?: string | null;
+  /** The logo already carries the company name: draw it larger, skip the name text (TASK-226). */
+  logoIsWordmark?: boolean;
   invoiceTerms?: string | null;
   estimateTerms?: string | null;
   /** Deposits wording with the standard percentage already substituted. */
@@ -118,6 +130,8 @@ export interface EstimatePdfData {
   /** When set (multi_option estimates), render priced option sections instead
    *  of a flat line-item table + parent total. */
   options?: EstimateOptionGroup[];
+  /** Optional add-ons, drawn in their own box after the totals (TASK-224). */
+  addOns?: PdfAddOn[];
   branding?: PdfBranding | null;
 }
 
@@ -220,6 +234,7 @@ interface RenderInput {
   lineItems: PdfLineItem[];
   totals: { label: string; value: string; strong?: boolean }[];
   optionGroups?: EstimateOptionGroup[];
+  addOns?: PdfAddOn[];
   notes?: string | null;
   workSummary?: string | null;
   itemizedReceiptsUrl?: string | null;
@@ -269,17 +284,20 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   if (input.branding?.phone) brandContact.push(input.branding.phone);
   if (input.branding?.email) brandContact.push(input.branding.email);
 
-  // Optional logo (PNG/JPG) — left of company name when present
+  // Optional logo (PNG/JPG). A square mark sits left of the company name; a
+  // wordmark (TASK-226) carries the name itself, so the text lines go under it.
+  const wordmark = !!input.branding?.logoIsWordmark;
   let headerLeft = MARGIN;
   let logoBottom = ctx.y;
+  let wordmarkDrawn = false;
   if (input.branding?.logoPath) {
     try {
       const fs = await import("fs");
       const bytes = fs.readFileSync(input.branding.logoPath);
       const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
       const img = isPng ? await ctx.doc.embedPng(bytes) : await ctx.doc.embedJpg(bytes);
-      const maxH = 48;
-      const maxW = 140;
+      const maxH = wordmark ? 58 : 48;
+      const maxW = wordmark ? 220 : 140;
       const scale = Math.min(maxW / img.width, maxH / img.height, 1);
       const w = img.width * scale;
       const h = img.height * scale;
@@ -289,15 +307,21 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
         width: w,
         height: h,
       });
-      headerLeft = MARGIN + w + 14;
       logoBottom = ctx.y - h + 10;
+      if (wordmark) wordmarkDrawn = true;
+      else headerLeft = MARGIN + w + 14;
     } catch {
       /* logo optional — fall back to text brand */
     }
   }
 
-  text(brandName, headerLeft, ctx.y, 16, bold, ACCENT);
-  let headerY = ctx.y - 15;
+  let headerY: number;
+  if (wordmarkDrawn) {
+    headerY = logoBottom - 12;
+  } else {
+    text(brandName, headerLeft, ctx.y, 16, bold, ACCENT);
+    headerY = ctx.y - 15;
+  }
   if (brandTagline) {
     text(brandTagline, headerLeft, headerY, 9, font, MUTED);
     headerY -= 13;
@@ -326,7 +350,7 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   // Do not render workflow status (SENT / DRAFT / PARTIAL) on customer PDFs.
   // Paid is communicated by the PAID stamp + zero balance due.
 
-  ctx.y = Math.min(headerY, metaY, logoBottom) - 14;
+  ctx.y = Math.min(headerY, metaY, wordmarkDrawn ? headerY : logoBottom) - 14;
   // Accent rule under letterhead (matches print-page .header-row border)
   ctx.page.drawLine({
     start: { x: MARGIN, y: ctx.y },
@@ -443,8 +467,10 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
       if (ctx.y === PAGE_H - MARGIN) drawTableHeader(); // redrew header on new page
       const rowTop = ctx.y;
       lines.forEach((ln, i) => text(ln, colDescX, rowTop - i * 13, 10));
-      rightText(qty(item.quantity), colQtyRight, rowTop, 10);
-      rightText(money(item.unitPriceCents), colUnitRight, rowTop, 10);
+      if (!item.hideQuantityAndRate) {
+        rightText(qty(item.quantity), colQtyRight, rowTop, 10);
+        rightText(money(item.unitPriceCents), colUnitRight, rowTop, 10);
+      }
       rightText(money(item.totalCents), colAmtRight, rowTop, 10);
       ctx.y = rowTop - rowH;
       ctx.page.drawLine({
@@ -526,6 +552,73 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
     drawTableHeader();
     drawRows(input.lineItems);
     drawTotals(input.totals);
+  }
+
+  // --- Optional add-ons (TASK-224): a tinted, bordered box so they read as choices.
+  // A long list continues in a new box on the next page instead of running off it.
+  if (input.addOns && input.addOns.length > 0) {
+    const pad = 12;
+    const priceW = 90;
+    const labelW = CONTENT_W - pad * 2 - priceW;
+    const intro = wrap("Not included in the total above. Tell us if you would like any of these added.", font, 9, CONTENT_W - pad * 2);
+    const headH = 16 + intro.length * 12 + 6;
+    const rows = input.addOns.map((a) => {
+      const label = wrap(a.label, bold, 10, labelW);
+      const note = a.note?.trim() ? wrap(a.note.trim(), font, 9, labelW) : [];
+      return { label, note, price: a.priceCents != null ? `+${money(a.priceCents)}` : "Price on request", h: label.length * 13 + note.length * 12 + 8 };
+    });
+    const floor = MARGIN + 48;
+    ctx.y -= 18;
+    if (ctx.y - (pad * 2 + headH + rows[0].h) < floor) newPage(ctx);
+    const chunks: { head: boolean; rows: typeof rows }[] = [{ head: true, rows: [] }];
+    let room = ctx.y + 10 - floor - pad * 2 - headH;
+    for (const r of rows) {
+      const chunk = chunks[chunks.length - 1];
+      if (r.h > room && chunk.rows.length > 0) {
+        chunks.push({ head: false, rows: [r] });
+        room = PAGE_H - MARGIN + 10 - floor - pad * 2 - r.h;
+      } else {
+        chunk.rows.push(r);
+        room -= r.h;
+      }
+    }
+    chunks.forEach((chunk, ci) => {
+      if (ci > 0) newPage(ctx);
+      const boxH = pad * 2 + (chunk.head ? headH : 0) + chunk.rows.reduce((h, r) => h + r.h, 0);
+      const top = ctx.y + 10;
+      ctx.page.drawRectangle({
+        x: MARGIN,
+        y: top - boxH,
+        width: CONTENT_W,
+        height: boxH,
+        color: ADD_ON_FILL,
+        borderColor: ACCENT,
+        borderWidth: 1.5,
+      });
+      let y = top - pad - 10;
+      if (chunk.head) {
+        text("OPTIONAL ADD-ONS", MARGIN + pad, y, 11, bold, ACCENT);
+        y -= 16;
+        for (const ln of intro) {
+          text(ln, MARGIN + pad, y, 9, font, MUTED);
+          y -= 12;
+        }
+        y -= 6;
+      }
+      for (const r of chunk.rows) {
+        rightText(r.price, PAGE_W - MARGIN - pad, y, 10, bold, ACCENT);
+        for (const ln of r.label) {
+          text(ln, MARGIN + pad, y, 10, bold, INK);
+          y -= 13;
+        }
+        for (const ln of r.note) {
+          text(ln, MARGIN + pad, y, 9, font, MUTED);
+          y -= 12;
+        }
+        y -= 8;
+      }
+      ctx.y = top - boxH - 4;
+    });
   }
 
   // --- Notes ----------------------------------------------------------------
@@ -777,6 +870,7 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
     dateValue2: fmtDate(d.expiresDate),
     lineItems: d.lineItems,
     totals,
+    addOns: d.addOns,
     notes: d.notes,
     terms,
     termsTitle: "QUOTE TERMS",
