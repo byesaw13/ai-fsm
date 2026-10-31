@@ -26,6 +26,7 @@ export * from "./assessment-summary";
 export * from "./prepared-scope";
 export * from "./construction-profiles";
 export * from "./production-takeoff";
+export * from "./production-rates";
 export * from "./work-order";
 export * from "./completion-criteria";
 export * from "./work-order-lifecycle";

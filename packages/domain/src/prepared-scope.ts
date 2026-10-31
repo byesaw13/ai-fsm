@@ -349,8 +349,10 @@ export const TALL_WALL_FT = 10;
 
 /** The owner's wall painting pace (production rate 5012). */
 export interface WallPaintRate {
-  /** Wall square feet per 8-hour day, two finish coats, standard prep. */
+  /** Wall square feet per work day, two finish coats, standard prep. */
   sqft_per_day: number;
+  /** Hours in that day (TASK-193 setting); 8 when not given. */
+  hours_per_day?: number;
 }
 
 /**
@@ -388,7 +390,7 @@ export function wallPaintHours(
   rate: WallPaintRate | null,
 ): HoursCandidate | null {
   if (!rate || rate.sqft_per_day <= 0 || sqft === null || sqft <= 0) return null;
-  const hours = (sqft / rate.sqft_per_day) * 8 * wallHeightTimeFactor(maxWallHeightFt).factor;
+  const hours = (sqft / rate.sqft_per_day) * (rate.hours_per_day ?? 8) * wallHeightTimeFactor(maxWallHeightFt).factor;
   const quarter = (n: number) => Math.max(0.25, Math.round(n * 4) / 4);
   return { low: quarter(hours * 0.85), high: quarter(hours * 1.15) };
 }
@@ -396,12 +398,14 @@ export function wallPaintHours(
 /** The owner's trim painting pace (production rate 5003, baseboard and casing). */
 export interface TrimPaintRate {
   linear_ft_per_day: number;
+  /** Hours in that day (TASK-193 setting); 8 when not given. */
+  hours_per_day?: number;
 }
 
 /** Hour range for trim at the owner's pace: length over the daily rate, plus or minus 15%, in quarter hours (TASK-217). */
 export function trimPaintHours(linearFt: number | null, rate: TrimPaintRate | null): HoursCandidate | null {
   if (!rate || rate.linear_ft_per_day <= 0 || linearFt === null || linearFt <= 0) return null;
-  const hours = (linearFt / rate.linear_ft_per_day) * 8;
+  const hours = (linearFt / rate.linear_ft_per_day) * (rate.hours_per_day ?? 8);
   const quarter = (n: number) => Math.max(0.25, Math.round(n * 4) / 4);
   return { low: quarter(hours * 0.85), high: quarter(hours * 1.15) };
 }

@@ -19,20 +19,21 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : Track D (D0–D5) complete and verified on production,
-                      2026-10-31. #740 (0e1b9921) and #741 (047cfdb9, mig 213)
-                      deployed; TASK-224..228 Done and archived.
-In-flight PR        : the docs PR closing Track D (branch docs/track-d-verified)
-Next step           : B4 (TASK-193), resuming Track B.
+Last step           : Track D complete and verified 2026-10-31 (#740, #741,
+                      docs #742).
+In-flight PR        : B4 PR 1 (TASK-193, branch task/193-production-rates):
+                      rates Settings card, calibration, hours-per-day.
+                      Continued the uncommitted start left in
+                      ~/worktrees/task-193 on 2026-10-26.
+Next step           : B4 PR 2 (TASK-193): square-foot calculator uses the
+                      rates (see the task's "Delivery" section; doctrine
+                      Rule 3 applies to useEstimateForm's painting mode).
 Blocked on          : nothing
 Last known-good     : 047cfdb9 (deploy-good/047cfdb9); previous 0e1b9921
-Notes               : Backup before mig 213: ai_fsm_20261031T163602Z.dump
-                      (1399 TOC entries, offsite copy). Worker image left as
-                      it was. The add-on approval flow was not exercised on
-                      production with a probe quote (integration tests cover
-                      it); the first real use is Angela Dowd EST-2026-0026.
-                      The agent may run scripts/deploy-garonhome.sh and
-                      gh api graphql (owner permission rules, 2026-10-31).
+Notes               : B4 split into two PRs (no product change). No migration
+                      in PR 1: hours_per_day (mig 209) and calibrated_at
+                      already exist. production_rates is a shared table (no
+                      account_id); writes need app.current_role owner/admin.
 ```
 
 ## Owner approvals
@@ -112,7 +113,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | B1 | TASK-190 | 2026-10-26 (CI 40419939119, 40419947446, #724) | 2026-10-26 (#724, f4837336) | 2026-10-27 (~00:02 UTC) | 2026-10-27 (draft split, 00:04 UTC) |
 | B2 | TASK-191 | 2026-10-27 (CI 40429996387, 40430001995, #726) | 2026-10-27 (#726, 20c7d5f8) | 2026-10-27 (~01:28 UTC) | 2026-10-27 (draft hours null, totals unchanged, 01:28 UTC) |
 | B3 | TASK-192 | 2026-10-27 (CI 40437008165, 40437011775, #728) | 2026-10-27 (#728, 2842780e) | 2026-10-27 (~02:32 UTC) | 2026-10-27 (equipment cost apart, 02:33 UTC) |
-| B4 | TASK-193 | | | | |
+| B4 | TASK-193 | PR 1 in progress | | | |
 | B5 | TASK-194 | | | | |
 | B6 | TASK-195 | | | | |
 | C1 | TASK-210 | | | | |
@@ -603,6 +604,7 @@ owner chose: D4 next, then D3 and D5.
 
 ## Log
 
+- 2026-10-31 · B4 · In progress · PR 1 of 2 (TASK-193): Settings card for rates/modifiers with calibration, hours-per-day setting, Prepare Quote pace uses it. Local: lint, typecheck, unit (web 2341, domain 548), knip
 - 2026-10-31 · D3/D5 · Verified · 047cfdb9 deployed ~16:42 UTC after backup ai_fsm_20261031T163602Z.dump (1399 TOC); migration 213 applied; health ok, /login HTTP/2 200; estimates.approved_add_ons present; Dowd quote unchanged (875000, add-ons shown). Known-good deploy-good/047cfdb9
 - 2026-10-31 · D3/D5 · Merged · #741 · squash 047cfdb9. Codex review: add-ons missing from the job-completion bill and the work order, and untaxed on the portal/deposit; fixed in 6a544247 (shared totalWithAddOns, addOnLines in final-invoice.ts, addOnWorkLines in work-order seeding)
 - 2026-10-31 · D2 · Data · logo: logo-dovetails-horizontal-2026.png (site repo dovetails-horizontal-color-1200.png) copied into /app/uploads/account/aaaaaaaa…0001/ and settings.logo_filename set (was logo-e680679f.png, file kept; reversal: set logo_filename back)

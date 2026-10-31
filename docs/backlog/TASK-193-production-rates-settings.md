@@ -1,7 +1,7 @@
 # TASK-193: Editable production rates with calibration
 
 Status:
-Proposed
+In Progress (PR 1 of 2)
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -35,6 +35,19 @@ Scope:
   "AI estimate".
 - Exception (owner decision 2026-10-26): rate 5012 keeps driving wall hours,
   labeled "production rate (uncalibrated)" until calibrated.
+
+Delivery (split 2026-10-31 by the implementing agent; no product change):
+- PR 1: the Settings → Labor & Pricing "Production rates" card. Owner and admin list and edit every rate
+  and modifier and mark them calibrated (`calibrated_at` stamped, cleared on uncalibrate). A tech gets
+  403. The hours-per-day setting (default 8) is on the pricing form, and every per-day rate shows its
+  hourly pace next to it. Prepare Quote's wall and trim pace use the setting instead of a fixed 8.
+  `productionRateHours` is in `packages/domain/src/production-rates.ts`.
+- PR 2: the square-foot calculator (room-by-room painting editor, `useEstimateForm.ts` painting mode)
+  turns area into hours with the rates. It saves `production_rate_snapshot` (rate id, value, unit,
+  hours-per-day, modifiers, calibration) on the labor line. Uncalibrated rates leave AI hours as the
+  default ("AI estimate"), except 5012 walls ("production rate (uncalibrated)"). That form references
+  the `painting.ts` legacy adapter, so doctrine Rule 3 (retire on touch) applies: plan it before
+  building.
 
 Out of Scope:
 Calibrating from actual hours (PI-007, Phase 4).

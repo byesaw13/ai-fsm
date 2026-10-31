@@ -89,7 +89,8 @@ function queueNoDraftThenContext() {
     .mockResolvedValueOnce({ rows: [CONTEXT_ROW] }) // visit/job/property
     .mockResolvedValueOnce({ rows: [] }) // price book
     .mockResolvedValueOnce({ rows: [] }) // wall paint pace
-    .mockResolvedValueOnce({ rows: [] }); // trim paint pace
+    .mockResolvedValueOnce({ rows: [] }) // trim paint pace
+    .mockResolvedValueOnce({ rows: [] }); // hours per day (TASK-193)
 }
 
 beforeEach(() => {

@@ -40,6 +40,7 @@ export function rowToPricingSettings(
       num(row.material_handling_pct, DEFAULT_PRICING_SETTINGS.material_handling_pct)
     ),
     card_fee_pct: num(row.card_fee_pct, DEFAULT_PRICING_SETTINGS.card_fee_pct),
+    hours_per_day: num(row.hours_per_day, DEFAULT_PRICING_SETTINGS.hours_per_day),
   };
 }
 

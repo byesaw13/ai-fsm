@@ -14,7 +14,7 @@ function dollarsToCents(raw: string): number {
   return Math.round(n * 100);
 }
 
-export function PricingSettingsForm() {
+export function PricingSettingsForm({ onSaved }: { onSaved?: (settings: BusinessPricingSettings) => void } = {}) {
   const [settings, setSettings] = useState<BusinessPricingSettings>({ ...DEFAULT_PRICING_SETTINGS });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,6 +41,7 @@ export function PricingSettingsForm() {
             full_day_rate_cents: json.data.full_day_rate_cents,
             material_handling_pct: json.data.material_handling_pct,
             card_fee_pct: json.data.card_fee_pct,
+            hours_per_day: json.data.hours_per_day,
           });
         }
       } catch {
@@ -67,7 +68,10 @@ export function PricingSettingsForm() {
         setError(json.error?.message ?? "Failed to save");
         return;
       }
-      if (json.data) setSettings(json.data as BusinessPricingSettings);
+      if (json.data) {
+        setSettings(json.data as BusinessPricingSettings);
+        onSaved?.(json.data as BusinessPricingSettings);
+      }
       setMessage("Labor & pricing rates saved. New estimates and T&M drafts will use these rates.");
     } catch {
       setError("Network error saving pricing settings");
@@ -288,6 +292,26 @@ export function PricingSettingsForm() {
             />
             <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
               0 means the customer is not charged a card fee.
+            </span>
+          </label>
+          <label style={{ display: "grid", gap: 4, fontSize: "var(--text-sm)" }}>
+            <span>Hours in a work day</span>
+            <Input
+              id="hours-per-day"
+              type="number"
+              step="0.5"
+              min="1"
+              max="24"
+              value={String(settings.hours_per_day)}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  hours_per_day: Math.min(24, Math.max(1, Number(e.target.value) || 8)),
+                })
+              }
+            />
+            <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+              Turns per-day production rates into hours. At 8, 400 sq ft a day is 50 sq ft an hour.
             </span>
           </label>
         </div>
