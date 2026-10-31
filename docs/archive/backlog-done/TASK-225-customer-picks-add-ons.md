@@ -1,7 +1,7 @@
 # TASK-225: Customer picks add-on options when approving a quote
 
 Status:
-In Progress
+Done (2026-10-31, verified on production; PRs #740, #741)
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -39,10 +39,10 @@ Out of scope:
   one whole package.
 
 Acceptance Criteria:
-- [ ] Approving with one add-on ticked records it, and the approved quote total includes it. Integration
+- [x] Approving with one add-on ticked records it, and the approved quote total includes it. Integration
       test.
-- [ ] Approving with none ticked behaves exactly as today.
-- [ ] Convert to job carries the add-on line.
+- [x] Approving with none ticked behaves exactly as today.
+- [x] Convert to job carries the add-on line.
 
 Open questions for the owner (ask before build):
 - Should an add-on chosen after approval (by text) go through a change order instead?

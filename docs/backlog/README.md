@@ -103,7 +103,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-224**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-229**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -206,11 +206,11 @@ closed in tests; owner-flow AC still open.
 | TASK-221 | [Materials checklists per job type (ask before you buy)](TASK-221-materials-checklists.md) | 002 | Proposed |
 | TASK-222 | [A stale quote page can't overwrite newer work](TASK-222-stale-quote-save-guard.md) | 002 | In Progress |
 | TASK-223 | [One authoritative estimate draft for prepared quotes](TASK-223-single-source-estimate.md) | 002 | In Progress |
-| TASK-224 | [Customer quote shows labor as an amount and options that stand out](TASK-224-customer-quote-labor-and-options.md) | 002 | In Progress |
-| TASK-225 | [Customer picks add-on options when approving a quote](TASK-225-customer-picks-add-ons.md) | 002 | In Progress |
-| TASK-226 | [New letterhead on invoices and customer PDFs](TASK-226-new-letterhead.md) | 004 | In Progress |
-| TASK-227 | [Itemized paint pools rooms that share a color](TASK-227-pool-shared-paint.md) | 002 | In Progress |
-| TASK-228 | [Tall walls take more hours in Prepare Quote](TASK-228-tall-wall-height-factors.md) | 002 | In Progress |
+| TASK-224 | [Customer quote shows labor as an amount and options that stand out](../archive/backlog-done/TASK-224-customer-quote-labor-and-options.md) | 002 | Done |
+| TASK-225 | [Customer picks add-on options when approving a quote](../archive/backlog-done/TASK-225-customer-picks-add-ons.md) | 002 | Done |
+| TASK-226 | [New letterhead on invoices and customer PDFs](../archive/backlog-done/TASK-226-new-letterhead.md) | 004 | Done |
+| TASK-227 | [Itemized paint pools rooms that share a color](../archive/backlog-done/TASK-227-pool-shared-paint.md) | 002 | Done |
+| TASK-228 | [Tall walls take more hours in Prepare Quote](../archive/backlog-done/TASK-228-tall-wall-height-factors.md) | 002 | Done |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |

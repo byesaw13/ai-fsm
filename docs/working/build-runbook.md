@@ -19,23 +19,20 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : D0 backlog for Track D (customer quote and letterhead),
-                      2026-10-31. B3 (TASK-192) was the last runbook code step
-                      verified (2026-10-27, squash 2842780e, #728).
-In-flight PR        : #741 (D3+D5, branch task/225-228-addons-height,
-                      migration 213).
-Next step           : #741 through CI, merge, then deploy WITH a verified
-                      backup first (migration 213). Owner allowed the agent
-                      to run scripts/deploy-garonhome.sh (2026-10-31).
+Last step           : Track D (D0–D5) complete and verified on production,
+                      2026-10-31. #740 (0e1b9921) and #741 (047cfdb9, mig 213)
+                      deployed; TASK-224..228 Done and archived.
+In-flight PR        : the docs PR closing Track D (branch docs/track-d-verified)
+Next step           : B4 (TASK-193), resuming Track B.
 Blocked on          : nothing
-Last known-good     : 0e1b9921 (deploy-good/0e1b9921); previous 8441846a
-Notes               : Off-runbook work 2026-10-31 on prod data (Dowd
-                      EST-2026-0026): switched to fixed $8,750 via the app's
-                      Apply code; options a1 (son's room, $750) and a2 (foyer
-                      stairwell, $1,050) added with the price in the label.
-                      D1's follow-up moves those prices into price_cents.
-                      Earlier notes: migration 210 applied 2026-10-27;
-                      TASK-218/219 deployed 2026-10-28 (mig 211, 212).
+Last known-good     : 047cfdb9 (deploy-good/047cfdb9); previous 0e1b9921
+Notes               : Backup before mig 213: ai_fsm_20261031T163602Z.dump
+                      (1399 TOC entries, offsite copy). Worker image left as
+                      it was. The add-on approval flow was not exercised on
+                      production with a probe quote (integration tests cover
+                      it); the first real use is Angela Dowd EST-2026-0026.
+                      The agent may run scripts/deploy-garonhome.sh and
+                      gh api graphql (owner permission rules, 2026-10-31).
 ```
 
 ## Owner approvals
@@ -139,9 +136,9 @@ docs-only commit after the event. Planned tests are not passing tests.
 | D0 | Backlog TASK-224..228 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | n/a | n/a |
 | D1 | TASK-224 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
 | D2 | TASK-226 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
-| D3 | TASK-225 | | | | |
+| D3 | TASK-225 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC, mig 213) | 2026-10-31 (health ok, /login 200, column present) |
 | D4 | TASK-227 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
-| D5 | TASK-228 | | | | |
+| D5 | TASK-228 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC) | 2026-10-31 (health ok, /login 200) |
 
 ## Operating rules
 
@@ -606,6 +603,8 @@ owner chose: D4 next, then D3 and D5.
 
 ## Log
 
+- 2026-10-31 · D3/D5 · Verified · 047cfdb9 deployed ~16:42 UTC after backup ai_fsm_20261031T163602Z.dump (1399 TOC); migration 213 applied; health ok, /login HTTP/2 200; estimates.approved_add_ons present; Dowd quote unchanged (875000, add-ons shown). Known-good deploy-good/047cfdb9
+- 2026-10-31 · D3/D5 · Merged · #741 · squash 047cfdb9. Codex review: add-ons missing from the job-completion bill and the work order, and untaxed on the portal/deposit; fixed in 6a544247 (shared totalWithAddOns, addOnLines in final-invoice.ts, addOnWorkLines in work-order seeding)
 - 2026-10-31 · D2 · Data · logo: logo-dovetails-horizontal-2026.png (site repo dovetails-horizontal-color-1200.png) copied into /app/uploads/account/aaaaaaaa…0001/ and settings.logo_filename set (was logo-e680679f.png, file kept; reversal: set logo_filename back)
 - 2026-10-31 · D1 · Data · Dowd EST-2026-0026: option prices moved from labels to price_cents (a1 75000, a2 105000), labels cleaned, foyer line says "(see Optional add-ons)", notes rebuilt with buildProposalNotes (no allowances sentence, no options list). Dry run first; total stayed 875000
 - 2026-10-31 · D1/D2/D4 · Verified · 0e1b9921 deployed ~16:05 UTC (no migration, no backup needed); health ok, /login HTTP/2 200; Dowd portal shows the add-ons box with prices
