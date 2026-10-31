@@ -77,6 +77,7 @@ function brandingFromAccount(
     email: b.email,
     website: b.website,
     logoPath: b.logoPath,
+    logoIsWordmark: b.logoIsWordmark,
     invoiceTerms: b.invoiceTerms,
     estimateTerms: b.estimateTerms,
     depositTerms: b.depositTerms,

@@ -64,6 +64,8 @@ export interface PdfBranding {
   website?: string | null;
   /** Absolute path to a PNG/JPEG logo on disk. */
   logoPath?: string | null;
+  /** The logo already carries the company name: draw it larger, skip the name text (TASK-226). */
+  logoIsWordmark?: boolean;
   invoiceTerms?: string | null;
   estimateTerms?: string | null;
   /** Deposits wording with the standard percentage already substituted. */
@@ -282,17 +284,20 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   if (input.branding?.phone) brandContact.push(input.branding.phone);
   if (input.branding?.email) brandContact.push(input.branding.email);
 
-  // Optional logo (PNG/JPG) — left of company name when present
+  // Optional logo (PNG/JPG). A square mark sits left of the company name; a
+  // wordmark (TASK-226) carries the name itself, so the text lines go under it.
+  const wordmark = !!input.branding?.logoIsWordmark;
   let headerLeft = MARGIN;
   let logoBottom = ctx.y;
+  let wordmarkDrawn = false;
   if (input.branding?.logoPath) {
     try {
       const fs = await import("fs");
       const bytes = fs.readFileSync(input.branding.logoPath);
       const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
       const img = isPng ? await ctx.doc.embedPng(bytes) : await ctx.doc.embedJpg(bytes);
-      const maxH = 48;
-      const maxW = 140;
+      const maxH = wordmark ? 58 : 48;
+      const maxW = wordmark ? 220 : 140;
       const scale = Math.min(maxW / img.width, maxH / img.height, 1);
       const w = img.width * scale;
       const h = img.height * scale;
@@ -302,15 +307,21 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
         width: w,
         height: h,
       });
-      headerLeft = MARGIN + w + 14;
       logoBottom = ctx.y - h + 10;
+      if (wordmark) wordmarkDrawn = true;
+      else headerLeft = MARGIN + w + 14;
     } catch {
       /* logo optional — fall back to text brand */
     }
   }
 
-  text(brandName, headerLeft, ctx.y, 16, bold, ACCENT);
-  let headerY = ctx.y - 15;
+  let headerY: number;
+  if (wordmarkDrawn) {
+    headerY = logoBottom - 12;
+  } else {
+    text(brandName, headerLeft, ctx.y, 16, bold, ACCENT);
+    headerY = ctx.y - 15;
+  }
   if (brandTagline) {
     text(brandTagline, headerLeft, headerY, 9, font, MUTED);
     headerY -= 13;
@@ -339,7 +350,7 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   // Do not render workflow status (SENT / DRAFT / PARTIAL) on customer PDFs.
   // Paid is communicated by the PAID stamp + zero balance due.
 
-  ctx.y = Math.min(headerY, metaY, logoBottom) - 14;
+  ctx.y = Math.min(headerY, metaY, wordmarkDrawn ? headerY : logoBottom) - 14;
   // Accent rule under letterhead (matches print-page .header-row border)
   ctx.page.drawLine({
     start: { x: MARGIN, y: ctx.y },

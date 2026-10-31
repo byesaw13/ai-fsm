@@ -28,7 +28,11 @@ In-flight PR        : D0 (branch docs/quote-options-backlog) and D1 (branch
                       push was blocked by the session's permission check.
                       Push both, open PRs (D1 based on D0 or on main after D0
                       merges), wait for CI incl. integration tests.
-Next step           : D2 (TASK-226). Track D runs ahead of B4.
+                      D2 (branch task/226-letterhead, stacked on D1) also
+                      committed locally, not pushed.
+Next step           : push D0/D1/D2 and take them through CI, merge, deploy;
+                      then D1 and D2 production follow-ups (see Plan: Track D).
+                      Then D4. D3 and D5 start with an owner question.
 Blocked on          : nothing
 Last known-good     : 8441846a (branch deploy-good/8441846a); previous 7490a24c
 Notes               : Off-runbook work 2026-10-31 on prod data (Dowd
@@ -592,6 +596,7 @@ the production follow-up. Record progress in "Current state" and "Log".
 - Logo source: `~/mydovetails-site` `origin/master`,
   `public/brand/png/dovetails-horizontal-color-1200.png`.
 - Production follow-up after Verified (owner-approved 2026-10-31):
+  - Address: DONE 2026-10-31 (removed before deploy; see Log).
   - Upload the logo. Use the Settings → Company logo upload, or
     `docker cp` it into `/app/uploads/account/aaaaaaaa-0000-0000-0000-000000000001/`
     and set `settings.logo_filename`. First check the uploads dir is a
@@ -606,6 +611,8 @@ answer in "Owner approvals" or the task file, then build.
 
 ## Log
 
+- 2026-10-31 · D2 · Data · prod account aaaaaaaa…0001 settings.company_address removed (was "85R Rockingham Rd Derry, NH 03038"; reversal: UPDATE accounts SET settings = settings || '{"company_address":"85R Rockingham Rd Derry, NH 03038"}' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'). Owner asked for it in session. Logo upload waits for D2's deploy (old code would print the name twice)
+- 2026-10-31 · D2 · In progress · local branch task/226-letterhead · wordmark detection from PNG IHDR, PDF + shared Letterhead on invoice and quote print pages. Local: lint, typecheck, web unit 2316 green, knip no failures; sample PDF checked by eye
 - 2026-10-31 · D1 · In progress · local branch task/224-customer-quote-options · labor amount only on portal/PDF/print, add-ons block, option editor, notes without options/allowances on fixed. Local: lint, typecheck, unit (web 2307, domain 532) green, knip no failures; integration test added (prepared-scope-apply), not run locally (no test server)
 - 2026-10-31 · D0 · In progress · backlog TASK-224..228, ROADMAP Phase 3 slice, map rows, Track D plan
 

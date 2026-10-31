@@ -1,7 +1,7 @@
 # TASK-226: New letterhead on invoices and customer PDFs
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-004 Billing & Profitability

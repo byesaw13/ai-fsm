@@ -12,6 +12,7 @@ import {
 } from "@ai-fsm/domain";
 import type { EstimateStatus, RoomSpec } from "@ai-fsm/domain";
 import { PrintButton } from "./PrintButton";
+import { Letterhead } from "@/components/features/documents/Letterhead";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 import { resolveCompanyBranding, type CompanyProfileSettings } from "@/lib/company/branding";
 import { customerAddOns, showsQuantityAndRate } from "@/lib/estimates/customer-quote";
@@ -204,7 +205,6 @@ export default async function EstimatePrintPage({
         .add-ons li p { margin: 2px 0 0; font-size: 13px; color: #57534e; }
         .add-on-price { font-weight: 700; color: #b3541f; white-space: nowrap; }
         .header-row { display: flex; justify-content: space-between; align-items: flex-start; }
-        .company-name { font-size: 20px; font-weight: 700; }
         .meta-label { color: #666; font-size: 12px; }
         .print-btn { position: fixed; top: 16px; right: 16px; padding: 8px 20px;
                      background: #111; color: #fff; border: none; border-radius: 6px;
@@ -216,10 +216,10 @@ export default async function EstimatePrintPage({
       <div className="wrap">
         {/* Header */}
         <div className="header-row">
-          <div>
-            <div className="company-name">{branding.name}</div>
-            <p style={{ color: "#666", fontSize: 13 }}>{branding.tagline ?? "Licensed & Insured"}</p>
-          </div>
+          <Letterhead
+            branding={branding}
+            logoSrc={branding.logoPath ? `/api/v1/account/logo?t=${encodeURIComponent(account?.settings?.logo_filename ?? "")}` : null}
+          />
           <div style={{ textAlign: "right" }}>
             <h1>Quote</h1>
             <p className="meta-label">{estimateNumber}</p>

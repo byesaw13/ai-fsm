@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { buildInvoicePdf, buildEstimatePdf } from "../document-pdf";
 import { pdfDrawnText } from "./pdf-text";
+import { writeFileSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { testPng } from "../../company/__tests__/test-png";
 
 /** A valid PDF byte stream begins with the "%PDF-" magic header. */
 function isPdf(bytes: Uint8Array): boolean {
@@ -307,5 +311,40 @@ describe("buildEstimatePdf", () => {
     });
     expect(isPdf(bytes)).toBe(true);
     expect(bytes.length).toBeGreaterThan(1000);
+  });
+});
+
+describe("letterhead (TASK-226)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "letterhead-"));
+  const wide = join(dir, "wide.png");
+  const square = join(dir, "square.png");
+  writeFileSync(wide, testPng(1200, 315));
+  writeFileSync(square, testPng(170, 170));
+  const invoice = (logoPath: string, logoIsWordmark: boolean) =>
+    buildInvoicePdf({
+      invoiceNumber: "INV-1",
+      status: "sent",
+      clientName: "Pat Client",
+      issueDate: "2026-10-31",
+      subtotalCents: 10000,
+      totalCents: 10000,
+      paidCents: 0,
+      lineItems: [{ description: "Work", quantity: 1, unitPriceCents: 10000, totalCents: 10000 }],
+      branding: { name: "Dovetails Home Services", tagline: "Fully Insured", phone: "(603) 479-1094", logoPath, logoIsWordmark },
+    });
+
+  it("a wordmark logo carries the name, so the name text is not printed again", async () => {
+    const lines = pdfDrawnText(await invoice(wide, true)).split("\n");
+    expect(lines).not.toContain("Dovetails Home Services");
+    expect(lines).toContain("Fully Insured");
+    expect(lines).toContain("(603) 479-1094");
+  });
+
+  it("a square logo keeps the name beside it", async () => {
+    expect(pdfDrawnText(await invoice(square, false)).split("\n")).toContain("Dovetails Home Services");
+  });
+
+  it("prints no address when none is set", async () => {
+    expect(pdfDrawnText(await invoice(wide, true))).not.toMatch(/Rockingham|Derry/);
   });
 });

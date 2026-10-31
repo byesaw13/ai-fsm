@@ -115,7 +115,7 @@ export const BRANCHES: MapNode[] = [
     kind: "branch",
     step: 7,
     intended: "The charge for the job. The customer can pay by card, and the receipt stays.",
-    built: "The bill is for the job. Converted from a quote, it shows the approved lines, including only the chosen option on a Good/Better/Best quote, and those lines add up to the subtotal. An equipment line on the quote stays an equipment line on the bill. The customer opens a link and pays. What is still owed also shows on their home page.",
+    built: "The bill is for the job. Converted from a quote, it shows the approved lines, including only the chosen option on a Good/Better/Best quote, and those lines add up to the subtotal. An equipment line on the quote stays an equipment line on the bill. The customer opens a link and pays. What is still owed also shows on their home page. The bill and quote carry your logo; a wide logo that already says the business name is printed larger and the name is not repeated.",
     records: [
       { name: "invoices", holds: "The bill, its total, and what has been paid." },
       { name: "payments", holds: "Each payment against that bill." },
