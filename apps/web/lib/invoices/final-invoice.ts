@@ -17,6 +17,7 @@
  *     roll back the job completion that triggered it.
  */
 
+import { addOnLines, invoiceMoneyFor } from "@/lib/estimates/approved-lines";
 import type { PoolClient } from "pg";
 import { generateInvoiceNumber, loadCreditedInvoicesForEstimate } from "@/lib/invoices/db";
 import { reconcileFinalInvoice } from "@/lib/invoices/billing";
@@ -104,6 +105,7 @@ export async function createDraftFinalInvoiceForJob(
     estimate_notes: string | null;
     deposit_cents: number | null;
     travel_snapshot_id: string | null;
+    approved_add_ons: { label: string; price_cents: number }[] | null;
   }>(
     `SELECT j.client_id, j.property_id,
             e.id           AS estimate_id,
@@ -115,6 +117,7 @@ export async function createDraftFinalInvoiceForJob(
             e.notes        AS estimate_notes,
             e.deposit_cents,
             e.travel_snapshot_id,
+            e.approved_add_ons,
             (
               SELECT br.pricing_mode
               FROM booking_requests br
@@ -125,7 +128,7 @@ export async function createDraftFinalInvoiceForJob(
      FROM jobs j
      LEFT JOIN LATERAL (
        SELECT id, presentation_mode, pricing_mode, subtotal_cents, tax_cents, total_cents,
-              notes, deposit_cents, travel_snapshot_id
+              notes, deposit_cents, travel_snapshot_id, approved_add_ons
        FROM estimates
        WHERE job_id = j.id AND account_id = j.account_id AND status = 'approved'
        ORDER BY created_at DESC
@@ -203,6 +206,12 @@ export async function createDraftFinalInvoiceForJob(
       });
     }
     shouldUseEstimateTotals = lineItems.length > 0;
+    // TASK-225: add-ons the customer ticked when approving are billed too.
+    if (shouldUseEstimateTotals) {
+      for (const line of addOnLines(job.approved_add_ons ?? [], lineItems)) {
+        lineItems.push({ ...line, line_item_type: "labor" });
+      }
+    }
   }
 
   // Actuals path: T&M jobs always, or flat jobs with no estimate line items.
@@ -371,13 +380,29 @@ export async function createDraftFinalInvoiceForJob(
       (s, li) => s + Math.round(li.quantity * li.unit_price_cents),
       0
     ) + materialPreviewSubtotal;
-  const subtotal = shouldUseEstimateTotals && job.subtotal_cents != null
-    ? job.subtotal_cents
-    : calculatedSubtotal;
-  const taxCents = shouldUseEstimateTotals ? job.tax_cents ?? 0 : 0;
-  const totalCents = shouldUseEstimateTotals && job.total_cents != null
-    ? job.total_cents
-    : subtotal + taxCents;
+  // Approved add-ons (TASK-225) sit on top of the quote's stored money, taxed
+  // at the quote's rate, exactly as Convert bills them.
+  const addOnCents = shouldUseEstimateTotals
+    ? (job.approved_add_ons ?? []).reduce((sum, a) => sum + a.price_cents, 0)
+    : 0;
+  const estimateMoney = shouldUseEstimateTotals && job.subtotal_cents != null && job.total_cents != null
+    ? invoiceMoneyFor({
+        presentation_mode: "standard",
+        subtotal_cents: job.subtotal_cents,
+        tax_cents: job.tax_cents ?? 0,
+        total_cents: job.total_cents,
+        option: null,
+        drafted_lines: [],
+        add_on_cents: addOnCents,
+      })
+    : null;
+  const subtotal = estimateMoney
+    ? estimateMoney.subtotal_cents
+    : shouldUseEstimateTotals && job.subtotal_cents != null
+      ? job.subtotal_cents
+      : calculatedSubtotal;
+  const taxCents = estimateMoney ? estimateMoney.tax_cents : shouldUseEstimateTotals ? job.tax_cents ?? 0 : 0;
+  const totalCents = estimateMoney ? estimateMoney.total_cents : subtotal + taxCents;
 
   // ── Deposit reconciliation ───────────────────────────────────────────────
   // Use reconcileFinalInvoice so voided deposit invoices are excluded and the

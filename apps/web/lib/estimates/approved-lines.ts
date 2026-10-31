@@ -142,6 +142,34 @@ export function invoiceLinesFor(
   return drafted;
 }
 
+/** An add-on amount's tax at the quote's own rate (TASK-225). */
+function addOnTaxCents(addOnCents: number, quote: { subtotal_cents: number; tax_cents: number }): number {
+  return quote.subtotal_cents > 0 ? Math.round((addOnCents * quote.tax_cents) / quote.subtotal_cents) : 0;
+}
+
+/**
+ * What the customer approves with add-ons: the quote total plus the add-ons
+ * and their tax. The portal, the deposit and both bill paths use this, so the
+ * approved amount is the billed amount (TASK-225).
+ */
+export function totalWithAddOns(
+  quote: { subtotal_cents: number; tax_cents: number; total_cents: number },
+  addOnCents: number,
+): number {
+  return quote.total_cents + addOnCents + addOnTaxCents(addOnCents, quote);
+}
+
+/** Add-ons as work items, so the crew's work order lists them (TASK-225). */
+export function addOnWorkLines(addOns: { label: string; price_cents: number }[]) {
+  return addOns.map((a) => ({
+    description: `${a.label} (added option)`,
+    line_item_type: "labor",
+    quantity: 1,
+    unit_price_cents: a.price_cents,
+    total_cents: a.price_cents,
+  }));
+}
+
 /** One bill line per add-on the customer chose when approving (TASK-225). */
 export function addOnLines(
   addOns: { label: string; price_cents: number }[],
@@ -171,9 +199,11 @@ export function invoiceMoneyFor(input: InvoiceMoneyInput): InvoiceMoney {
   const addOn = input.add_on_cents ?? 0;
   if (input.presentation_mode !== "multi_option" && addOn > 0) {
     // The quote's stored money plus the chosen add-ons, taxed at the quote's rate.
-    const subtotal = input.subtotal_cents + addOn;
-    const tax = input.subtotal_cents > 0 ? Math.round((subtotal * input.tax_cents) / input.subtotal_cents) : 0;
-    return { subtotal_cents: subtotal, tax_cents: tax, total_cents: input.total_cents - input.tax_cents + addOn + tax };
+    return {
+      subtotal_cents: input.subtotal_cents + addOn,
+      tax_cents: input.tax_cents + addOnTaxCents(addOn, input),
+      total_cents: totalWithAddOns(input, addOn),
+    };
   }
   if (input.presentation_mode !== "multi_option") {
     if (draftedSum === input.subtotal_cents) {

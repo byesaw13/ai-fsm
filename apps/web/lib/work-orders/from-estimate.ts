@@ -3,6 +3,7 @@
  * estimate is accepted and linked to a project.
  */
 
+import { addOnWorkLines } from "@/lib/estimates/approved-lines";
 import type { PoolClient } from "pg";
 import { seedCompletionCriteriaFromLineItems } from "@ai-fsm/domain";
 import { deriveJobTitle, deriveJobDescription } from "../estimates/job-from-estimate";
@@ -22,6 +23,7 @@ interface EstimateContext {
   total_cents: number;
   client_name: string | null;
   property_address: string | null;
+  approved_add_ons: { label: string; price_cents: number }[] | null;
 }
 
 /**
@@ -52,7 +54,7 @@ export async function promoteOrCreateWorkOrderFromEstimate({
   }
 
   const estRes = await client.query<EstimateContext>(
-    `SELECT e.id, e.client_id, e.property_id, e.notes, e.total_cents,
+    `SELECT e.id, e.client_id, e.property_id, e.notes, e.total_cents, e.approved_add_ons,
             c.name AS client_name, p.address AS property_address
      FROM estimates e
      LEFT JOIN clients c ON c.id = e.client_id
@@ -133,6 +135,8 @@ export async function promoteOrCreateWorkOrderFromEstimate({
     [estimateId],
   );
 
+  // TASK-225: add-ons the customer ticked at approval are work for the crew too.
+  lineItemsRes.rows.push(...addOnWorkLines(est.approved_add_ons ?? []));
   const completionCriteria = seedCompletionCriteriaFromLineItems(lineItemsRes.rows);
   const materialsTotal = lineItemsRes.rows
     .filter((li) => li.line_item_type === "materials")

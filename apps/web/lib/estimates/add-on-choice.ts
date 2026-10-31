@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { parsePreparedScope } from "@ai-fsm/domain";
 import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "./deposit-policy";
+import { totalWithAddOns } from "./approved-lines";
 
 /** An add-on the customer ticked when approving (TASK-225). */
 export interface ApprovedAddOn {
@@ -38,13 +39,15 @@ export async function recordAddOnChoice(client: PoolClient, estimateId: string, 
   const { rows } = await client.query<{
     prepared_scope: unknown;
     presentation_mode: string;
+    subtotal_cents: number;
+    tax_cents: number;
     total_cents: number;
     deposit_required: boolean;
     deposit_type: "none" | "materials" | "percentage" | "fixed";
     deposit_percentage: string | number | null;
     deposit_fixed_cents: number | null;
   }>(
-    `SELECT prepared_scope, presentation_mode, total_cents, deposit_required, deposit_type, deposit_percentage, deposit_fixed_cents
+    `SELECT prepared_scope, presentation_mode, subtotal_cents, tax_cents, total_cents, deposit_required, deposit_type, deposit_percentage, deposit_fixed_cents
      FROM estimates WHERE id = $1`,
     [estimateId],
   );
@@ -63,7 +66,11 @@ export async function recordAddOnChoice(client: PoolClient, estimateId: string, 
     deposit_percentage: est.deposit_percentage === null ? null : Number(est.deposit_percentage),
     deposit_fixed_cents: est.deposit_fixed_cents,
     material_total_cents: estimateMaterialsDepositBasis(lines),
-    total_cents: Number(est.total_cents) + addOns.reduce((s, a) => s + a.price_cents, 0),
+    // The amount the customer approved: add-ons taxed like the bill taxes them.
+    total_cents: totalWithAddOns(
+      { subtotal_cents: Number(est.subtotal_cents), tax_cents: Number(est.tax_cents), total_cents: Number(est.total_cents) },
+      addOns.reduce((s, a) => s + a.price_cents, 0),
+    ),
   });
   await client.query(
     `UPDATE estimates SET approved_add_ons = $1, deposit_cents = $2, balance_cents = $3, updated_at = now() WHERE id = $4`,

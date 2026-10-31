@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addOnLines, approvedLines, invoiceLinesFor, invoiceMoneyFor, type ConvertSourceLine } from "../approved-lines";
+import { seedCompletionCriteriaFromLineItems } from "@ai-fsm/domain";
+import { addOnLines, addOnWorkLines, approvedLines, totalWithAddOns, invoiceLinesFor, invoiceMoneyFor, type ConvertSourceLine } from "../approved-lines";
 
 function line(over: Partial<ConvertSourceLine> & Pick<ConvertSourceLine, "id" | "description" | "total_cents">): ConvertSourceLine {
   return {
@@ -254,6 +255,33 @@ describe("add-ons on the final bill (TASK-225)", () => {
         add_on_cents: 20_000,
       }),
     ).toEqual({ subtotal_cents: 120_000, tax_cents: 6_000, total_cents: 126_000 });
+  });
+});
+
+describe("add-on totals are the same everywhere (TASK-225)", () => {
+  it("what the customer approves includes the add-on's tax at the quote's rate", () => {
+    expect(totalWithAddOns({ subtotal_cents: 100_000, tax_cents: 5_000, total_cents: 105_000 }, 20_000)).toBe(126_000);
+    expect(totalWithAddOns({ subtotal_cents: 875_000, tax_cents: 0, total_cents: 875_000 }, 105_000)).toBe(980_000);
+    expect(totalWithAddOns({ subtotal_cents: 0, tax_cents: 0, total_cents: 0 }, 5_000)).toBe(5_000);
+  });
+
+  it("matches the bill's money", () => {
+    const quote = { subtotal_cents: 100_000, tax_cents: 5_000, total_cents: 105_000 };
+    const bill = invoiceMoneyFor({ presentation_mode: "standard", ...quote, option: null, drafted_lines: [], add_on_cents: 20_000 });
+    expect(bill.total_cents).toBe(totalWithAddOns(quote, 20_000));
+  });
+
+  it("add-on work items survive the crew checklist filter", () => {
+    const criteria = seedCompletionCriteriaFromLineItems(
+      addOnWorkLines([{ label: "Foyer stairwell: paint the tall walls along the staircase", price_cents: 105_000 }]),
+    );
+    expect(criteria.map((c) => c.label)).toEqual(["Foyer stairwell: paint the tall walls along the staircase (added option)"]);
+  });
+
+  it("add-ons become labor work items for the crew", () => {
+    expect(addOnWorkLines([{ label: "Foyer stairwell", price_cents: 105_000 }])).toEqual([
+      { description: "Foyer stairwell (added option)", line_item_type: "labor", quantity: 1, unit_price_cents: 105_000, total_cents: 105_000 },
+    ]);
   });
 });
 

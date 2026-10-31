@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { totalWithAddOns } from "@/lib/estimates/approved-lines";
 
 interface LineItem {
   id: string;
@@ -471,7 +472,7 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
                   </label>
                 ))}
                 <div style={{ marginTop: 6, fontWeight: 700 }} aria-live="polite">
-                  Total with your choices: {cents(estimate.total_cents + addOnCents)}
+                  Total with your choices: {cents(totalWithAddOns(estimate, addOnCents))}
                 </div>
               </fieldset>
             )}

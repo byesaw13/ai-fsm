@@ -91,6 +91,14 @@ describe.skipIf(!RUN)("add-on approval", () => {
     expect(est).toMatchObject({ status: "approved", total_cents: 500_000, deposit_cents: 181_500, balance_cents: 423_500 });
     expect(est.approved_add_ons).toEqual([{ id: "a2", label: "Foyer stairwell", price_cents: 105_000 }]);
 
+    // The crew's work order lists the add-on (Codex review on #741).
+    const criteria = await db<{ completion_criteria: { label: string }[] }>(
+      `SELECT wo.completion_criteria FROM work_orders wo WHERE wo.source_estimate_id = $1`,
+      [id],
+    );
+    expect(criteria).toHaveLength(1);
+    expect(criteria[0].completion_criteria.map((c) => c.label)).toContain("Foyer stairwell (added option)");
+
     const converted = await api("POST", `/api/v1/estimates/${id}/convert`);
     expect(converted.status).toBeLessThan(300);
     const [bill] = await db<{ id: string; subtotal_cents: number; total_cents: number }>(
