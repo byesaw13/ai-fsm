@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
+import { QuoteSaveAlert } from "@/components/QuoteSaveAlert";
+import { quoteSaveOffersReload, rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import {
   TRAVEL_CHARGE_MODE_LABELS,
   TRAVEL_POLICY_TIER_LABELS,
@@ -522,11 +523,13 @@ export function TravelPanel({
         </div>
       )}
 
-      {error && (
+      {error && quoteSaveOffersReload(error) ? (
+        <QuoteSaveAlert message={error} />
+      ) : error ? (
         <p className="error-inline" style={{ color: "var(--color-danger)", fontSize: "var(--text-sm)" }}>
           {error}
         </p>
-      )}
+      ) : null}
 
       {editable && (
         <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
