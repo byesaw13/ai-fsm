@@ -6,6 +6,10 @@ re-keying, and keeping estimate structure consistent across jobs.
 ## Active tasks
 
 - [TASK-223: One authoritative estimate draft for prepared quotes](TASK-223-single-source-estimate.md) — two PRs; owner-approved 2026-10-27.
+- [TASK-224: Customer quote shows labor as an amount and options that stand out](TASK-224-customer-quote-labor-and-options.md) — owner 2026-10-31; runbook step D1.
+- [TASK-225: Customer picks add-on options when approving](TASK-225-customer-picks-add-ons.md) — proposed; needs a migration decision; runbook step D3.
+- [TASK-227: Itemized paint pools rooms that share a color](TASK-227-pool-shared-paint.md) — proposed; runbook step D4.
+- [TASK-228: Tall walls take more hours in Prepare Quote](TASK-228-tall-wall-height-factors.md) — proposed; owner must approve the factors; runbook step D5.
 - [TASK-217: Trade-aware estimating methods in Prepare Quote](TASK-217-trade-aware-estimate-methods.md) — focused correction, owner-approved 2026-10-27.
 
 ## Estimating assistant, Phase 3 slice (TASK-209 to TASK-216)

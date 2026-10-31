@@ -73,3 +73,7 @@ See [TASK-136-done-invoice-from-complete.md](./TASK-136-done-invoice-from-comple
 - [TASK-088: Store purchase history import (HD + Lowe's)](../archive/backlog-done/TASK-088-store-purchase-history-import.md) — Done
 - [TASK-089: T&M final invoice from actuals + mobile deliver](../archive/backlog-done/TASK-089-tm-final-invoice-actuals.md) — Done (PR #565; was mis-IDd as 082)
 - [TASK-090: Separate estimate vs invoice document terms](../archive/backlog-done/TASK-090-estimate-invoice-document-terms.md) — Done (PR #566; was mis-IDd as 083)
+
+# TASK-226: New letterhead on invoices and customer PDFs
+
+See [TASK-226-new-letterhead.md](./TASK-226-new-letterhead.md). House-and-dove lockup from the site repo, no home address. Owner 2026-10-31; runbook step D2.

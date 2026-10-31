@@ -39,8 +39,10 @@ PR 2, single source:
   manual lines, travel, notes and options are kept.
 - AI revisions never replace owner-set hours or material prices.
 - Send is blocked while the prepared scope and the quote lines disagree.
-- Customer PDF and portal: no internal itemized materials; T&M labor shown as
-  work-area hours x rate.
+- Customer PDF and portal: no internal itemized materials. Labor is shown as
+  one amount per work area, with no hours and no hourly rate (owner
+  2026-10-31: "the customer should not see the hourly on there end it should
+  be labor"). The customer-view part is built in TASK-224; PR 2 must keep it.
 - Playwright regression test in CI.
 
 Out of Scope:
