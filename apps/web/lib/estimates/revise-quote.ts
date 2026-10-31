@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 // The SDK's zodOutputFormat helper requires Zod 4 schemas; zod 3.25 ships them at "zod/v4".
 import { z } from "zod/v4";
 import {
+  lastAlternativeNumber,
   bindQuantities,
   type AssessmentSummary,
   type PreparedScope,
@@ -145,7 +146,8 @@ export function applyRevision(
   }
 
   const resolve = (ref: string) => (byId.has(ref) ? ref : refs.get(ref));
-  let nextAlt = scope.alternatives.length;
+  // Highest id in use, not the count: the owner may have deleted an earlier option (TASK-224).
+  let nextAlt = lastAlternativeNumber(scope.alternatives);
   const alternatives = [
     ...scope.alternatives,
     ...output.alternatives_add

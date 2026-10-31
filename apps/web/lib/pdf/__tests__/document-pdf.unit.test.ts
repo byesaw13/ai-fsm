@@ -314,6 +314,51 @@ describe("buildEstimatePdf", () => {
   });
 });
 
+describe("add-ons that fill more than a page (TASK-224)", () => {
+  it("continues the box on the next page and keeps every option on the page", async () => {
+    const addOns = Array.from({ length: 50 }, (_, i) => ({
+      label: `Option number ${i + 1} with a description long enough to take most of the line`,
+      note: "Why you might want this, in a sentence that wraps onto a second line in the customer's quote PDF.",
+      priceCents: 10_000 + i,
+    }));
+    const bytes = await buildEstimatePdf({
+      estimateRef: "Q-LONG", status: "draft", clientName: "Pat", issueDate: "2026-10-31", subtotalCents: 1000, totalCents: 1000,
+      lineItems: [{ description: "Work", quantity: 1, unitPriceCents: 1000, totalCents: 1000 }],
+      addOns,
+    });
+    const { PDFDocument } = await import("pdf-lib");
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThanOrEqual(4);
+    const lines = pdfDrawnText(bytes).split("\n");
+    for (let i = 1; i <= 50; i++) expect(lines.some((l) => l.startsWith(`Option number ${i} with`))).toBe(true);
+    expect(lines).toContain("+$100.49");
+  });
+
+  it("draws every text line inside the page margins", async () => {
+    const addOns = Array.from({ length: 30 }, (_, i) => ({ label: `Add-on ${i + 1}`, note: "A note.", priceCents: 5000 }));
+    const bytes = await buildEstimatePdf({
+      estimateRef: "Q-LONG2", status: "draft", clientName: "Pat", issueDate: "2026-10-31", subtotalCents: 1000, totalCents: 1000,
+      lineItems: [{ description: "Work", quantity: 1, unitPriceCents: 1000, totalCents: 1000 }],
+      addOns,
+    });
+    // Every text placement (1 0 0 1 x y Tm) must sit above the bottom margin.
+    const raw = (await import("node:zlib")).inflateSync;
+    const buf = Buffer.from(bytes);
+    const ys: number[] = [];
+    let from = 0;
+    while (true) {
+      const s = buf.indexOf("stream\n", from);
+      if (s < 0) break;
+      const e = buf.indexOf("\nendstream", s);
+      try {
+        for (const m of raw(buf.subarray(s + 7, e)).toString("latin1").matchAll(/1 0 0 1 (-?[\d.]+) (-?[\d.]+) Tm/g)) ys.push(Number(m[2]));
+      } catch { /* not a content stream */ }
+      from = e + 10;
+    }
+    expect(ys.length).toBeGreaterThan(30);
+    expect(Math.min(...ys)).toBeGreaterThan(40);
+  });
+});
+
 describe("letterhead (TASK-226)", () => {
   const dir = mkdtempSync(join(tmpdir(), "letterhead-"));
   const wide = join(dir, "wide.png");

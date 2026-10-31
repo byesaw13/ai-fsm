@@ -92,6 +92,11 @@ export interface PreparedQuestion {
   answer: string | null;
 }
 
+/** Highest `a<n>` number in use, so a new option never reuses an id after one is deleted (TASK-224). */
+export function lastAlternativeNumber(alternatives: { id: string }[]): number {
+  return Math.max(0, ...alternatives.map((a) => Number(/^a(\d+)$/.exec(a.id)?.[1] ?? 0)));
+}
+
 export interface PreparedAlternative {
   id: string;
   label: string;

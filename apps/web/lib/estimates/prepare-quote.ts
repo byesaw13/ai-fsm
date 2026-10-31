@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 // The SDK's zodOutputFormat helper requires Zod 4 schemas; zod 3.25 ships them at "zod/v4".
 import { z } from "zod/v4";
 import {
+  lastAlternativeNumber,
   allocateFixedPrice,
   bindQuantities,
   computeAssessmentRoomGeometry,
@@ -482,7 +483,7 @@ function mergeAlternativeEdits(
 ): PreparedScope["alternatives"] {
   if (!incoming) return stored;
   const byId = new Map(stored.map((a) => [a.id, a]));
-  let next = Math.max(0, ...stored.map((a) => Number(/^a(\d+)$/.exec(a.id)?.[1] ?? 0))) + 1;
+  let next = lastAlternativeNumber(stored) + 1;
   const out: PreparedScope["alternatives"] = [];
   for (const e of incoming) {
     const label = e.label.trim().slice(0, 200);

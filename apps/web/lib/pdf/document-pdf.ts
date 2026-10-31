@@ -554,52 +554,71 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
     drawTotals(input.totals);
   }
 
-  // --- Optional add-ons (TASK-224): a tinted, bordered box so they read as choices
+  // --- Optional add-ons (TASK-224): a tinted, bordered box so they read as choices.
+  // A long list continues in a new box on the next page instead of running off it.
   if (input.addOns && input.addOns.length > 0) {
     const pad = 12;
     const priceW = 90;
     const labelW = CONTENT_W - pad * 2 - priceW;
     const intro = wrap("Not included in the total above. Tell us if you would like any of these added.", font, 9, CONTENT_W - pad * 2);
-    const rows = input.addOns.map((a) => ({
-      label: wrap(a.label, bold, 10, labelW),
-      note: a.note?.trim() ? wrap(a.note.trim(), font, 9, labelW) : [],
-      price: a.priceCents != null ? `+${money(a.priceCents)}` : "Price on request",
-    }));
-    const rowsH = rows.reduce((h, r) => h + r.label.length * 13 + r.note.length * 12 + 8, 0);
-    const boxH = pad + 16 + intro.length * 12 + 6 + rowsH + pad;
-    ctx.y -= 18;
-    ensureSpace(ctx, boxH + 10);
-    const top = ctx.y + 10;
-    ctx.page.drawRectangle({
-      x: MARGIN,
-      y: top - boxH,
-      width: CONTENT_W,
-      height: boxH,
-      color: ADD_ON_FILL,
-      borderColor: ACCENT,
-      borderWidth: 1.5,
+    const headH = 16 + intro.length * 12 + 6;
+    const rows = input.addOns.map((a) => {
+      const label = wrap(a.label, bold, 10, labelW);
+      const note = a.note?.trim() ? wrap(a.note.trim(), font, 9, labelW) : [];
+      return { label, note, price: a.priceCents != null ? `+${money(a.priceCents)}` : "Price on request", h: label.length * 13 + note.length * 12 + 8 };
     });
-    let y = top - pad - 10;
-    text("OPTIONAL ADD-ONS", MARGIN + pad, y, 11, bold, ACCENT);
-    y -= 16;
-    for (const ln of intro) {
-      text(ln, MARGIN + pad, y, 9, font, MUTED);
-      y -= 12;
-    }
-    y -= 6;
+    const floor = MARGIN + 48;
+    ctx.y -= 18;
+    if (ctx.y - (pad * 2 + headH + rows[0].h) < floor) newPage(ctx);
+    const chunks: { head: boolean; rows: typeof rows }[] = [{ head: true, rows: [] }];
+    let room = ctx.y + 10 - floor - pad * 2 - headH;
     for (const r of rows) {
-      rightText(r.price, PAGE_W - MARGIN - pad, y, 10, bold, ACCENT);
-      for (const ln of r.label) {
-        text(ln, MARGIN + pad, y, 10, bold, INK);
-        y -= 13;
+      const chunk = chunks[chunks.length - 1];
+      if (r.h > room && chunk.rows.length > 0) {
+        chunks.push({ head: false, rows: [r] });
+        room = PAGE_H - MARGIN + 10 - floor - pad * 2 - r.h;
+      } else {
+        chunk.rows.push(r);
+        room -= r.h;
       }
-      for (const ln of r.note) {
-        text(ln, MARGIN + pad, y, 9, font, MUTED);
-        y -= 12;
-      }
-      y -= 8;
     }
-    ctx.y = top - boxH - 4;
+    chunks.forEach((chunk, ci) => {
+      if (ci > 0) newPage(ctx);
+      const boxH = pad * 2 + (chunk.head ? headH : 0) + chunk.rows.reduce((h, r) => h + r.h, 0);
+      const top = ctx.y + 10;
+      ctx.page.drawRectangle({
+        x: MARGIN,
+        y: top - boxH,
+        width: CONTENT_W,
+        height: boxH,
+        color: ADD_ON_FILL,
+        borderColor: ACCENT,
+        borderWidth: 1.5,
+      });
+      let y = top - pad - 10;
+      if (chunk.head) {
+        text("OPTIONAL ADD-ONS", MARGIN + pad, y, 11, bold, ACCENT);
+        y -= 16;
+        for (const ln of intro) {
+          text(ln, MARGIN + pad, y, 9, font, MUTED);
+          y -= 12;
+        }
+        y -= 6;
+      }
+      for (const r of chunk.rows) {
+        rightText(r.price, PAGE_W - MARGIN - pad, y, 10, bold, ACCENT);
+        for (const ln of r.label) {
+          text(ln, MARGIN + pad, y, 10, bold, INK);
+          y -= 13;
+        }
+        for (const ln of r.note) {
+          text(ln, MARGIN + pad, y, 9, font, MUTED);
+          y -= 12;
+        }
+        y -= 8;
+      }
+      ctx.y = top - boxH - 4;
+    });
   }
 
   // --- Notes ----------------------------------------------------------------
