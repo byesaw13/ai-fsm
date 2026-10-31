@@ -39,7 +39,10 @@ Next step           : push D0/D1/D2 and take them through CI, merge, deploy;
                       not pushed yet: after #740 merges, rebase it onto main
                       (git rebase --onto origin/main task/227-pool-paint
                       task/225-add-on-approval) and open its own PR.
-                      Next build step: D5 (TASK-228, G7 approved).
+                      D5 on local branch task/228-height-factors (on top of
+                      D3), not pushed. Same rebase plan as D3.
+                      Track D is built. Remaining: CI/merge/deploy of #740,
+                      then D3 and D5 PRs, then the production follow-ups.
 Blocked on          : nothing
 Last known-good     : 8441846a (branch deploy-good/8441846a); previous 7490a24c
 Notes               : Off-runbook work 2026-10-31 on prod data (Dowd
@@ -619,6 +622,7 @@ owner chose: D4 next, then D3 and D5.
 
 ## Log
 
+- 2026-10-31 · D5 · In progress · local branch task/228-height-factors · Craftsman height factors replace the vaulted_ceilings pace modifier in Prepare Quote; note on each wall task. Local: lint, typecheck, unit (domain 542, web 2328), knip
 - 2026-10-31 · D3 · In progress · local branch task/225-add-on-approval · migration 213 approved_add_ons (applied + reversed on the dev DB in a rolled-back transaction), portal checkboxes with running total, deposit on base + add-ons, final bill add-on lines, staff card. Local: lint, typecheck, web unit 2328, knip, migration prefixes; integration test add-on-choice.integration.test.ts for CI
 - 2026-10-31 · D0–D4 · PR #740 opened (one PR for the four stacked commits)
 - 2026-10-31 · D4 · In progress · local branch task/227-pool-paint · owner toggle pool_paint; pooledPaint in domain (pails, gallons, quarts under 1 gal; shares by need); buy list "Paint (bought together)". Local: lint, typecheck, unit (domain 539, web 2320) green, knip no failures

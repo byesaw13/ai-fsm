@@ -210,7 +210,7 @@ closed in tests; owner-flow AC still open.
 | TASK-225 | [Customer picks add-on options when approving a quote](TASK-225-customer-picks-add-ons.md) | 002 | In Progress |
 | TASK-226 | [New letterhead on invoices and customer PDFs](TASK-226-new-letterhead.md) | 004 | In Progress |
 | TASK-227 | [Itemized paint pools rooms that share a color](TASK-227-pool-shared-paint.md) | 002 | In Progress |
-| TASK-228 | [Tall walls take more hours in Prepare Quote](TASK-228-tall-wall-height-factors.md) | 002 | Proposed |
+| TASK-228 | [Tall walls take more hours in Prepare Quote](TASK-228-tall-wall-height-factors.md) | 002 | In Progress |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |

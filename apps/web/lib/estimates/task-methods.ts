@@ -5,6 +5,7 @@ import {
   trimPaintHours,
   wallPaintGallons,
   wallPaintHours,
+  wallHeightTimeFactor,
   type AssessmentRoomGeometry,
   type EstimateNote,
   type HoursCandidate,
@@ -139,6 +140,13 @@ export function estimateTask(t: MethodInput, ctx: MethodContext): MethodEstimate
           kind: "limitation",
           text: `Rate 5012 (${ctx.wallPaintRate!.sqft_per_day} sq ft a day) ${UNCALIBRATED} It includes standard prep: filling ordinary nail holes and light sanding.`,
         });
+        const height = wallHeightTimeFactor(g?.max_wall_height_ft ?? null);
+        if (height.factor > 1) {
+          notes.push({
+            kind: "assumption",
+            text: `Walls up to ${g!.max_wall_height_ft} ft: ${height.factor}× the hours (Craftsman height factor, ${height.band}).${height.aboveTable ? " Above 21 ft: price the staging separately." : ""}`,
+          });
+        }
       } else if (sqft === null) {
         notes.push({ kind: "missing", text: "Wall area unknown: add the room's height and count its doors and windows." });
       } else {
