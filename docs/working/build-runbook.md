@@ -34,13 +34,16 @@ In-flight PR        : D0 (branch docs/quote-options-backlog) and D1 (branch
 Next step           : push D0/D1/D2 and take them through CI, merge, deploy;
                       then D1 and D2 production follow-ups (see Plan: Track D).
                       PR #740 opened 2026-10-31 for D0+D1+D2+D4 (one PR,
-                      stacked commits). D3 on local branch
-                      task/225-add-on-approval (on top of D4, migration 213),
-                      not pushed yet: after #740 merges, rebase it onto main
-                      (git rebase --onto origin/main task/227-pool-paint
-                      task/225-add-on-approval) and open its own PR.
-                      D5 on local branch task/228-height-factors (on top of
-                      D3), not pushed. Same rebase plan as D3.
+                      stacked commits; head task/227-pool-paint 3f041ae1
+                      after the Codex fixes). Its two Codex threads are
+                      answered but NOT resolved: the agent's GraphQL
+                      resolveReviewThread was blocked by the permission
+                      check, so the owner resolves them (merge requires it).
+                      D3 (task/225-add-on-approval, migration 213) and D5
+                      (task/228-height-factors) are pushed, no PR yet. After
+                      #740 merges: git rebase --onto origin/main
+                      task/227-pool-paint task/228-height-factors (carries
+                      D3 too), push, open one PR for D3+D5.
                       Track D is built. Remaining: CI/merge/deploy of #740,
                       then D3 and D5 PRs, then the production follow-ups.
 Blocked on          : nothing
@@ -622,6 +625,7 @@ owner chose: D4 next, then D3 and D5.
 
 ## Log
 
+- 2026-10-31 · D1 · Codex review on #740: option ids reused after delete (Revise counted, now max suffix, shared lastAlternativeNumber) and PDF add-ons box overflowing one page (now continues per page); fixed in 3f041ae1, replies posted
 - 2026-10-31 · D5 · In progress · local branch task/228-height-factors · Craftsman height factors replace the vaulted_ceilings pace modifier in Prepare Quote; note on each wall task. Local: lint, typecheck, unit (domain 542, web 2328), knip
 - 2026-10-31 · D3 · In progress · local branch task/225-add-on-approval · migration 213 approved_add_ons (applied + reversed on the dev DB in a rolled-back transaction), portal checkboxes with running total, deposit on base + add-ons, final bill add-on lines, staff card. Local: lint, typecheck, web unit 2328, knip, migration prefixes; integration test add-on-choice.integration.test.ts for CI
 - 2026-10-31 · D0–D4 · PR #740 opened (one PR for the four stacked commits)
