@@ -19,21 +19,19 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : Track D complete and verified 2026-10-31 (#740, #741,
-                      docs #742).
-In-flight PR        : B4 PR 1 (TASK-193, branch task/193-production-rates):
-                      rates Settings card, calibration, hours-per-day.
-                      Continued the uncommitted start left in
-                      ~/worktrees/task-193 on 2026-10-26.
+Last step           : B4 PR 1 (TASK-193) verified on production 2026-10-31:
+                      #743 squash 8f158a7a deployed ~19:13 UTC, no migration;
+                      health ok, /login HTTP/2 200, /api/v1/production-rates
+                      401 without a session.
+In-flight PR        : none
 Next step           : B4 PR 2 (TASK-193): square-foot calculator uses the
                       rates (see the task's "Delivery" section; doctrine
                       Rule 3 applies to useEstimateForm's painting mode).
+                      Branch task/193-calculator-rates exists for it.
 Blocked on          : nothing
-Last known-good     : 047cfdb9 (deploy-good/047cfdb9); previous 0e1b9921
-Notes               : B4 split into two PRs (no product change). No migration
-                      in PR 1: hours_per_day (mig 209) and calibrated_at
-                      already exist. production_rates is a shared table (no
-                      account_id); writes need app.current_role owner/admin.
+Last known-good     : 8f158a7a (deploy-good/8f158a7a); previous 047cfdb9
+Notes               : Open PR #739 (quote editor design fixes, TASK-222
+                      follow-up) belongs to another session; not touched.
 ```
 
 ## Owner approvals
@@ -113,7 +111,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | B1 | TASK-190 | 2026-10-26 (CI 40419939119, 40419947446, #724) | 2026-10-26 (#724, f4837336) | 2026-10-27 (~00:02 UTC) | 2026-10-27 (draft split, 00:04 UTC) |
 | B2 | TASK-191 | 2026-10-27 (CI 40429996387, 40430001995, #726) | 2026-10-27 (#726, 20c7d5f8) | 2026-10-27 (~01:28 UTC) | 2026-10-27 (draft hours null, totals unchanged, 01:28 UTC) |
 | B3 | TASK-192 | 2026-10-27 (CI 40437008165, 40437011775, #728) | 2026-10-27 (#728, 2842780e) | 2026-10-27 (~02:32 UTC) | 2026-10-27 (equipment cost apart, 02:33 UTC) |
-| B4 | TASK-193 | PR 1 in progress | | | |
+| B4 | TASK-193 | PR 1 2026-10-31 (#743, CI green) | PR 1 2026-10-31 (#743, 8f158a7a) | PR 1 2026-10-31 (~19:13 UTC) | PR 1 2026-10-31 (health ok, /login 200, rates API 401 unauth); PR 2 pending |
 | B5 | TASK-194 | | | | |
 | B6 | TASK-195 | | | | |
 | C1 | TASK-210 | | | | |
@@ -604,6 +602,8 @@ owner chose: D4 next, then D3 and D5.
 
 ## Log
 
+- 2026-10-31 · B4 PR 1 · Verified · 8f158a7a deployed ~19:13 UTC, no migration; health ok, /login HTTP/2 200; known-good deploy-good/8f158a7a. Codex review fixed before merge: rates panel refetch loop on load error; saved hours-per-day now updates the card
+- 2026-10-31 · B4 PR 1 · Merged · #743 · squash 8f158a7a
 - 2026-10-31 · B4 · In progress · PR 1 of 2 (TASK-193): Settings card for rates/modifiers with calibration, hours-per-day setting, Prepare Quote pace uses it. Local: lint, typecheck, unit (web 2341, domain 548), knip
 - 2026-10-31 · D3/D5 · Verified · 047cfdb9 deployed ~16:42 UTC after backup ai_fsm_20261031T163602Z.dump (1399 TOC); migration 213 applied; health ok, /login HTTP/2 200; estimates.approved_add_ons present; Dowd quote unchanged (875000, add-ons shown). Known-good deploy-good/047cfdb9
 - 2026-10-31 · D3/D5 · Merged · #741 · squash 047cfdb9. Codex review: add-ons missing from the job-completion bill and the work order, and untaxed on the portal/deposit; fixed in 6a544247 (shared totalWithAddOns, addOnLines in final-invoice.ts, addOnWorkLines in work-order seeding)
