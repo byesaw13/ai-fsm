@@ -110,7 +110,7 @@ describe("TASK-217 acceptance room", () => {
   it("one room package: one labor line and one materials line; only the price changes with the rate", () => {
     const at85 = preparedScopeToLineItems(scope, 8500).lineItems;
     const at115 = preparedScopeToLineItems(scope, 11500).lineItems;
-    expect(at85.map((l) => l.description)).toEqual(["Bedroom — labor, est. 12–17.25 h", "Bedroom — materials allowance"]);
+    expect(at85.map((l) => l.description)).toEqual(["Bedroom — labor", "Bedroom — materials allowance"]);
     expect(at85.map((l) => [l.quantity, l.unit_price_cents])).toEqual([[14.75, 8500], [1, 30500]]);
     expect(at115.map((l) => [l.quantity, l.unit_price_cents])).toEqual([[14.75, 11500], [1, 30500]]);
     expect(buildProposalNotes(scope, 8500)).not.toMatch(/rate 5003|uncalibrated|price book/);

@@ -1,7 +1,7 @@
 # TASK-224: Customer quote shows labor as an amount and options that stand out
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-002 Estimating & Assessments

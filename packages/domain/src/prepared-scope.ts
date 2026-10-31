@@ -97,6 +97,8 @@ export interface PreparedAlternative {
   label: string;
   task_ids: string[];
   note: string | null;
+  /** Owner-set add-on price shown to the customer; null or absent = no price yet (TASK-224). */
+  price_cents?: number | null;
 }
 
 /** How the owner prices the prepared quote, and the inputs for modeling profit (TASK-180). */
@@ -412,7 +414,13 @@ export const preparedScopeSchema = z.object({
     .array(z.object({ id: z.string(), task_ids: z.array(z.string()), text: z.string().max(500), answer: z.string().max(1000).nullable() }))
     .max(100),
   alternatives: z
-    .array(z.object({ id: z.string(), label: z.string().max(200), task_ids: z.array(z.string()), note: z.string().max(500).nullable() }))
+    .array(z.object({
+        id: z.string(),
+        label: z.string().max(200),
+        task_ids: z.array(z.string()),
+        note: z.string().max(500).nullable(),
+        price_cents: z.number().int().min(0).max(100_000_000).nullable().optional(),
+      }))
     .max(50),
   exclusions: z.array(z.string().max(500)).max(50),
   pricing: z

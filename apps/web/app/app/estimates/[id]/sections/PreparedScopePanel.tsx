@@ -18,6 +18,7 @@ import { formatCents } from "@/lib/money";
 import type { RevisionChange } from "@/lib/estimates/revise-quote";
 import { hoursSourceLabel, kindLabel, methodLabel, quantityLabel, tmRangeLabel, workAreaFlags, workAreaRows } from "@/lib/estimates/prepared-scope-display";
 import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
+import { PreparedOptionsEditor } from "@/components/features/estimates/PreparedOptionsEditor";
 
 interface Props {
   estimateId: string;
@@ -452,14 +453,14 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
         </div>
       )}
 
-      {scope.alternatives.length > 0 && (
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }}>
-          <h3 style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-sm)" }}>Options</h3>
-          <ul style={{ margin: 0, paddingLeft: "var(--space-4)" }}>
-            {scope.alternatives.map((a) => <li key={a.id}>{a.label}{a.note ? ` — ${a.note}` : ""}</li>)}
-          </ul>
-        </div>
-      )}
+      <PreparedOptionsEditor
+        options={scope.alternatives}
+        editable={editable}
+        onChange={(alternatives) => {
+          setScope((s) => ({ ...s, alternatives }));
+          setDirty(true);
+        }}
+      />
       {scope.exclusions.length > 0 && (
         <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }}>
           <h3 style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-sm)" }}>Not included</h3>

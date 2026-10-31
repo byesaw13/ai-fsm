@@ -66,3 +66,21 @@ describe("PreparedScopePanel with no work listed", () => {
     expect(html).toContain("for Kitchen, Hall");
   });
 });
+
+describe("PreparedScopePanel options (TASK-224)", () => {
+  const html = renderToStaticMarkup(
+    createElement(PreparedScopePanel, {
+      estimateId: "e1",
+      initialScope: { ...SCOPE, alternatives: [{ id: "a1", label: "Foyer stairwell", task_ids: [], note: "Same room", price_cents: 105_000 }] },
+      roomNames: {}, laborRateCents: 8500, laborCostCents: 5000, editable: true, showInternal: false,
+    }),
+  );
+
+  it("lets the owner edit each option's name, price and note, and add another", () => {
+    expect(html).toContain('value="Foyer stairwell"');
+    expect(html).toContain('value="1050.00"');
+    expect(html).toContain('value="Same room"');
+    expect(html).toContain("Add option");
+    expect(html).toContain("apart from the quote total");
+  });
+});

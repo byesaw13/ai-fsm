@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { queryOne, query, getPool } from "@/lib/db";
 import { EstimatePortalClient } from "./EstimatePortalClient";
 import { isPortalPreview } from "@/lib/portal/session";
+import { customerAddOns, showsQuantityAndRate } from "@/lib/estimates/customer-quote";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ interface EstimateRow extends Record<string, unknown> {
   property_state: string | null;
   property_zip: string | null;
   account_name: string;
+  prepared_scope: unknown;
 }
 
 interface LineItemRow extends Record<string, unknown> {
@@ -32,6 +34,7 @@ interface LineItemRow extends Record<string, unknown> {
   estimate_id: string;
   option_id: string | null;
   description: string;
+  line_item_type: string | null;
   quantity: string;
   unit_price_cents: number;
   total_cents: number;
@@ -65,7 +68,7 @@ export default async function EstimatePortalPage({
        c.name AS client_name,
        p.address AS property_address, p.city AS property_city,
        p.state AS property_state, p.zip AS property_zip,
-       a.name AS account_name
+       a.name AS account_name, e.prepared_scope
      FROM estimates e
      JOIN clients c ON c.id = e.client_id
      JOIN accounts a ON a.id = e.account_id
@@ -99,13 +102,14 @@ export default async function EstimatePortalPage({
     // advisory
   }
 
-  const lineItems = await query<LineItemRow>(
-    `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, total_cents, sort_order
+  const rows = await query<LineItemRow>(
+    `SELECT id, estimate_id, option_id, description, line_item_type, quantity, unit_price_cents, total_cents, sort_order
      FROM estimate_line_items
      WHERE estimate_id = $1 AND (visible_to_customer IS NULL OR visible_to_customer = true)
      ORDER BY sort_order`,
     [estimate.id]
   );
+  const lineItems = rows.map((li) => ({ ...li, show_quantity_and_rate: showsQuantityAndRate(li.line_item_type) }));
 
   const options = await query<OptionRow>(
     `SELECT id, estimate_id, label, description, sort_order, subtotal_cents, tax_cents, total_cents, is_recommended
@@ -122,10 +126,13 @@ export default async function EstimatePortalPage({
 
   const standardLineItems = lineItems.filter((li) => !li.option_id);
 
+  const { prepared_scope, ...estimateFields } = estimate;
+
   return (
     <EstimatePortalClient
       token={token}
-      estimate={estimate}
+      estimate={estimateFields}
+      addOns={customerAddOns(prepared_scope)}
       lineItems={standardLineItems}
       options={optionsWithItems}
       readOnly={await isPortalPreview(estimate.client_id as string)}

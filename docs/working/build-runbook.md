@@ -22,9 +22,13 @@ docs-only commit when there is no PR).
 Last step           : D0 backlog for Track D (customer quote and letterhead),
                       2026-10-31. B3 (TASK-192) was the last runbook code step
                       verified (2026-10-27, squash 2842780e, #728).
-In-flight PR        : D0 docs PR (docs/quote-options-backlog)
-Next step           : D1 (TASK-224), then D2 (TASK-226). Track D runs ahead
-                      of B4.
+In-flight PR        : D0 (branch docs/quote-options-backlog) and D1 (branch
+                      task/224-customer-quote-options, stacked on D0). Both
+                      committed locally on 2026-10-31; NOT pushed: the agent's
+                      push was blocked by the session's permission check.
+                      Push both, open PRs (D1 based on D0 or on main after D0
+                      merges), wait for CI incl. integration tests.
+Next step           : D2 (TASK-226). Track D runs ahead of B4.
 Blocked on          : nothing
 Last known-good     : 8441846a (branch deploy-good/8441846a); previous 7490a24c
 Notes               : Off-runbook work 2026-10-31 on prod data (Dowd
@@ -602,6 +606,7 @@ answer in "Owner approvals" or the task file, then build.
 
 ## Log
 
+- 2026-10-31 · D1 · In progress · local branch task/224-customer-quote-options · labor amount only on portal/PDF/print, add-ons block, option editor, notes without options/allowances on fixed. Local: lint, typecheck, unit (web 2307, domain 532) green, knip no failures; integration test added (prepared-scope-apply), not run locally (no test server)
 - 2026-10-31 · D0 · In progress · backlog TASK-224..228, ROADMAP Phase 3 slice, map rows, Track D plan
 
 One line per state change: date, step, state, PR, evidence.

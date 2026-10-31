@@ -10,6 +10,15 @@ interface LineItem {
   quantity: string;
   unit_price_cents: number;
   total_cents: number;
+  /** False for labor: customers see the amount, not hours times a rate (TASK-224). */
+  show_quantity_and_rate?: boolean;
+}
+
+interface AddOn {
+  id: string;
+  label: string;
+  note: string | null;
+  price_cents: number | null;
 }
 
 interface EstimateOption {
@@ -52,6 +61,8 @@ interface Props {
   estimate: Estimate;
   lineItems: LineItem[];
   options?: EstimateOption[];
+  /** Priced options the customer can ask to add; not in the total (TASK-224). */
+  addOns?: AddOn[];
 }
 
 function cents(n: number) {
@@ -155,7 +166,7 @@ function SignaturePad({ onSave }: { onSave: (svg: string) => void }) {
   );
 }
 
-export function EstimatePortalClient({ token, estimate, lineItems, options = [], readOnly = false }: Props) {
+export function EstimatePortalClient({ token, estimate, lineItems, options = [], addOns = [], readOnly = false }: Props) {
   const [status, setStatus] = useState(estimate.status);
   const [approvedName, setApprovedName] = useState(estimate.client_approved_name ?? "");
   const [name, setName] = useState("");
@@ -311,8 +322,8 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
               {lineItems.map((item) => (
                 <tr key={item.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
                   <td style={{ padding: "10px 16px" }}>{item.description}</td>
-                  <td style={{ padding: "10px 16px", textAlign: "right", color: "#6b7280" }}>{item.quantity}</td>
-                  <td style={{ padding: "10px 16px", textAlign: "right", color: "#6b7280" }}>{cents(item.unit_price_cents)}</td>
+                  <td style={{ padding: "10px 16px", textAlign: "right", color: "#6b7280" }}>{item.show_quantity_and_rate === false ? "" : item.quantity}</td>
+                  <td style={{ padding: "10px 16px", textAlign: "right", color: "#6b7280" }}>{item.show_quantity_and_rate === false ? "" : cents(item.unit_price_cents)}</td>
                   <td style={{ padding: "10px 16px", textAlign: "right", fontWeight: 500 }}>{cents(item.total_cents)}</td>
                 </tr>
               ))}
@@ -337,6 +348,35 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
             </div>
           </div>
         </div>
+        )}
+
+        {/* Optional add-ons (TASK-224): set apart so they read as choices, not scope */}
+        {addOns.length > 0 && (
+          <section
+            aria-labelledby="add-ons-heading"
+            style={{ background: "#fdf4ec", border: "2px solid #d2672a", borderRadius: 8, padding: 16, marginBottom: 24 }}
+          >
+            <h2 id="add-ons-heading" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#13263c" }}>Optional add-ons</h2>
+            <p style={{ margin: "4px 0 12px", fontSize: 13, color: "#57534e" }}>
+              Not included in the total above. Tell us if you would like any of these added.
+            </p>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+              {addOns.map((a) => (
+                <li
+                  key={a.id}
+                  style={{ background: "#fff", border: "1px solid #f0d3bd", borderRadius: 6, padding: "10px 12px", display: "flex", gap: 12, justifyContent: "space-between", alignItems: "flex-start" }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, color: "#13263c" }}>{a.label}</div>
+                    {a.note && <div style={{ fontSize: 13, color: "#57534e", marginTop: 2 }}>{a.note}</div>}
+                  </div>
+                  <div style={{ fontWeight: 700, color: "#b3541f", whiteSpace: "nowrap" }}>
+                    {a.price_cents != null ? `+${cents(a.price_cents)}` : "Price on request"}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {/* Notes */}

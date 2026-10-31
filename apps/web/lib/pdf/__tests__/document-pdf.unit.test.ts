@@ -229,6 +229,36 @@ describe("PDF voice", () => {
 });
 
 describe("buildEstimatePdf", () => {
+  it("shows labor as an amount without quantity or rate, and lists add-ons apart from the total (TASK-224)", async () => {
+    const bytes = await buildEstimatePdf({
+      estimateRef: "EST-2026-0026",
+      status: "draft",
+      clientName: "Pat Client",
+      issueDate: "2026-10-31",
+      subtotalCents: 146_971 + 29_750,
+      totalCents: 146_971 + 29_750,
+      lineItems: [
+        { description: "Living room — labor", quantity: 16.25, unitPriceCents: 9045, totalCents: 146_971, hideQuantityAndRate: true },
+        { description: "Living room — materials allowance", quantity: 1, unitPriceCents: 29_750, totalCents: 29_750 },
+      ],
+      addOns: [
+        { label: "Foyer stairwell", note: "Same open space as the foyer", priceCents: 105_000 },
+        { label: "Trim touch-ups", note: null, priceCents: null },
+      ],
+    });
+    const lines = pdfDrawnText(bytes).split("\n");
+    expect(lines).not.toContain("16.25");
+    expect(lines).not.toContain("$90.45");
+    expect(lines).toContain("$1,469.71");
+    expect(lines).toContain("$297.50");
+    expect(lines).toContain("OPTIONAL ADD-ONS");
+    expect(lines).toContain("Foyer stairwell");
+    expect(lines).toContain("Same open space as the foyer");
+    expect(lines).toContain("+$1,050.00");
+    expect(lines).toContain("Price on request");
+    expect(lines.some((l) => l.startsWith("Not included in the total above."))).toBe(true);
+  });
+
   it("renders multi-option estimates from option groups (parent total is 0)", async () => {
     const bytes = await buildEstimatePdf({
       estimateRef: "MULTI001",
