@@ -1,7 +1,7 @@
 # TASK-227: Itemized paint pools rooms that share a color
 
 Status:
-In Progress
+Done (2026-10-31, verified on production; PRs #740, #741)
 
 Epic:
 EPIC-002 Estimating & Assessments

@@ -1,7 +1,7 @@
 # TASK-224: Customer quote shows labor as an amount and options that stand out
 
 Status:
-In Progress
+Done (2026-10-31, verified on production; PRs #740, #741)
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -57,16 +57,16 @@ Out of scope:
 - Manual (non-prepared) quotes get the labor-column change only. They have no alternatives.
 
 Acceptance Criteria:
-- [ ] The portal, PDF and print page of a quote with a labor line show no Qty, Unit price or hours for
+- [x] The portal, PDF and print page of a quote with a labor line show no Qty, Unit price or hours for
       that line. Unit tests cover the PDF rows and the notes builder. A render test covers the portal row.
-- [ ] Prepared T&M Apply writes "<Area> — labor" descriptions with the hours in hours_low/hours_high.
-- [ ] A prepared quote with two priced options shows the add-ons block on all three views, with the
+- [x] Prepared T&M Apply writes "<Area> — labor" descriptions with the hours in hours_low/hours_high.
+- [x] A prepared quote with two priced options shows the add-ons block on all three views, with the
       label, note and "+$X", and the totals do not change.
-- [ ] Notes no longer duplicate the options when alternatives exist.
-- [ ] A fixed-price quote prints no allowances sentence.
-- [ ] The owner can add, edit and remove an option and save it. An integration test covers the
+- [x] Notes no longer duplicate the options when alternatives exist.
+- [x] A fixed-price quote prints no allowances sentence.
+- [x] The owner can add, edit and remove an option and save it. An integration test covers the
       prepared-scope PUT with a new option and a changed price.
-- [ ] Dowd EST-2026-0026 is migrated: the prices in its option labels move to `price_cents`, and its
+- [x] Dowd EST-2026-0026 is migrated: the prices in its option labels move to `price_cents`, and its
       notes are rebuilt. Dry run first, no total change. This happens after the deploy is verified.
 
 Related:

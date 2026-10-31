@@ -1,7 +1,7 @@
 # TASK-226: New letterhead on invoices and customer PDFs
 
 Status:
-In Progress
+Done (2026-10-31, verified on production; PRs #740, #741)
 
 Epic:
 EPIC-004 Billing & Profitability
@@ -45,9 +45,9 @@ Out of scope:
 - The business card (TASK-177) keeps its own settings.
 
 Acceptance Criteria:
-- [ ] Unit tests: wordmark detection on a 1200×315 PNG, a 170×170 PNG and a JPEG.
-- [ ] The PDF test renders with a wordmark logo and does not draw the company name text.
-- [ ] After deploy, the production account logo is the new lockup and `company_address` is empty. The
+- [x] Unit tests: wordmark detection on a 1200×315 PNG, a 170×170 PNG and a JPEG.
+- [x] The PDF test renders with a wordmark logo and does not draw the company name text.
+- [x] After deploy, the production account logo is the new lockup and `company_address` is empty. The
       invoice PDF of a recent invoice is checked by eye.
 
 Effort:

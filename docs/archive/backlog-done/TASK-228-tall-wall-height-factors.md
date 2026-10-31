@@ -1,7 +1,7 @@
 # TASK-228: Tall walls take more hours in Prepare Quote
 
 Status:
-In Progress
+Done (2026-10-31, verified on production; PRs #740, #741)
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -44,9 +44,9 @@ Scope:
 - Hours the owner has already set (`hours_source = "owner"`) are never changed.
 
 Acceptance Criteria:
-- [ ] Unit test: a 400 sq ft room at 18 ft gets 1.69× the hours of the same room at 9 ft.
-- [ ] Owner-set hours are untouched.
-- [ ] The factor shows in the task's notes on the prepared scope panel.
+- [x] Unit test: a 400 sq ft room at 18 ft gets 1.69× the hours of the same room at 9 ft.
+- [x] Owner-set hours are untouched.
+- [x] The factor shows in the task's notes on the prepared scope panel.
 
 Effort:
 0.5 d

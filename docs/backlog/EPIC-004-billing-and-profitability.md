@@ -76,4 +76,4 @@ See [TASK-136-done-invoice-from-complete.md](./TASK-136-done-invoice-from-comple
 
 # TASK-226: New letterhead on invoices and customer PDFs
 
-See [TASK-226-new-letterhead.md](./TASK-226-new-letterhead.md). House-and-dove lockup from the site repo, no home address. Owner 2026-10-31; runbook step D2.
+Done (2026-10-31). See [TASK-226-new-letterhead.md](../archive/backlog-done/TASK-226-new-letterhead.md). House-and-dove lockup from the site repo, no home address.
