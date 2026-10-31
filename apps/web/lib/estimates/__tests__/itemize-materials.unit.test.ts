@@ -94,6 +94,28 @@ describe("itemized materials (TASK-187)", () => {
     expect(preparedShoppingList(SCOPE)).toBeNull();
   });
 
+  it("buys paint shared by rooms together as pails and gallons when the owner pools it (TASK-227)", () => {
+    const bath = toMaterialList(RESULT, ["t1", "t2"]); // toilet + 2 gal paint
+    const hall = toMaterialList({ ...RESULT, items: [{ ...RESULT.items[1], quantity: 4.5 }] }, ["t4"]);
+    const pooled = preparedShoppingList({ ...SCOPE, materials: { bath, hall }, pool_paint: true })!;
+    expect(pooled.sections.map((sec) => sec.section)).toEqual(["Bathroom", "Paint (bought together)"]);
+    expect(pooled.sections[0].specified_items.map((i) => i.name)).toEqual(["American Standard Toilet, elongated"]);
+    expect(pooled.sections[1].specified_items.map((i) => [i.name, i.units_to_order, i.unit_label, i.unit_cost_cents])).toEqual([
+      ["Interior paint", 1, "5-gal pail", 27500],
+      ["Interior paint", 2, "gallon", 5500],
+    ]);
+    expect(pooled.total_specified_cost_cents).toBe(28900 + 7 * 5500);
+
+    const apart = preparedShoppingList({ ...SCOPE, materials: { bath, hall } })!;
+    expect(apart.sections.map((sec) => sec.section)).toEqual(["Bathroom", "Hall"]);
+  });
+
+  it("Save keeps the owner's paint pooling choice (TASK-227)", () => {
+    expect(applyScopeEdits(SCOPE, { ...SCOPE, pool_paint: true }).pool_paint).toBe(true);
+    expect(applyScopeEdits({ ...SCOPE, pool_paint: true }, { ...SCOPE, pool_paint: false }).pool_paint).toBe(false);
+    expect(applyScopeEdits({ ...SCOPE, pool_paint: true }, SCOPE).pool_paint).toBe(true);
+  });
+
   it("an itemized quote whose materials are all zeroed writes an empty list, so the old one is replaced", () => {
     const zeroed = toMaterialList(RESULT, ["t1", "t2"]);
     zeroed.lines = zeroed.lines.map((l) => ({ ...l, quantity: 0 }));

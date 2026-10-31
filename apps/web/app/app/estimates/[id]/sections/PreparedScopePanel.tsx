@@ -6,6 +6,7 @@ import {
   DEFAULT_PREPARED_PRICING,
   materialLineCents,
   modelPreparedProfit,
+  pooledPaint,
   summarizePreparedScope,
   type PreparedMaterialLine,
   type PreparedMaterialList,
@@ -97,6 +98,8 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
     [scope, laborRateCents, laborCostCents],
   );
   const areas = useMemo(() => workAreaRows(scope, laborRateCents), [scope, laborRateCents]);
+  // Paint more than one room lists, which could be bought together (TASK-227).
+  const poolable = useMemo(() => pooledPaint({ ...scope, pool_paint: true }), [scope]);
   // Work areas start collapsed (TASK-185); the owner opens one to edit its tasks.
   const [openAreas, setOpenAreas] = useState<Set<string>>(() => new Set());
   function toggleArea(key: string) {
@@ -392,6 +395,33 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
           <span style={{ textAlign: "right" }}>{formatCents(areas.materials_cents)}</span>
           <span style={{ textAlign: "right" }} data-testid="work-area-total">{formatCents(areas.total_cents)}</span>
         </div>
+        {poolable.length > 0 && (
+          <div style={{ padding: "var(--space-2) 0" }} data-testid="pool-paint">
+            <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-start" }}>
+              <input
+                type="checkbox"
+                checked={!!scope.pool_paint}
+                disabled={!editable}
+                onChange={(e) => {
+                  setScope((s) => ({ ...s, pool_paint: e.target.checked }));
+                  setDirty(true);
+                }}
+              />
+              <span>
+                One color everywhere: buy paint together
+                <span style={{ ...label, display: "block" }}>
+                  {poolable
+                    .map((p) => {
+                      const parts = [p.pails ? `${p.pails} × 5-gal pail` : null, p.gallons ? `${p.gallons} gal` : null, p.quarts ? `${p.quarts} qt` : null].filter(Boolean);
+                      return `${p.name}: ${p.needed} gal across ${Object.keys(p.shares).length} rooms → ${parts.join(" + ")}, ${formatCents(p.cost_cents)}`;
+                    })
+                    .join(" · ")}
+                  . Each room&apos;s materials carry its share. A pail is priced as 5 gallons; edit the price on the buy list if yours is lower.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
         {editable && areas.rows.some((r) => !r.materials_itemized) && (
           <Button variant="secondary" onClick={() => itemize(areas.rows.filter((r) => !r.materials_itemized).map((r) => r.key))} disabled={itemizing !== null || revising}>
             {itemizing === "all" ? "Listing materials…" : "Itemize materials for every area"}

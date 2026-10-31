@@ -1,4 +1,4 @@
-import type { AssessmentSummary, PreparedMaterialList, PreparedScope, ShoppingList } from "@ai-fsm/domain";
+import { pooledPaint, type AssessmentSummary, type PreparedMaterialList, type PreparedScope, type ShoppingList } from "@ai-fsm/domain";
 import {
   MaterialsGenerationError,
   type GenerateMaterialsInput,
@@ -99,31 +99,48 @@ export async function itemizeGroups(
  */
 export function preparedShoppingList(scope: PreparedScope): ShoppingList | null {
   if (!scope.materials) return null;
-  const lists = Object.entries(scope.materials).filter(([, l]) => l.lines.some((line) => line.quantity > 0));
+  // Paint shared by rooms is bought together (TASK-227): off the room sections, onto one.
+  const pooled = pooledPaint(scope);
+  const pooledRefs = new Set(pooled.flatMap((p) => p.line_refs));
   const labels = new Map(scope.groups.map((g) => [g.key, g.label]));
-  const sections = lists.map(([key, list]) => {
-    const specified_items = list.lines
-      .filter((l) => l.quantity > 0)
-      .map((l) => ({
-        name: l.name,
-        sku: null,
-        coverage_per_unit: null,
-        unit_label: l.unit,
-        unit_cost_cents: l.unit_cost_cents,
-        quantity_needed: l.quantity,
-        waste_factor: 1,
-        units_to_order: l.quantity,
-        store_section: labels.get(key) ?? key,
-        service_code: "prepared_scope",
-        notes: l.notes || null,
-      }));
-    return {
-      section: labels.get(key) ?? key,
-      computed_items: [],
-      specified_items,
-      section_total_cents: specified_items.reduce((s, i) => s + Math.round((i.unit_cost_cents ?? 0) * i.units_to_order), 0),
-    };
+  const item = (section: string, name: string, unit: string, unitCost: number | null, qty: number, notes: string | null) => ({
+    name,
+    sku: null,
+    coverage_per_unit: null,
+    unit_label: unit,
+    unit_cost_cents: unitCost,
+    quantity_needed: qty,
+    waste_factor: 1,
+    units_to_order: qty,
+    store_section: section,
+    service_code: "prepared_scope",
+    notes,
   });
+  const section = (name: string, specified_items: ReturnType<typeof item>[]) => ({
+    section: name,
+    computed_items: [],
+    specified_items,
+    section_total_cents: specified_items.reduce((s, i) => s + Math.round((i.unit_cost_cents ?? 0) * i.units_to_order), 0),
+  });
+  const sections = Object.entries(scope.materials)
+    .map(([key, list]) => {
+      const label = labels.get(key) ?? key;
+      const lines = list.lines.filter((l) => l.quantity > 0 && !pooledRefs.has(`${key}/${l.id}`));
+      return section(label, lines.map((l) => item(label, l.name, l.unit, l.unit_cost_cents, l.quantity, l.notes || null)));
+    })
+    .filter((sec) => sec.specified_items.length > 0);
+  if (pooled.length) {
+    const label = "Paint (bought together)";
+    const items = pooled.flatMap((p) => {
+      const note = `${p.needed} gal needed across ${Object.keys(p.shares).length} rooms`;
+      return [
+        p.pails > 0 ? item(label, p.name, "5-gal pail", p.unit_cost_cents * 5, p.pails, note) : null,
+        p.gallons > 0 ? item(label, p.name, "gallon", p.unit_cost_cents, p.gallons, note) : null,
+        p.quarts > 0 ? item(label, p.name, "quart", Math.round(p.unit_cost_cents / 4), p.quarts, note) : null,
+      ].filter((i) => i !== null);
+    });
+    sections.push(section(label, items));
+  }
   return {
     sections,
     total_catalog_cost_cents: 0,

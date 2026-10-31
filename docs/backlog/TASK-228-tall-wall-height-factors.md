@@ -12,8 +12,8 @@ Phase:
 Related:
 TASK-219 (production rate review). TASK-218 (Craftsman reference).
 
-Owner decision needed before build:
-Adopt the Craftsman height factors below, or set our own.
+Owner decision (2026-10-31, runbook G7):
+Use the Craftsman height factors below.
 
 Problem:
 Prepare Quote turns wall square feet into hours with one production rate (code 5012, 400 sq ft/day) and

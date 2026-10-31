@@ -528,6 +528,7 @@ export function applyScopeEdits(stored: PreparedScope, incoming: PreparedScope):
     }),
     pricing: incoming.pricing ?? stored.pricing,
     alternatives: mergeAlternativeEdits(stored.alternatives, incoming.alternatives),
+    pool_paint: incoming.pool_paint ?? stored.pool_paint,
     materials: mergeMaterialEdits(stored.materials, incoming.materials),
     // Server-managed: only Apply sets it.
     proposal_notes: stored.proposal_notes ?? null,

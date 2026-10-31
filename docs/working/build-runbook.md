@@ -28,11 +28,13 @@ In-flight PR        : D0 (branch docs/quote-options-backlog) and D1 (branch
                       push was blocked by the session's permission check.
                       Push both, open PRs (D1 based on D0 or on main after D0
                       merges), wait for CI incl. integration tests.
-                      D2 (branch task/226-letterhead, stacked on D1) also
+                      D2 (branch task/226-letterhead, stacked on D1) and D4
+                      (branch task/227-pool-paint, stacked on D2) also
                       committed locally, not pushed.
 Next step           : push D0/D1/D2 and take them through CI, merge, deploy;
                       then D1 and D2 production follow-ups (see Plan: Track D).
-                      Then D4. D3 and D5 start with an owner question.
+                      Next build step: D3 (TASK-225, G6 approved), then D5
+                      (TASK-228, G7 approved).
 Blocked on          : nothing
 Last known-good     : 8441846a (branch deploy-good/8441846a); previous 7490a24c
 Notes               : Off-runbook work 2026-10-31 on prod data (Dowd
@@ -63,6 +65,8 @@ this one, as an approval.
 | G2 | Paint pilot passed its success criteria (before TASK-216) | Pending (after the pilot) | |
 | G3 | Closing each stale "sent" estimate (TASK-206) | Per estimate, non-blocking | |
 | G4 | Any database restore or data repair on production | Ask every time | |
+| G6 | TASK-225 table-freeze exception (one nullable column for chosen add-ons) | Approved 2026-10-31 | Owner in session: "approve both, use craftsman factors, start TASK-227", answering (1) TASK-225's one new column and (2) TASK-228's factors. |
+| G7 | TASK-228 height factors: Craftsman ×1.23 (9–13 ft), ×1.46 (13–17 ft), ×1.69 (17–19 ft), ×1.92 (19–21 ft) | Approved 2026-10-31 | Same session answer as G6. |
 
 **Without G0 active** the agent works in "PRs only" mode: it builds, tests and
 opens PRs, gets them ready to merge, then stops and asks the owner to merge.
@@ -354,11 +358,10 @@ it if needed." Track D runs ahead of the remaining B, C and F steps.
   owner edits options.
 - **D2** TASK-226 New letterhead (code), then the settings change (logo
   upload, clear the address) after Verified.
-- **D3** TASK-225 Customer ticks add-ons when approving (needs D1, and the
-  owner's table-freeze decision for its one column: stop and ask).
+- **D3** TASK-225 Customer ticks add-ons when approving (needs D1; column
+  approved, G6).
 - **D4** TASK-227 Pool paint across rooms that share a color.
-- **D5** TASK-228 Tall-wall height factors (needs the owner to approve the
-  factors: stop and ask).
+- **D5** TASK-228 Tall-wall height factors (factors approved, G7).
 
 Not in this runbook: TASK-183 (deferred until Good/Better/Best is used) and
 the Phase 4 items in `docs/canonical/ROADMAP.md`.
@@ -606,11 +609,13 @@ the production follow-up. Record progress in "Current state" and "Log".
 
 ### D3 to D5
 
-See the task files. D3 and D5 begin with an owner question. Ask, record the
-answer in "Owner approvals" or the task file, then build.
+See the task files. Owner questions answered 2026-10-31 (G6, G7). Order the
+owner chose: D4 next, then D3 and D5.
 
 ## Log
 
+- 2026-10-31 · D4 · In progress · local branch task/227-pool-paint · owner toggle pool_paint; pooledPaint in domain (pails, gallons, quarts under 1 gal; shares by need); buy list "Paint (bought together)". Local: lint, typecheck, unit (domain 539, web 2320) green, knip no failures
+- 2026-10-31 · G6/G7 · Approved in session: "approve both, use craftsman factors, start TASK-227"
 - 2026-10-31 · D2 · Data · prod account aaaaaaaa…0001 settings.company_address removed (was "85R Rockingham Rd Derry, NH 03038"; reversal: UPDATE accounts SET settings = settings || '{"company_address":"85R Rockingham Rd Derry, NH 03038"}' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'). Owner asked for it in session. Logo upload waits for D2's deploy (old code would print the name twice)
 - 2026-10-31 · D2 · In progress · local branch task/226-letterhead · wordmark detection from PNG IHDR, PDF + shared Letterhead on invoice and quote print pages. Local: lint, typecheck, web unit 2316 green, knip no failures; sample PDF checked by eye
 - 2026-10-31 · D1 · In progress · local branch task/224-customer-quote-options · labor amount only on portal/PDF/print, add-ons block, option editor, notes without options/allowances on fixed. Local: lint, typecheck, unit (web 2307, domain 532) green, knip no failures; integration test added (prepared-scope-apply), not run locally (no test server)

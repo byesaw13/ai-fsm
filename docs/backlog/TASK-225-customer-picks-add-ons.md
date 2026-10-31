@@ -23,7 +23,7 @@ Scope:
 - Approve records the chosen option ids and the approved total on the estimate:
   - one nullable jsonb column, `approved_add_ons` (id, label, price_cents)
   - the stored total stays the base price
-  - this needs a migration and an owner table-freeze decision before build
+  - this needs a migration. Table-freeze exception approved by the owner 2026-10-31 (runbook G6).
 - Approve adds each chosen add-on as a line on the quote, after the prepared lines, so convert, the job
   and the invoice carry it. `prepared_group_key` is `addon:<id>`, so Apply keeps or rebuilds it.
 - The staff estimate page shows which add-ons were chosen.
