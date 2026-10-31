@@ -22,31 +22,15 @@ docs-only commit when there is no PR).
 Last step           : D0 backlog for Track D (customer quote and letterhead),
                       2026-10-31. B3 (TASK-192) was the last runbook code step
                       verified (2026-10-27, squash 2842780e, #728).
-In-flight PR        : D0 (branch docs/quote-options-backlog) and D1 (branch
-                      task/224-customer-quote-options, stacked on D0). Both
-                      committed locally on 2026-10-31; NOT pushed: the agent's
-                      push was blocked by the session's permission check.
-                      Push both, open PRs (D1 based on D0 or on main after D0
-                      merges), wait for CI incl. integration tests.
-                      D2 (branch task/226-letterhead, stacked on D1) and D4
-                      (branch task/227-pool-paint, stacked on D2) also
-                      committed locally, not pushed.
-Next step           : push D0/D1/D2 and take them through CI, merge, deploy;
-                      then D1 and D2 production follow-ups (see Plan: Track D).
-                      PR #740 opened 2026-10-31 for D0+D1+D2+D4 (one PR,
-                      stacked commits; head task/227-pool-paint 3f041ae1
-                      after the Codex fixes). Its two Codex threads are
-                      answered but NOT resolved: the agent's GraphQL
-                      resolveReviewThread was blocked by the permission
-                      check, so the owner resolves them (merge requires it).
-                      D3 (task/225-add-on-approval, migration 213) and D5
-                      (task/228-height-factors) are pushed, no PR yet. After
-                      #740 merges: git rebase --onto origin/main
-                      task/227-pool-paint task/228-height-factors (carries
-                      D3 too), push, open one PR for D3+D5.
-                      Track D is built. Remaining: CI/merge/deploy of #740,
-                      then D3 and D5 PRs, then the production follow-ups.
-Blocked on          : nothing
+In-flight PR        : D3+D5 PR (branch task/225-228-addons-height, rebased
+                      on main 0e1b9921; migration 213).
+Next step           : deploy main 0e1b9921 (D1, D2, D4; no migration), verify,
+                      then the D1/D2 production follow-ups (logo upload, Dowd
+                      option prices to price_cents). Then CI/merge/deploy the
+                      D3+D5 PR (migration 213: backup first).
+Blocked on          : the agent's run of scripts/deploy-garonhome.sh was blocked
+                      by the session's permission check (2026-10-31); the owner
+                      runs the deploy or allows it.
 Last known-good     : 8441846a (branch deploy-good/8441846a); previous 7490a24c
 Notes               : Off-runbook work 2026-10-31 on prod data (Dowd
                       EST-2026-0026): switched to fixed $8,750 via the app's
@@ -155,11 +139,11 @@ docs-only commit after the event. Planned tests are not passing tests.
 | F9 | TASK-200 | | | | |
 | F10 | TASK-201 | | | | |
 | F11 | TASK-208 | | | | |
-| D0 | Backlog TASK-224..228 | | | n/a | n/a |
-| D1 | TASK-224 | | | | |
-| D2 | TASK-226 | | | | |
+| D0 | Backlog TASK-224..228 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | n/a | n/a |
+| D1 | TASK-224 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | | |
+| D2 | TASK-226 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | | |
 | D3 | TASK-225 | | | | |
-| D4 | TASK-227 | | | | |
+| D4 | TASK-227 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | | |
 | D5 | TASK-228 | | | | |
 
 ## Operating rules
@@ -625,6 +609,7 @@ owner chose: D4 next, then D3 and D5.
 
 ## Log
 
+- 2026-10-31 · D0/D1/D2/D4 · Merged · #740 · squash 0e1b9921 (Codex threads resolved by the agent after the owner allowed gh api graphql). Deploy pending
 - 2026-10-31 · D1 · Codex review on #740: option ids reused after delete (Revise counted, now max suffix, shared lastAlternativeNumber) and PDF add-ons box overflowing one page (now continues per page); fixed in 3f041ae1, replies posted
 - 2026-10-31 · D5 · In progress · local branch task/228-height-factors · Craftsman height factors replace the vaulted_ceilings pace modifier in Prepare Quote; note on each wall task. Local: lint, typecheck, unit (domain 542, web 2328), knip
 - 2026-10-31 · D3 · In progress · local branch task/225-add-on-approval · migration 213 approved_add_ons (applied + reversed on the dev DB in a rolled-back transaction), portal checkboxes with running total, deposit on base + add-ons, final bill add-on lines, staff card. Local: lint, typecheck, web unit 2328, knip, migration prefixes; integration test add-on-choice.integration.test.ts for CI
