@@ -10,7 +10,7 @@ import {
   getTravelSnapshot,
 } from "@/lib/travel/snapshots";
 import { resolveIssueDueDate } from "@ai-fsm/domain";
-import { approvedLines, invoiceLinesFor, invoiceMoneyFor, type ConvertSourceLine } from "@/lib/estimates/approved-lines";
+import { addOnLines, approvedLines, invoiceLinesFor, invoiceMoneyFor, type ConvertSourceLine } from "@/lib/estimates/approved-lines";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +46,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
                 e.subtotal_cents, e.tax_cents, e.total_cents, e.deposit_cents,
                 e.notes, e.created_by, e.travel_snapshot_id,
                 e.presentation_mode, e.selected_option_id,
-                e.risk_adjustment_cents, e.travel_surcharge_cents
+                e.risk_adjustment_cents, e.travel_surcharge_cents, e.approved_add_ons
          FROM estimates e
          WHERE e.id = $1 AND e.account_id = $2`,
         [id, session.accountId]
@@ -75,6 +75,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         selected_option_id: string | null;
         risk_adjustment_cents: number;
         travel_surcharge_cents: number;
+        approved_add_ons: { label: string; price_cents: number }[] | null;
       };
 
       // 2. Enforce prerequisite: only approved estimates can be converted
@@ -154,7 +155,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         line_item_type: item.line_item_type,
       }));
       const chosen = approvedLines(sourceLines, estimate.selected_option_id);
-      const lineItems = invoiceLinesFor(
+      const quoteLines = invoiceLinesFor(
         {
           risk_adjustment_cents: Number(estimate.risk_adjustment_cents),
           travel_surcharge_cents: Number(estimate.travel_surcharge_cents),
@@ -162,6 +163,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         },
         chosen,
       );
+      // TASK-225: add-ons the customer ticked when approving become their own lines.
+      const addOns = estimate.approved_add_ons ?? [];
+      const lineItems = [...quoteLines, ...addOnLines(addOns, quoteLines)];
 
       let optionMoney: { subtotal_cents: number; tax_cents: number } | null = null;
       if (estimate.presentation_mode === "multi_option" && estimate.selected_option_id) {
@@ -197,6 +201,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         option: optionMoney,
         drafted_lines: lineItems,
         snapshot_travel_cents: snapshotTravelCents,
+        add_on_cents: addOns.reduce((sum, a) => sum + a.price_cents, 0),
       });
 
       // 3b. Reconcile against any deposit/progress invoices already billed so the

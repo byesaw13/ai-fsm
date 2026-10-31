@@ -1,7 +1,7 @@
 # TASK-225: Customer picks add-on options when approving a quote
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -24,8 +24,14 @@ Scope:
   - one nullable jsonb column, `approved_add_ons` (id, label, price_cents)
   - the stored total stays the base price
   - this needs a migration. Table-freeze exception approved by the owner 2026-10-31 (runbook G6).
-- Approve adds each chosen add-on as a line on the quote, after the prepared lines, so convert, the job
-  and the invoice carry it. `prepared_group_key` is `addon:<id>`, so Apply keeps or rebuilds it.
+- The quote's own lines and totals stay as sent. The immutability trigger forbids changing a sent
+  quote's totals (found while building, 2026-10-31). Instead:
+  - the deposit is recalculated on base + add-ons when the customer approves
+  - convert adds one "<label> (added option)" line per add-on to the final bill, and the bill's
+    subtotal/total include them (`addOnLines`, `invoiceMoneyFor.add_on_cents` in
+    `lib/estimates/approved-lines.ts`)
+- Only the first portal approval of a sent quote records add-ons. The owner's transition and the email
+  respond path don't offer add-ons.
 - The staff estimate page shows which add-ons were chosen.
 
 Out of scope:

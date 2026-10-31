@@ -58,3 +58,16 @@ describe("EstimatePortalClient (TASK-224)", () => {
     expect(plain).not.toContain("Optional add-ons");
   });
 });
+
+describe("EstimatePortalClient add-on approval (TASK-225)", () => {
+  it("tells a customer who can still approve that add-ons can be ticked then", () => {
+    const html = renderToStaticMarkup(
+      createElement(EstimatePortalClient, {
+        token: "tok", estimate: ESTIMATE, readOnly: false, lineItems: [],
+        addOns: [{ id: "a2", label: "Foyer stairwell", note: null, price_cents: 105_000 }],
+      }),
+    );
+    expect(html).toContain("You can add any of these when you approve.");
+  });
+});
+

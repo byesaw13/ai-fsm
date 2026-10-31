@@ -33,8 +33,13 @@ In-flight PR        : D0 (branch docs/quote-options-backlog) and D1 (branch
                       committed locally, not pushed.
 Next step           : push D0/D1/D2 and take them through CI, merge, deploy;
                       then D1 and D2 production follow-ups (see Plan: Track D).
-                      Next build step: D3 (TASK-225, G6 approved), then D5
-                      (TASK-228, G7 approved).
+                      PR #740 opened 2026-10-31 for D0+D1+D2+D4 (one PR,
+                      stacked commits). D3 on local branch
+                      task/225-add-on-approval (on top of D4, migration 213),
+                      not pushed yet: after #740 merges, rebase it onto main
+                      (git rebase --onto origin/main task/227-pool-paint
+                      task/225-add-on-approval) and open its own PR.
+                      Next build step: D5 (TASK-228, G7 approved).
 Blocked on          : nothing
 Last known-good     : 8441846a (branch deploy-good/8441846a); previous 7490a24c
 Notes               : Off-runbook work 2026-10-31 on prod data (Dowd
@@ -614,6 +619,8 @@ owner chose: D4 next, then D3 and D5.
 
 ## Log
 
+- 2026-10-31 · D3 · In progress · local branch task/225-add-on-approval · migration 213 approved_add_ons (applied + reversed on the dev DB in a rolled-back transaction), portal checkboxes with running total, deposit on base + add-ons, final bill add-on lines, staff card. Local: lint, typecheck, web unit 2328, knip, migration prefixes; integration test add-on-choice.integration.test.ts for CI
+- 2026-10-31 · D0–D4 · PR #740 opened (one PR for the four stacked commits)
 - 2026-10-31 · D4 · In progress · local branch task/227-pool-paint · owner toggle pool_paint; pooledPaint in domain (pails, gallons, quarts under 1 gal; shares by need); buy list "Paint (bought together)". Local: lint, typecheck, unit (domain 539, web 2320) green, knip no failures
 - 2026-10-31 · G6/G7 · Approved in session: "approve both, use craftsman factors, start TASK-227"
 - 2026-10-31 · D2 · Data · prod account aaaaaaaa…0001 settings.company_address removed (was "85R Rockingham Rd Derry, NH 03038"; reversal: UPDATE accounts SET settings = settings || '{"company_address":"85R Rockingham Rd Derry, NH 03038"}' WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001'). Owner asked for it in session. Logo upload waits for D2's deploy (old code would print the name twice)
