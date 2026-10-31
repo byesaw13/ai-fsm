@@ -347,17 +347,39 @@ export function pickStartingHours(candidates: {
 /** Walls above this height are tall work: ladders or planks, slower going. */
 export const TALL_WALL_FT = 10;
 
-/** The owner's wall painting pace (production rate 5012 and its vaulted modifier). */
+/** The owner's wall painting pace (production rate 5012). */
 export interface WallPaintRate {
   /** Wall square feet per 8-hour day, two finish coats, standard prep. */
   sqft_per_day: number;
-  /** Production change for tall walls, e.g. -0.15 = 15% slower. */
-  tall_wall_modifier_pct: number;
+}
+
+/**
+ * Time factors for walls by height (TASK-228). Source: Craftsman National
+ * Painting Cost Estimator, "High Time Difficulty Factors", relative to an
+ * 8–9 ft wall (captured in ~/craftsman-reference/raw2/Painting--stair_.txt).
+ * Approved by the owner 2026-10-31 (build runbook G7). They replace the old
+ * single "vaulted ceilings" modifier for any wall over 10 ft.
+ */
+const WALL_HEIGHT_FACTORS: { upToFt: number; factor: number; band: string }[] = [
+  { upToFt: 9, factor: 1, band: "up to 9 ft" },
+  { upToFt: 13, factor: 1.23, band: "9–13 ft" },
+  { upToFt: 17, factor: 1.46, band: "13–17 ft" },
+  { upToFt: 19, factor: 1.69, band: "17–19 ft" },
+  { upToFt: 21, factor: 1.92, band: "19–21 ft" },
+];
+
+/** How much longer a wall of this height takes. Above 21 ft the top factor applies and the staging needs its own price. */
+export function wallHeightTimeFactor(maxWallHeightFt: number | null): { factor: number; band: string | null; aboveTable: boolean } {
+  if (maxWallHeightFt === null || maxWallHeightFt <= 0) return { factor: 1, band: null, aboveTable: false };
+  const row = WALL_HEIGHT_FACTORS.find((r) => maxWallHeightFt <= r.upToFt);
+  if (row) return { factor: row.factor, band: row.band, aboveTable: false };
+  const top = WALL_HEIGHT_FACTORS[WALL_HEIGHT_FACTORS.length - 1];
+  return { factor: top.factor, band: top.band, aboveTable: true };
 }
 
 /**
  * Hour range for painting a wall area at the owner's pace (TASK-184): the
- * area over the daily rate, slowed for tall walls, plus or minus 15%, in
+ * area over the daily rate, times the wall-height factor, plus or minus 15%, in
  * quarter hours. Null when the area or the rate is missing.
  */
 export function wallPaintHours(
@@ -366,10 +388,7 @@ export function wallPaintHours(
   rate: WallPaintRate | null,
 ): HoursCandidate | null {
   if (!rate || rate.sqft_per_day <= 0 || sqft === null || sqft <= 0) return null;
-  const tall = maxWallHeightFt !== null && maxWallHeightFt > TALL_WALL_FT;
-  const perDay = rate.sqft_per_day * (1 + (tall ? rate.tall_wall_modifier_pct : 0));
-  if (perDay <= 0) return null;
-  const hours = (sqft / perDay) * 8;
+  const hours = (sqft / rate.sqft_per_day) * 8 * wallHeightTimeFactor(maxWallHeightFt).factor;
   const quarter = (n: number) => Math.max(0.25, Math.round(n * 4) / 4);
   return { low: quarter(hours * 0.85), high: quarter(hours * 1.15) };
 }

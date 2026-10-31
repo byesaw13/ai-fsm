@@ -17,11 +17,11 @@ export async function loadPreparationInputs(
             labor_hours_high::float AS labor_hours_high
      FROM price_book WHERE is_active = true ORDER BY code`,
   );
-  const { rows: pace } = await client.query<{ sqft_per_day: number; tall_pct: number | null }>(
-    `SELECT r.base_rate::float AS sqft_per_day, m.modifier_pct::float AS tall_pct
+  // Wall height is handled by the Craftsman height factors (TASK-228), not the
+  // old 'vaulted_ceilings' modifier, so it is not counted twice.
+  const { rows: pace } = await client.query<{ sqft_per_day: number }>(
+    `SELECT r.base_rate::float AS sqft_per_day
      FROM production_rates r
-     LEFT JOIN production_rate_modifiers m
-       ON m.service_code = r.service_code AND m.complexity_factor_key = 'vaulted_ceilings'
      WHERE r.service_code = '5012' AND r.scope_component_key = 'wall_sqft' AND r.rate_unit = 'sqft_per_day'`,
   );
   // Trim pace (TASK-217): rate 5003, baseboard and casing.
@@ -32,6 +32,6 @@ export async function loadPreparationInputs(
   return {
     priceBook,
     trimPaintRate: trim[0] ? { linear_ft_per_day: trim[0].lf_per_day } : null,
-    wallPaintRate: pace[0] ? { sqft_per_day: pace[0].sqft_per_day, tall_wall_modifier_pct: pace[0].tall_pct ?? 0 } : null,
+    wallPaintRate: pace[0] ? { sqft_per_day: pace[0].sqft_per_day } : null,
   };
 }

@@ -1,7 +1,7 @@
 # TASK-228: Tall walls take more hours in Prepare Quote
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -36,8 +36,11 @@ Scope:
 - Wall-paint tasks (`method: "wall_paint"`) multiply their hours by the factor for the room's
   `peak_height_ft` (or `height_ft` when there is no peak). The task's `estimate_notes` say which factor
   was used.
-- The factors live in code as a named constant, with the source cited, after the owner approves them.
-  No table.
+- The factors live in code as a named constant (`WALL_HEIGHT_FACTORS` in
+  `packages/domain/src/prepared-scope.ts`) with the source cited. No table.
+- They replace the old 15% `vaulted_ceilings` pace modifier on Prepare Quote's wall painting, so height
+  is not counted twice. The modifier row stays for the older painting estimator.
+- Above 21 ft the top factor applies, and the task's note says to price the staging separately.
 - Hours the owner has already set (`hours_source = "owner"`) are never changed.
 
 Acceptance Criteria:
