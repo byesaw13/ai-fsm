@@ -45,6 +45,8 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
   ];
 
   const [activeTab, setActiveTab] = useState(tabs[0].id);
+  // Hours in a work day just saved on the pricing form; the rates card shows its conversions with it (TASK-193).
+  const [savedHoursPerDay, setSavedHoursPerDay] = useState<number | null>(null);
 
   return (
     <div className="p7-settings-layout">
@@ -126,11 +128,11 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
               Used by T&amp;M estimates, margin checks, and invoice labor.
             </p>
             <Card padding="default">
-              <PricingSettingsForm />
+              <PricingSettingsForm onSaved={(s) => setSavedHoursPerDay(s.hours_per_day)} />
             </Card>
             <h3 style={{ fontSize: 16, fontWeight: 700, margin: "24px 0 8px 0" }}>Production rates</h3>
             <Card padding="default">
-              <ProductionRatesPanel />
+              <ProductionRatesPanel savedHoursPerDay={savedHoursPerDay} />
             </Card>
           </section>
         )}

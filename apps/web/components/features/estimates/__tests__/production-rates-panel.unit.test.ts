@@ -39,3 +39,12 @@ describe("ProductionRatesPanel (TASK-193)", () => {
     expect((html.match(/checked=""/g) ?? []).length).toBe(1);
   });
 });
+
+describe("ProductionRatesPanel saved hours (Codex review on #743)", () => {
+  it("does not refetch on every toast: the load effect depends on the error callback, not the toast context", async () => {
+    const src = (await import("node:fs")).readFileSync(new URL("../ProductionRatesPanel.tsx", import.meta.url), "utf8");
+    expect(src).toContain("[initialRates, toastError]");
+    expect(src).not.toMatch(/\[initialRates, toast\]/);
+  });
+});
+

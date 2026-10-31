@@ -12,8 +12,19 @@ const muted: React.CSSProperties = { color: "var(--fg-muted)", fontSize: "var(--
  * pace and mark each one calibrated once real jobs back it up. Saved quotes
  * keep their hours; only new calculations use a changed rate.
  */
-export function ProductionRatesPanel({ initialRates, initialHoursPerDay }: { initialRates?: ProductionRateRow[]; initialHoursPerDay?: number }) {
+export function ProductionRatesPanel({
+  initialRates,
+  initialHoursPerDay,
+  savedHoursPerDay,
+}: {
+  initialRates?: ProductionRateRow[];
+  initialHoursPerDay?: number;
+  /** The hours-per-day the pricing form just saved, so conversions update without a reload. */
+  savedHoursPerDay?: number | null;
+}) {
   const toast = useToast();
+  // The toast context object changes on every toast; its error callback does not.
+  const toastError = toast.error;
   const [rates, setRates] = useState<ProductionRateRow[] | null>(initialRates ?? null);
   const [hoursPerDay, setHoursPerDay] = useState(initialHoursPerDay ?? 8);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -28,10 +39,14 @@ export function ProductionRatesPanel({ initialRates, initialHoursPerDay }: { ini
         setRates(json.data.rates);
         setHoursPerDay(json.data.hours_per_day);
       } else {
-        toast.error("Could not load production rates");
+        toastError("Could not load production rates");
       }
     })();
-  }, [initialRates, toast]);
+  }, [initialRates, toastError]);
+
+  useEffect(() => {
+    if (savedHoursPerDay) setHoursPerDay(savedHoursPerDay);
+  }, [savedHoursPerDay]);
 
   async function save(path: string, key: string, body: Record<string, unknown>, apply: (after: Record<string, unknown>) => void) {
     setBusy(key);

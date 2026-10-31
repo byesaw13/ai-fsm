@@ -14,7 +14,7 @@ function dollarsToCents(raw: string): number {
   return Math.round(n * 100);
 }
 
-export function PricingSettingsForm() {
+export function PricingSettingsForm({ onSaved }: { onSaved?: (settings: BusinessPricingSettings) => void } = {}) {
   const [settings, setSettings] = useState<BusinessPricingSettings>({ ...DEFAULT_PRICING_SETTINGS });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,7 +68,10 @@ export function PricingSettingsForm() {
         setError(json.error?.message ?? "Failed to save");
         return;
       }
-      if (json.data) setSettings(json.data as BusinessPricingSettings);
+      if (json.data) {
+        setSettings(json.data as BusinessPricingSettings);
+        onSaved?.(json.data as BusinessPricingSettings);
+      }
       setMessage("Labor & pricing rates saved. New estimates and T&M drafts will use these rates.");
     } catch {
       setError("Network error saving pricing settings");
