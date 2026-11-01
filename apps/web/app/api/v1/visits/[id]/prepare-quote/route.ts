@@ -14,6 +14,7 @@ import { logger } from "@/lib/logger";
 import { withEstimateContext } from "@/lib/estimates/db";
 import { loadAssessmentSummary } from "@/lib/estimates/assessment-summary-loader";
 import { createEstimate, createEstimateSchema } from "@/lib/estimates/create-estimate";
+import { standardDepositFields } from "@/lib/estimates/deposit-policy";
 import {
   extractPreparedScope,
   preparedScopeInternalNote,
@@ -65,10 +66,13 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         property_id: string | null;
         property_state: string | null;
         assessment_updated_at: string | null;
+        account_settings: { deposit_percent?: number; deposit_terms?: string } | null;
       }>(
         `SELECT j.id AS job_id, j.client_id, j.property_id, p.state AS property_state,
-                a.updated_at::text AS assessment_updated_at
+                a.updated_at::text AS assessment_updated_at,
+                acct.settings AS account_settings
          FROM visits v
+         JOIN accounts acct ON acct.id = v.account_id
          JOIN jobs j ON j.id = v.job_id AND j.account_id = v.account_id
          LEFT JOIN properties p ON p.id = j.property_id
          LEFT JOIN site_visit_assessments a ON a.visit_id = v.id AND a.account_id = v.account_id
@@ -109,6 +113,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       line_items: lineItems,
       internal_notes: preparedScopeInternalNote(scope, labor_rate_cents),
       scope_assumptions: scope.exclusions.length ? `Not included: ${scope.exclusions.join("; ")}` : null,
+      // The standard deposit books the work (TASK-230), like the new-quote form.
+      ...standardDepositFields(context.account_settings),
     });
 
     try {

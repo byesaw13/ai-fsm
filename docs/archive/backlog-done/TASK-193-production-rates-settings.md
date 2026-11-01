@@ -1,7 +1,7 @@
 # TASK-193: Editable production rates with calibration
 
 Status:
-In Progress (PR 1 live; PR 2 in review)
+Done 2026-10-31 (PR 1 #743, PR 2 #745 6cbce4d3, both deployed)
 
 Epic:
 EPIC-002 Estimating & Assessments
