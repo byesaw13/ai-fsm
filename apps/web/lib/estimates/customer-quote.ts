@@ -1,4 +1,5 @@
 import { parsePreparedScope } from "@ai-fsm/domain";
+import { resolveCompanyBranding, type CompanyProfileSettings } from "@/lib/company/branding";
 
 /** A priced option the customer can ask to add; never part of the quote total (TASK-224). */
 interface CustomerAddOn {
@@ -30,4 +31,21 @@ export function depositLabel(depositType: string | null | undefined, depositPerc
     return `Deposit to book (${Math.round(pct * 100) / 100}%)`;
   }
   return "Deposit to book";
+}
+
+/**
+ * The terms the customer reads on the quote page (TASK-231): the same
+ * Settings text the PDF and print copy use, with {deposit_percent} filled in.
+ * Deposit terms show only when the quote asks for a deposit.
+ */
+export function customerQuoteTerms(
+  accountName: string,
+  settings: CompanyProfileSettings | null | undefined,
+  depositCents: number | null | undefined,
+): { terms: string; depositTerms: string | null } {
+  const b = resolveCompanyBranding(accountName, settings);
+  return {
+    terms: b.estimateTerms,
+    depositTerms: b.depositTerms && (depositCents ?? 0) > 0 ? b.depositTerms : null,
+  };
 }
