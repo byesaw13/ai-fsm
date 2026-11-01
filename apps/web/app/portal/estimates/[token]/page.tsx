@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { queryOne, query, getPool } from "@/lib/db";
 import { EstimatePortalClient } from "./EstimatePortalClient";
 import { isPortalPreview } from "@/lib/portal/session";
-import { customerAddOns, showsQuantityAndRate, depositLabel } from "@/lib/estimates/customer-quote";
+import { customerAddOns, showsQuantityAndRate, depositLabel, customerQuoteTerms } from "@/lib/estimates/customer-quote";
+import type { CompanyProfileSettings } from "@/lib/company/branding";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ interface EstimateRow extends Record<string, unknown> {
   property_state: string | null;
   property_zip: string | null;
   account_name: string;
+  account_settings: CompanyProfileSettings | null;
   prepared_scope: unknown;
 }
 
@@ -70,7 +72,7 @@ export default async function EstimatePortalPage({
        c.name AS client_name,
        p.address AS property_address, p.city AS property_city,
        p.state AS property_state, p.zip AS property_zip,
-       a.name AS account_name, e.prepared_scope
+       a.name AS account_name, a.settings AS account_settings, e.prepared_scope
      FROM estimates e
      JOIN clients c ON c.id = e.client_id
      JOIN accounts a ON a.id = e.account_id
@@ -128,8 +130,14 @@ export default async function EstimatePortalPage({
 
   const standardLineItems = lineItems.filter((li) => !li.option_id);
 
-  const { prepared_scope, deposit_type, deposit_percentage, ...rest } = estimate;
-  const estimateFields = { ...rest, deposit_label: depositLabel(deposit_type, deposit_percentage) };
+  const { prepared_scope, deposit_type, deposit_percentage, account_settings, ...rest } = estimate;
+  const { terms, depositTerms } = customerQuoteTerms(estimate.account_name, account_settings, estimate.deposit_cents);
+  const estimateFields = {
+    ...rest,
+    deposit_label: depositLabel(deposit_type, deposit_percentage),
+    terms,
+    deposit_terms: depositTerms,
+  };
 
   return (
     <EstimatePortalClient
