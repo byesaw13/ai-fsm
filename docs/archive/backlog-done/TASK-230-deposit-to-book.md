@@ -1,7 +1,7 @@
 # TASK-230: Quotes ask for the standard deposit to book
 
 Status:
-In Progress
+Done 2026-11-01 (#746 f4b5adb2, deployed; portal shows "Deposit to book (30%) $2,625")
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -40,8 +40,8 @@ Out of Scope:
 - The deposit row on staff screens keeps its "Deposit due" label.
 
 Acceptance Criteria:
-- [ ] A quote from Prepare Quote has the standard deposit percentage set.
-- [ ] The customer page, PDF and print view show "Deposit to book (30%)".
+- [x] A quote from Prepare Quote has the standard deposit percentage set.
+- [x] The customer page, PDF and print view show "Deposit to book (30%)".
 - [x] The Dowd quote shows a $2,625 deposit (data, 2026-10-31).
 
 Effort:

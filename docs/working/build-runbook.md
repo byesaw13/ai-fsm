@@ -19,19 +19,14 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : B4 done 2026-10-31. TASK-193 PR 2 #745 squash
-                      6cbce4d3 deployed ~01:18 UTC 11-01, no migration;
-                      health ok, /login 200, rates API 401 unauth, new
-                      hours-basis text in the running build. TASK-193 closed.
-                      Owner-requested TASK-230 (deposit to book): Dowd quote
-                      30% deposit and terms paragraph changed on prod (data,
-                      reversal in the task file); code PR in flight.
-In-flight PR        : TASK-230, branch task/230-deposit-to-book
-Next step           : merge + deploy TASK-230 once CI is green and threads
-                      are resolved, verify, close it; then the next eligible
-                      runbook step after B4.
+Last step           : TASK-230 (owner request) done 2026-11-01: #746 squash
+                      f4b5adb2 deployed ~01:55 UTC, no migration; health ok,
+                      /login 200, Dowd portal shows "Deposit to book (30%)
+                      $2,625". B4 (TASK-193) done earlier the same night.
+In-flight PR        : none
+Next step           : next eligible runbook step after B4.
 Blocked on          : nothing
-Last known-good     : 6cbce4d3 (deploy-good/6cbce4d3); previous 8f158a7a
+Last known-good     : f4b5adb2 (deploy-good/f4b5adb2); previous 6cbce4d3
 Notes               : Open PR #739 (quote editor design fixes, TASK-222
                       follow-up) belongs to another session; not touched.
 ```
@@ -610,6 +605,7 @@ owner chose: D4 next, then D3 and D5.
 - 2026-10-31 · B4 · In progress · PR 2 of 2 (TASK-193): paintingRateHours (walls 5012 always, trim 5003 when calibrated, ceilings default pace), snapshot saved on the labor line, preview shows the hours basis. Rule 3 parity-adapter retirement logged as TASK-229. Local: lint, typecheck, unit (web 2344, domain 558)
 - 2026-10-31 · B4 · Done · PR 2 #745 merged 6cbce4d3 after Codex fixes (snapshot survived engine rewrite; recalc when rates load), deployed, verified. TASK-193 archived.
 - 2026-10-31 · owner request · TASK-230 · Dowd quote 30% deposit ($2,625) and estimate-terms Deposits paragraph changed on prod; code: Prepare Quote defaults to the standard deposit, customer views say "Deposit to book (30%)".
+- 2026-11-01 · owner request · TASK-230 · Done · #746 merged f4b5adb2 (Codex: Quote bubble text updated), deployed, verified on the Dowd portal. Archived.
 - 2026-10-31 · D3/D5 · Verified · 047cfdb9 deployed ~16:42 UTC after backup ai_fsm_20261031T163602Z.dump (1399 TOC); migration 213 applied; health ok, /login HTTP/2 200; estimates.approved_add_ons present; Dowd quote unchanged (875000, add-ons shown). Known-good deploy-good/047cfdb9
 - 2026-10-31 · D3/D5 · Merged · #741 · squash 047cfdb9. Codex review: add-ons missing from the job-completion bill and the work order, and untaxed on the portal/deposit; fixed in 6a544247 (shared totalWithAddOns, addOnLines in final-invoice.ts, addOnWorkLines in work-order seeding)
 - 2026-10-31 · D2 · Data · logo: logo-dovetails-horizontal-2026.png (site repo dovetails-horizontal-color-1200.png) copied into /app/uploads/account/aaaaaaaa…0001/ and settings.logo_filename set (was logo-e680679f.png, file kept; reversal: set logo_filename back)
