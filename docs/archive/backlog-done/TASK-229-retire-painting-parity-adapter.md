@@ -1,7 +1,7 @@
 # TASK-229: Retire the painting parity adapter
 
 Status:
-In progress (PR open 2026-11-01). Owner decision 2026-11-01: "remove the old one",
+Done 2026-11-01 (#749 d2ac0d71, deployed; health ok). Owner decision 2026-11-01: "remove the old one",
 so the engine rules price room-by-room labor and the $/sq ft total goes.
 
 Epic:
