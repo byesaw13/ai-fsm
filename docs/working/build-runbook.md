@@ -19,15 +19,15 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : B4 PR 1 (TASK-193) verified on production 2026-10-31:
-                      #743 squash 8f158a7a deployed ~19:13 UTC, no migration;
-                      health ok, /login HTTP/2 200, /api/v1/production-rates
-                      401 without a session.
-In-flight PR        : none
-Next step           : B4 PR 2 (TASK-193): square-foot calculator uses the
-                      rates (see the task's "Delivery" section; doctrine
-                      Rule 3 applies to useEstimateForm's painting mode).
-                      Branch task/193-calculator-rates exists for it.
+Last step           : B4 PR 2 (TASK-193) built 2026-10-31: room-by-room
+                      calculator turns area into hours with rates 5012/5003
+                      (paintingRateHours), labor line saves
+                      production_rate_snapshot. Rule 3 adapter retirement
+                      deferred to TASK-229 (changes prices; owner decision).
+In-flight PR        : B4 PR 2, branch task/193-pr2-calculator
+Next step           : merge + deploy B4 PR 2 once CI is green and review
+                      threads are resolved, verify, then close TASK-193 and
+                      move to the next eligible step.
 Blocked on          : nothing
 Last known-good     : 8f158a7a (deploy-good/8f158a7a); previous 047cfdb9
 Notes               : Open PR #739 (quote editor design fixes, TASK-222
@@ -111,7 +111,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | B1 | TASK-190 | 2026-10-26 (CI 40419939119, 40419947446, #724) | 2026-10-26 (#724, f4837336) | 2026-10-27 (~00:02 UTC) | 2026-10-27 (draft split, 00:04 UTC) |
 | B2 | TASK-191 | 2026-10-27 (CI 40429996387, 40430001995, #726) | 2026-10-27 (#726, 20c7d5f8) | 2026-10-27 (~01:28 UTC) | 2026-10-27 (draft hours null, totals unchanged, 01:28 UTC) |
 | B3 | TASK-192 | 2026-10-27 (CI 40437008165, 40437011775, #728) | 2026-10-27 (#728, 2842780e) | 2026-10-27 (~02:32 UTC) | 2026-10-27 (equipment cost apart, 02:33 UTC) |
-| B4 | TASK-193 | PR 1 2026-10-31 (#743, CI green) | PR 1 2026-10-31 (#743, 8f158a7a) | PR 1 2026-10-31 (~19:13 UTC) | PR 1 2026-10-31 (health ok, /login 200, rates API 401 unauth); PR 2 pending |
+| B4 | TASK-193 | PR 1 2026-10-31 (#743, CI green) | PR 1 2026-10-31 (#743, 8f158a7a) | PR 1 2026-10-31 (~19:13 UTC) | PR 1 2026-10-31 (health ok, /login 200, rates API 401 unauth); PR 2 built 2026-10-31, in review |
 | B5 | TASK-194 | | | | |
 | B6 | TASK-195 | | | | |
 | C1 | TASK-210 | | | | |
@@ -605,6 +605,7 @@ owner chose: D4 next, then D3 and D5.
 - 2026-10-31 · B4 PR 1 · Verified · 8f158a7a deployed ~19:13 UTC, no migration; health ok, /login HTTP/2 200; known-good deploy-good/8f158a7a. Codex review fixed before merge: rates panel refetch loop on load error; saved hours-per-day now updates the card
 - 2026-10-31 · B4 PR 1 · Merged · #743 · squash 8f158a7a
 - 2026-10-31 · B4 · In progress · PR 1 of 2 (TASK-193): Settings card for rates/modifiers with calibration, hours-per-day setting, Prepare Quote pace uses it. Local: lint, typecheck, unit (web 2341, domain 548), knip
+- 2026-10-31 · B4 · In progress · PR 2 of 2 (TASK-193): paintingRateHours (walls 5012 always, trim 5003 when calibrated, ceilings default pace), snapshot saved on the labor line, preview shows the hours basis. Rule 3 parity-adapter retirement logged as TASK-229. Local: lint, typecheck, unit (web 2344, domain 558)
 - 2026-10-31 · D3/D5 · Verified · 047cfdb9 deployed ~16:42 UTC after backup ai_fsm_20261031T163602Z.dump (1399 TOC); migration 213 applied; health ok, /login HTTP/2 200; estimates.approved_add_ons present; Dowd quote unchanged (875000, add-ons shown). Known-good deploy-good/047cfdb9
 - 2026-10-31 · D3/D5 · Merged · #741 · squash 047cfdb9. Codex review: add-ons missing from the job-completion bill and the work order, and untaxed on the portal/deposit; fixed in 6a544247 (shared totalWithAddOns, addOnLines in final-invoice.ts, addOnWorkLines in work-order seeding)
 - 2026-10-31 · D2 · Data · logo: logo-dovetails-horizontal-2026.png (site repo dovetails-horizontal-color-1200.png) copied into /app/uploads/account/aaaaaaaa…0001/ and settings.logo_filename set (was logo-e680679f.png, file kept; reversal: set logo_filename back)

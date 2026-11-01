@@ -17,8 +17,9 @@ import {
   resolveAssessmentContext,
   type AssessmentContext,
 } from "@/lib/estimates/assessment-context";
-import type { ShoppingList, SpecifiedMaterial, RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
+import type { ShoppingList, SpecifiedMaterial, RoomSpec, ProjectOptions, EstimateResult, PaintingRateHours } from "@ai-fsm/domain";
 import {
+  paintingRateHours,
   estimateResultToLegacyFields,
   buildShoppingListFromEstimateResult,
   roomSpecsToEstimateSpec,
@@ -35,6 +36,7 @@ import {
 import { useEstimatePricing } from "./useEstimatePricing";
 import { useEstimateLiveIntel } from "./useEstimateLiveIntel";
 import { usePricingSettings } from "./usePricingSettings";
+import { usePaintingRates } from "./usePaintingRates";
 import {
   withAiMaterialsDelta,
   reconcileAiMaterialsDelta,
@@ -268,6 +270,9 @@ export function useEstimateForm({
   });
   // Shopping list derived from room-by-room computation (authoritative for painting mode)
   const [roomShoppingList, setRoomShoppingList] = useState<ShoppingList | null>(null);
+  // Labor hours the room-by-room calculator worked out from production rates (TASK-193)
+  const [roomRateHours, setRoomRateHours] = useState<PaintingRateHours | null>(null);
+  const paintingRates = usePaintingRates();
 
   // ---------------------------------------------------------------------------
   // Price book sub-hook
@@ -476,6 +481,19 @@ export function useEstimateForm({
 
   const { settings: pricingSettings } = usePricingSettings();
 
+  // Rates can arrive after rooms were entered. Recalculate hours the owner has
+  // not typed over, so saved hours never miss rate 5012 (TASK-193 PR 2).
+  const rateHoursPerDay = paintingRates.hoursPerDay ?? pricingSettings.hours_per_day;
+  useEffect(() => {
+    if (paintingMode !== "room_by_room" || roomSpecs.length === 0 || !roomRateHours) return;
+    if (laborHours.trim() !== roomRateHours.hours.toFixed(1)) return;
+    const next = paintingRateHours(roomSpecs, projectOptions, paintingRates.rates, rateHoursPerDay);
+    setRoomRateHours(next);
+    setLaborHours(next.hours.toFixed(1));
+    // Only a change in the rates or hours per day should trigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paintingRates.rates, rateHoursPerDay]);
+
   const pricing = useEstimatePricing({
     serviceType, mode, lineItems, tiers, flatRate, taxRate,
     sqFt, prepLevel, includesTrim, includesCeiling,
@@ -538,9 +556,14 @@ export function useEstimateForm({
     setIncludesTrim(legacy.includes_trim);
     setIncludesCeiling(legacy.includes_ceiling);
     setMaterialCostDollars((result.summary.materialCents / 100).toFixed(2));
-    const paintableSqft = legacy.sq_ft;
-    const estHours = paintableSqft / 100 * 0.85 * opts.coat_count;
-    setLaborHours(estHours.toFixed(1));
+    const rateHours = paintingRateHours(
+      rooms,
+      opts,
+      paintingRates.rates,
+      rateHoursPerDay,
+    );
+    setRoomRateHours(rateHours);
+    setLaborHours(rateHours.hours.toFixed(1));
     setRoomShoppingList(buildShoppingListFromEstimateResult(result, rooms, opts));
   }
 
@@ -616,6 +639,21 @@ export function useEstimateForm({
         lineItemsByAiDeltaKey
       );
 
+      // Hours the calculator produced keep their rate and snapshot; hours typed over them are the owner's.
+      const paintingLaborHourFields = () => {
+        const fromRates =
+          paintingMode === "room_by_room" &&
+          roomRateHours?.usesProductionRate &&
+          laborHours.trim() === roomRateHours.hours.toFixed(1);
+        if (!fromRates || !roomRateHours) return ownerHourFields(laborHours, laborHours);
+        return {
+          hours_low: roomRateHours.hours,
+          hours_high: roomRateHours.hours,
+          hours_source: "production_rate" as const,
+          production_rate_snapshot: roomRateHours.snapshot,
+        };
+      };
+
       if (serviceType === "painting") {
         if (!paintingResult) {
           setError("Enter the square footage to create a painting estimate.");
@@ -646,7 +684,7 @@ export function useEstimateForm({
               unit_price_cents: paintingResult.labor_flat_rate_cents,
               line_item_type: "labor" as const,
               sort_order: 0,
-              ...ownerHourFields(laborHours, laborHours),
+              ...paintingLaborHourFields(),
             },
             ...(paintingResult.material_cents > 0
               ? [{ description: "Materials", quantity: 1, unit_price_cents: paintingResult.material_cents, sort_order: 1 }]
@@ -1000,6 +1038,7 @@ export function useEstimateForm({
     liveIntel,
     paintingMode, setPaintingMode,
     roomSpecs, projectOptions,
+    roomRateHours,
     handleRoomByRoomChange,
     // Pricing (from useEstimatePricing)
     ...pricing,

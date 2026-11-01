@@ -29,6 +29,11 @@ export interface ComputeAndPersistArgs {
    * Write this range onto labor lines that are still blank.
    */
   stampLaborHours?: number | null;
+  /**
+   * Where the stamped hours came from. Production-rate hours keep their snapshot
+   * (TASK-193 PR 2); anything else is the owner's.
+   */
+  stampHoursProvenance?: { source: "production_rate"; snapshot: Record<string, unknown> } | null;
 }
 
 export interface ComputeAndPersistResult {
@@ -154,7 +159,7 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
     // labor lines. Writing the total on each of them multiplies the hours.
     await query(
       `UPDATE estimate_line_items
-       SET hours_low = $2, hours_high = $2, hours_source = 'owner'
+       SET hours_low = $2, hours_high = $2, hours_source = $3, production_rate_snapshot = $4
        WHERE id = (
          SELECT id FROM estimate_line_items
          WHERE estimate_id = $1 AND option_id IS NULL AND line_item_type = 'labor'
@@ -162,7 +167,12 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
          ORDER BY (COALESCE(total_cents, 0) > 0) DESC, COALESCE(total_cents, 0) DESC, sort_order ASC
          LIMIT 1
        )`,
-      [estimateId, args.stampLaborHours],
+      [
+        estimateId,
+        args.stampLaborHours,
+        args.stampHoursProvenance?.source ?? "owner",
+        args.stampHoursProvenance ? JSON.stringify(args.stampHoursProvenance.snapshot) : null,
+      ],
     );
   }
 

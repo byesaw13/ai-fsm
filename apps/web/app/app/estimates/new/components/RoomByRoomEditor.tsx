@@ -9,7 +9,8 @@ import {
   roomSpecsToEstimateSpec,
   CURRENT_RULES,
 } from "@ai-fsm/domain";
-import type { RoomSpec, RoomPrepLevel, PaintGrade, PaintSupplier, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
+import type { RoomSpec, RoomPrepLevel, PaintGrade, PaintSupplier, ProjectOptions, EstimateResult, PaintingRateHours } from "@ai-fsm/domain";
+import { paintingHoursBasis } from "@/lib/estimates/painting-hours-display";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -19,6 +20,8 @@ interface RoomByRoomEditorProps {
   rooms: RoomSpec[];
   options: ProjectOptions;
   onChange: (rooms: RoomSpec[], options: ProjectOptions, result: EstimateResult) => void;
+  /** Labor hours from production rates for these rooms (TASK-193). */
+  rateHours?: PaintingRateHours | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +343,7 @@ function RoomCard({
 // Main editor
 // ---------------------------------------------------------------------------
 
-export function RoomByRoomEditor({ rooms, options, onChange }: RoomByRoomEditorProps) {
+export function RoomByRoomEditor({ rooms, options, onChange, rateHours }: RoomByRoomEditorProps) {
   const recompute = useCallback((nextRooms: RoomSpec[], nextOptions: ProjectOptions) => {
     const spec = roomSpecsToEstimateSpec(nextRooms, nextOptions);
     const result = computeEstimate(spec, CURRENT_RULES);
@@ -449,6 +452,12 @@ export function RoomByRoomEditor({ rooms, options, onChange }: RoomByRoomEditorP
               </div>
             ))}
           </div>
+          {rateHours && rateHours.hours > 0 && (
+            <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+              <strong style={{ color: "var(--fg)" }}>Labor hours: {rateHours.hours.toFixed(1)}</strong>
+              {" — "}{paintingHoursBasis(rateHours)}
+            </p>
+          )}
           {engineResult.internalSummary.grossMarginPct < 0.30 && (
             <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "#dc2626" }}>
               ⚠ Margin {(engineResult.internalSummary.grossMarginPct * 100).toFixed(1)}% is below the 30% floor — check pricing.
