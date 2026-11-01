@@ -19,14 +19,16 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : TASK-230 (owner request) done 2026-11-01: #746 squash
-                      f4b5adb2 deployed ~01:55 UTC, no migration; health ok,
-                      /login 200, Dowd portal shows "Deposit to book (30%)
-                      $2,625". B4 (TASK-193) done earlier the same night.
+Last step           : owner requests done 2026-11-01: TASK-231 (#748
+                      d4a4cf94, portal shows quote terms) and TASK-229 (#749
+                      d2ac0d71, room-by-room painting priced by engine rules
+                      only, no reconciliation line). Both deployed ~08:16 UTC,
+                      no migration; health ok, /login 200, Dowd portal 200.
+                      TASK-230 (#746) and B4 (TASK-193) done earlier.
 In-flight PR        : none
 Next step           : next eligible runbook step after B4.
 Blocked on          : nothing
-Last known-good     : f4b5adb2 (deploy-good/f4b5adb2); previous 6cbce4d3
+Last known-good     : d2ac0d71 (deploy-good/d2ac0d71); previous d4a4cf94
 Notes               : Open PR #739 (quote editor design fixes, TASK-222
                       follow-up) belongs to another session; not touched.
 ```

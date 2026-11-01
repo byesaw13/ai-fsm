@@ -1,7 +1,7 @@
 # TASK-231: The customer quote page shows the quote terms
 
 Status:
-In progress (PR open 2026-11-01)
+Done 2026-11-01 (#748 d4a4cf94, deployed; Dowd page shows "A 30% deposit is required to book your project.")
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -27,8 +27,8 @@ Scope:
   as on the print copy. An empty `deposit_terms` hides them.
 
 Acceptance Criteria:
-- [ ] The Dowd quote page shows "A 30% deposit is required to book your project."
-- [ ] Unit tests cover the placeholder, the deposit-only rule and the fallback.
+- [x] The Dowd quote page shows "A 30% deposit is required to book your project."
+- [x] Unit tests cover the placeholder, the deposit-only rule and the fallback.
 
 Related:
 TASK-230.
