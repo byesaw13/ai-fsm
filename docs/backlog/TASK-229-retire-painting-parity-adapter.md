@@ -1,7 +1,8 @@
 # TASK-229: Retire the painting parity adapter
 
 Status:
-Proposed (needs an owner pricing decision)
+In progress (PR open 2026-11-01). Owner decision 2026-11-01: "remove the old one",
+so the engine rules price room-by-room labor and the $/sq ft total goes.
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -33,9 +34,28 @@ Scope:
 - Paint gallons and the shopping list come from one calculation.
 
 Acceptance Criteria:
-- [ ] A room-by-room quote has no "Pricing reconciliation" line.
-- [ ] `computePaintingProject` has no callers outside tests, or is deleted.
-- [ ] Preview total, saved lines and saved total agree.
+- [x] A room-by-room quote has no "Pricing reconciliation" line.
+- [x] `computePaintingProject` has no callers outside tests, or is deleted (deleted).
+- [x] Preview total, saved lines and saved total agree (one spec builder feeds all three).
+
+As built (2026-11-01):
+- `computePaintingProject` and `computeRoomPainting` are deleted from
+  `packages/domain/src/painting.ts`. `computePaintingMaterials(rooms, options)`
+  keeps only paint and primer: gallons by grade at the real coat count,
+  primer (two passes for dark to light), none for customer-supplied rooms.
+- `EstimateSpec.roomMaterials` (engine): when set, the rooms add no paint of
+  their own; the items become material lines plus one handling line. The old
+  engine paint guess used the engine coat number (1 for a 2-coat job), so it
+  under-bought paint; that is why the parity line existed.
+- `roomSpecsToEstimateSpec` no longer adds the "Pricing reconciliation"
+  adjustment. The shopping list reads `computePaintingMaterials` too.
+- Price effect: a standard 2-coat bedroom (12x12x8, ceiling and trim) is
+  $1,241.90 before and after; the paint line now says 4 gal instead of 3 plus
+  a $63.25 reconciliation. Rooms with primer now carry the engine's prime
+  labor multiplier (+20%) as well as primer material. Customer-supplied rooms
+  no longer pay for paint through the reconciliation.
+- Production had no estimates with room specs or a parity line (checked
+  2026-11-01: 0 of 41), so no saved quote changes.
 
 Related:
 TASK-199 (painting edit uses account rates), TASK-201 (room-by-room save is atomic).

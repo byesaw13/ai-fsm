@@ -8,7 +8,7 @@ import {
   computeSqftPaintingResult,
 } from "./adapters";
 import {
-  computePaintingProject,
+  computePaintingMaterials,
   type RoomSpec as PaintingRoomSpec,
   type ProjectOptions,
 } from "../painting";
@@ -130,48 +130,52 @@ describe("pricing parity — sqft calculatePaintingEstimate", () => {
   }
 });
 
-describe("pricing parity — room-by-room computePaintingProject", () => {
+describe("room-by-room — one price model (TASK-229)", () => {
   for (const [index, fixture] of ROOM_FIXTURES.entries()) {
-    it(`fixture ${index + 1}: totalCents matches legacy (±0 cents)`, () => {
-      const legacy = computePaintingProject(fixture.rooms, fixture.options);
+    it(`fixture ${index + 1}: no reconciliation line; paint lines match the paint list`, () => {
       const spec = roomSpecsToEstimateSpec(fixture.rooms, fixture.options);
+      expect(spec.adjustments).toBeUndefined();
       const engine = computeEstimate(spec, CURRENT_RULES);
-      expect(engine.summary.totalCents).toBe(legacy.total_cents);
+      expect(engine.lineItems.some((l) => l.category === "adjustment")).toBe(false);
+
+      const materials = computePaintingMaterials(fixture.rooms, fixture.options);
+      expect(engine.summary.materialCents).toBe(materials.material_cents);
+      expect(engine.summary.handlingCents).toBe(Math.round(materials.material_cents * CURRENT_RULES.materialHandlingRate));
+      expect(engine.summary.totalCents).toBe(
+        engine.summary.laborCents + engine.summary.materialCents + engine.summary.handlingCents,
+      );
     });
   }
+
+  it("customer-supplied paint adds no paint line", () => {
+    const rooms = ROOM_FIXTURES[0].rooms.map((r) => ({ ...r, paint_supplied_by: "customer" as const, primer_needed: false }));
+    const engine = computeEstimate(roomSpecsToEstimateSpec(rooms, ROOM_FIXTURES[0].options), CURRENT_RULES);
+    expect(engine.summary.materialCents).toBe(0);
+    expect(engine.summary.handlingCents).toBe(0);
+  });
 });
 
-describe("pricing parity — shopping list", () => {
+describe("shopping list — same paint as the quote", () => {
   for (const fixture of ROOM_FIXTURES) {
-    it(`shopping list matches for ${fixture.rooms.map((r) => r.name).join(" + ")}`, () => {
-      const legacy = computePaintingProject(fixture.rooms, fixture.options);
+    it(`shopping list matches the quote's paint for ${fixture.rooms.map((r) => r.name).join(" + ")}`, () => {
       const spec = roomSpecsToEstimateSpec(fixture.rooms, fixture.options);
       const engine = computeEstimate(spec, CURRENT_RULES);
       const sl = buildShoppingListFromEstimateResult(engine, fixture.rooms, fixture.options);
+      const paintLines = engine.lineItems.filter((l) => l.category === "material");
 
       expect(sl).not.toBeNull();
-      expect(sl!.sections).toHaveLength(1);
-      expect(sl!.sections[0].specified_items).toHaveLength(legacy.shopping_summary.length);
-
-      for (let i = 0; i < legacy.shopping_summary.length; i++) {
-        const legacyItem = legacy.shopping_summary[i];
-        const engineItem = sl!.sections[0].specified_items[i];
-        expect(engineItem.name).toBe(legacyItem.item);
-        expect(engineItem.quantity_needed).toBe(legacyItem.qty);
-        expect(engineItem.unit_label).toBe(legacyItem.unit);
-        const engineCost = (engineItem.unit_cost_cents ?? 0) * engineItem.quantity_needed;
-        expect(engineCost).toBe(legacyItem.cost_cents);
+      const items = sl!.sections[0].specified_items;
+      expect(items).toHaveLength(paintLines.length);
+      for (let i = 0; i < items.length; i++) {
+        expect(items[i].quantity_needed).toBe(paintLines[i].quantity);
       }
-
-      expect(sl!.total_specified_cost_cents).toBe(
-        legacy.shopping_summary.reduce((sum, item) => sum + item.cost_cents, 0)
-      );
+      expect(sl!.total_specified_cost_cents).toBe(engine.summary.materialCents);
     });
   }
 });
 
 describe("roomSpecsToEstimateSpec — 2-room worked example", () => {
-  it("maps surfaces from computeRoomMeasurements and matches legacy total", () => {
+  it("maps surfaces from computeRoomMeasurements", () => {
     const rooms = ROOM_FIXTURES[0].rooms;
     const options = ROOM_FIXTURES[0].options;
     const spec = roomSpecsToEstimateSpec(rooms, options);
@@ -181,9 +185,5 @@ describe("roomSpecsToEstimateSpec — 2-room worked example", () => {
     expect(spec.rooms![0].surfaces.some((s) => s.type === "ceiling")).toBe(true);
     expect(spec.rooms![0].surfaces.some((s) => s.type === "trim")).toBe(true);
     expect(spec.rooms![1].surfaces.some((s) => s.type === "ceiling")).toBe(false);
-
-    const legacy = computePaintingProject(rooms, options);
-    const engine = computeEstimate(spec, CURRENT_RULES);
-    expect(engine.summary.totalCents).toBe(legacy.total_cents);
   });
 });

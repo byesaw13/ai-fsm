@@ -58,7 +58,7 @@ export type {
 export type { ProductionRate, ProductionRateModifier, LaborEstimate } from "./production";
 export {
   computeRoomMeasurements,
-  computePaintingProject,
+  computePaintingMaterials,
   computeAssessmentRoomGeometry,
   wallPaintGallons,
   trimPaintGallons,
@@ -72,8 +72,7 @@ export type {
   RoomSpec,
   ProjectOptions,
   RoomMeasurements,
-  RoomPaintingResult,
-  PaintingProjectResult,
+  PaintingMaterials,
   QuantityBasis,
   RoomQuantity,
   AssessmentRoomGeometry,

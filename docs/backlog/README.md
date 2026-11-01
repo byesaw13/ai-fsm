@@ -211,7 +211,7 @@ closed in tests; owner-flow AC still open.
 | TASK-226 | [New letterhead on invoices and customer PDFs](../archive/backlog-done/TASK-226-new-letterhead.md) | 004 | Done |
 | TASK-227 | [Itemized paint pools rooms that share a color](../archive/backlog-done/TASK-227-pool-shared-paint.md) | 002 | Done |
 | TASK-228 | [Tall walls take more hours in Prepare Quote](../archive/backlog-done/TASK-228-tall-wall-height-factors.md) | 002 | Done |
-| TASK-229 | [Retire the painting parity adapter](TASK-229-retire-painting-parity-adapter.md) | 002 | Proposed |
+| TASK-229 | [Retire the painting parity adapter](TASK-229-retire-painting-parity-adapter.md) | 002 | In progress |
 | TASK-230 | [Quotes ask for the standard deposit to book](../archive/backlog-done/TASK-230-deposit-to-book.md) | 002 | Done |
 | TASK-231 | [The customer quote page shows the quote terms](TASK-231-portal-quote-terms.md) | 002 | In progress |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |

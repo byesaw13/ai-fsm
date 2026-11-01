@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui";
 import {
   computeRoomMeasurements,
-  computePaintingProject,
+  computePaintingMaterials,
   computeEstimate,
   roomSpecsToEstimateSpec,
   CURRENT_RULES,
@@ -371,7 +371,7 @@ export function RoomByRoomEditor({ rooms, options, onChange, rateHours }: RoomBy
   }
 
   const hasValidRooms = rooms.some((r) => r.length_ft > 0 && r.width_ft > 0);
-  const metrics = hasValidRooms ? computePaintingProject(rooms, options) : null;
+  const metrics = hasValidRooms ? computePaintingMaterials(rooms, options) : null;
   const engineResult = hasValidRooms
     ? computeEstimate(roomSpecsToEstimateSpec(rooms, options), CURRENT_RULES)
     : null;
