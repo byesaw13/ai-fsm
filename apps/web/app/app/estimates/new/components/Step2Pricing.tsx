@@ -20,7 +20,7 @@ import type { EditableSuggestion, ScopeResult } from "../hooks/useEstimateAI";
 import type { DraftEstimate } from "@/lib/estimates/ai-draft";
 import { DraftReviewPanel } from "./DraftReviewPanel";
 import { RoomByRoomEditor } from "./RoomByRoomEditor";
-import type { ShoppingList, RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
+import type { ShoppingList, RoomSpec, ProjectOptions, EstimateResult, PaintingRateHours } from "@ai-fsm/domain";
 import type { PriceBookEntry } from "../hooks/useEstimatePriceBook";
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import type { PriceBookService } from "@/components/PriceBookSelector";
@@ -76,6 +76,7 @@ interface Step2Props {
   roomSpecs: RoomSpec[];
   projectOptions: ProjectOptions;
   handleRoomByRoomChange: (rooms: RoomSpec[], options: ProjectOptions, result: EstimateResult) => void;
+  roomRateHours?: PaintingRateHours | null;
   // Tiers / flat rate
   flatRate: string;
   setFlatRate: (v: string) => void;
@@ -139,7 +140,7 @@ export function Step2Pricing({
   mode, handleModeChange,
   priceBookItems, removePriceBookItem, scopeResults, handleScopeChange, pendingDraftScope,
   handleAddPriceBookItem,
-  paintingMode, setPaintingMode, roomSpecs, projectOptions, handleRoomByRoomChange,
+  paintingMode, setPaintingMode, roomSpecs, projectOptions, handleRoomByRoomChange, roomRateHours,
   flatRate, setFlatRate,
   personHoursLow, setPersonHoursLow,
   personHoursHigh, setPersonHoursHigh,
@@ -200,6 +201,7 @@ export function Step2Pricing({
               }]}
               options={projectOptions}
               onChange={handleRoomByRoomChange}
+              rateHours={roomRateHours}
             />
           </div>
         ) : (

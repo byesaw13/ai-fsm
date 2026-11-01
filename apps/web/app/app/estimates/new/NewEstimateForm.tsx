@@ -81,7 +81,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     resolvedJobType, addedMaterials,
     handleAddPriceBookItem,
     paintingMode, setPaintingMode,
-    roomSpecs, projectOptions, handleRoomByRoomChange,
+    roomSpecs, projectOptions, handleRoomByRoomChange, roomRateHours,
     handleScopeChange,
     removePriceBookItem,
     applyDraft,
@@ -214,6 +214,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           roomSpecs={roomSpecs}
           projectOptions={projectOptions}
           handleRoomByRoomChange={handleRoomByRoomChange}
+          roomRateHours={roomRateHours}
           flatRate={flatRate} setFlatRate={setFlatRate}
           personHoursLow={personHoursLow} setPersonHoursLow={setPersonHoursLow}
           personHoursHigh={personHoursHigh} setPersonHoursHigh={setPersonHoursHigh}

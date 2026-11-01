@@ -41,6 +41,8 @@ const lineItemInputSchema = z.object({
   hours_low: z.number().nonnegative().nullable().optional(),
   hours_high: z.number().nonnegative().nullable().optional(),
   hours_source: z.enum(HOUR_SOURCES).nullable().optional(),
+  /** The rate, modifiers and calibration behind production-rate hours (TASK-193). Saved only with that source. */
+  production_rate_snapshot: z.record(z.unknown()).nullable().optional(),
   line_item_type: lineItemTypeSchema.default("labor"),
   visible_to_customer: z.boolean().default(true),
   adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
@@ -370,6 +372,13 @@ export async function createEstimate(
   const estimateHours = storedHourRange(labor_hours_low, labor_hours_high);
   const estimateHourSource = storedHourSource(labor_hours_source);
 
+  /** A snapshot only means something next to production-rate hours. */
+  function rateSnapshotFor(item: (typeof line_items)[number], source: string | null): string | null {
+    return source === "production_rate" && item.production_rate_snapshot
+      ? JSON.stringify(item.production_rate_snapshot)
+      : null;
+  }
+
   let paintingHoursPlaced = false;
   function lineHoursForInsert(item: (typeof line_items)[number]) {
     const hours = lineHourColumns(item);
@@ -507,8 +516,8 @@ export async function createEstimate(
             `INSERT INTO estimate_line_items
                (estimate_id, option_id, description, quantity, unit_price_cents, total_cents,
                 line_item_type, visible_to_customer, adjustment_type, sort_order, price_book_id,
-                unit_cost_cents, hours_low, hours_high, hours_source)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+                unit_cost_cents, hours_low, hours_high, hours_source, production_rate_snapshot)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
             [
               estimateId,
               optionId,
@@ -525,6 +534,7 @@ export async function createEstimate(
               hours.hours_low,
               hours.hours_high,
               hours.hours_source,
+              rateSnapshotFor(item, hours.hours_source),
             ]
           );
         }
@@ -539,8 +549,8 @@ export async function createEstimate(
           `INSERT INTO estimate_line_items
              (estimate_id, description, quantity, unit_price_cents, total_cents,
               line_item_type, visible_to_customer, adjustment_type, sort_order, price_book_id,
-              prepared_group_key, unit_cost_cents, hours_low, hours_high, hours_source)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+              prepared_group_key, unit_cost_cents, hours_low, hours_high, hours_source, production_rate_snapshot)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
           [
             estimateId,
             item.description,
@@ -557,6 +567,7 @@ export async function createEstimate(
             hours.hours_low,
             hours.hours_high,
             hours.hours_source,
+            rateSnapshotFor(item, hours.hours_source),
           ]
         );
       }
