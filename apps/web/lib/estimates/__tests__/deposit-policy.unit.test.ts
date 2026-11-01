@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { estimateEmailHtml, estimateEmailText } from "@ai-fsm/email-templates";
-import { calculateDepositPolicy, depositDueTriggerLabel, estimateMaterialsDepositBasis } from "../deposit-policy";
+import { calculateDepositPolicy, depositDueTriggerLabel, estimateMaterialsDepositBasis, standardDepositFields } from "../deposit-policy";
 import { createApprovalArtifacts } from "../approve";
 
 vi.mock("@/lib/invoices/db", () => ({
@@ -115,5 +115,19 @@ describe("customer estimate deposit copy", () => {
     expect(html).toContain("$700.00");
     expect(text).toContain("Deposit due: $300.00");
     expect(text).toContain("Balance: $700.00");
+  });
+});
+
+describe("standardDepositFields (TASK-230)", () => {
+  it("asks for the standard 30% when the account has not set one", () => {
+    expect(standardDepositFields(null)).toEqual({
+      deposit_required: true, deposit_type: "percentage", deposit_percentage: 30, deposit_due_trigger: "before_scheduling",
+    });
+  });
+  it("uses the account's percentage", () => {
+    expect(standardDepositFields({ deposit_percent: 25 }).deposit_percentage).toBe(25);
+  });
+  it("asks for none when the business takes 0%", () => {
+    expect(standardDepositFields({ deposit_percent: 0 })).toMatchObject({ deposit_required: false, deposit_type: "none" });
   });
 });

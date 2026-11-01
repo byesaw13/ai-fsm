@@ -15,7 +15,7 @@ import { PrintButton } from "./PrintButton";
 import { Letterhead } from "@/components/features/documents/Letterhead";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 import { resolveCompanyBranding, type CompanyProfileSettings } from "@/lib/company/branding";
-import { customerAddOns, showsQuantityAndRate } from "@/lib/estimates/customer-quote";
+import { customerAddOns, showsQuantityAndRate, depositLabel } from "@/lib/estimates/customer-quote";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +26,8 @@ interface EstimateRow {
   tax_cents: number;
   total_cents: number;
   deposit_cents: number;
+  deposit_type: string | null;
+  deposit_percentage: string | number | null;
   balance_cents: number;
   notes: string | null;
   scope_assumptions: string | null;
@@ -90,7 +92,7 @@ export default async function EstimatePrintPage({
       `SELECT
          e.id, e.status,
          e.subtotal_cents, e.tax_cents, e.total_cents,
-         COALESCE(e.deposit_cents, 0) AS deposit_cents,
+         COALESCE(e.deposit_cents, 0) AS deposit_cents, e.deposit_type, e.deposit_percentage,
          COALESCE(e.balance_cents, 0) AS balance_cents,
          e.notes, e.scope_assumptions, e.sent_at, e.expires_at, e.created_at,
          e.sq_ft, e.prep_level, e.includes_trim, e.includes_ceiling,
@@ -394,7 +396,7 @@ export default async function EstimatePrintPage({
                 {estimate.deposit_cents > 0 && (
                   <>
                     <tr className="deposit-row">
-                      <td colSpan={3}>Deposit due</td>
+                      <td colSpan={3}>{depositLabel(estimate.deposit_type, estimate.deposit_percentage)}</td>
                       <td className="amt">{formatCents(estimate.deposit_cents)}</td>
                     </tr>
                     <tr className="deposit-row">
@@ -421,7 +423,7 @@ export default async function EstimatePrintPage({
                 {estimate.deposit_cents > 0 && (
                   <>
                     <tr className="deposit-row">
-                      <td>Deposit due</td>
+                      <td>{depositLabel(estimate.deposit_type, estimate.deposit_percentage)}</td>
                       <td className="amt">{formatCents(estimate.deposit_cents)}</td>
                     </tr>
                     <tr className="deposit-row">

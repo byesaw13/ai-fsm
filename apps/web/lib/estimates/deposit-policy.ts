@@ -1,3 +1,4 @@
+import { resolveDepositPolicy } from "@ai-fsm/domain";
 export const DEPOSIT_TYPES = ["none", "materials", "percentage", "fixed"] as const;
 export type DepositType = typeof DEPOSIT_TYPES[number];
 
@@ -72,4 +73,22 @@ export function depositDueTriggerLabel(trigger: DepositDueTrigger | null | undef
 function clampNumber(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Deposit fields for a new quote from the account's standard deposit (TASK-230):
+ * a percentage due before scheduling, or none when the business takes 0%.
+ */
+export function standardDepositFields(
+  settings: { deposit_percent?: number; deposit_terms?: string } | null | undefined,
+): {
+  deposit_required: boolean;
+  deposit_type: "percentage" | "none";
+  deposit_percentage: number | null;
+  deposit_due_trigger: "before_scheduling";
+} {
+  const { percent } = resolveDepositPolicy(settings);
+  return percent > 0
+    ? { deposit_required: true, deposit_type: "percentage", deposit_percentage: percent, deposit_due_trigger: "before_scheduling" }
+    : { deposit_required: false, deposit_type: "none", deposit_percentage: null, deposit_due_trigger: "before_scheduling" };
 }

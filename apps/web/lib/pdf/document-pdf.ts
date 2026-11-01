@@ -125,6 +125,8 @@ export interface EstimatePdfData {
   taxCents?: number | null;
   totalCents: number;
   depositCents?: number | null;
+  /** Label for the deposit row, e.g. "Deposit to book (30%)" (TASK-230). */
+  depositLabel?: string | null;
   notes?: string | null;
   lineItems: PdfLineItem[];
   /** When set (multi_option estimates), render priced option sections instead
@@ -846,7 +848,7 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
   if (d.taxCents && d.taxCents > 0) totals.push({ label: "Tax", value: money(d.taxCents) });
   totals.push({ label: "Total", value: money(d.totalCents), strong: true });
   if (d.depositCents && d.depositCents > 0) {
-    totals.push({ label: "Deposit due", value: money(d.depositCents), strong: true });
+    totals.push({ label: d.depositLabel || "Deposit to book", value: money(d.depositCents), strong: true });
   }
 
   const site = (d.branding?.website?.trim() || DEFAULT_BRAND_URL).replace(/^https?:\/\//, "");

@@ -42,6 +42,8 @@ interface Estimate {
   tax_cents: number;
   total_cents: number;
   deposit_cents: number | null;
+  /** "Deposit to book (30%)" (TASK-230). */
+  deposit_label?: string;
   notes: string | null;
   scope_assumptions: string | null;
   expires_at: string | null;
@@ -354,7 +356,7 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
             )}
             {estimate.deposit_cents != null && estimate.deposit_cents > 0 && (
               <div style={{ display: "flex", gap: 32, color: "#6b7280", fontSize: 13 }}>
-                <span>Deposit due</span><span>{cents(estimate.deposit_cents)}</span>
+                <span>{estimate.deposit_label ?? "Deposit to book"}</span><span>{cents(estimate.deposit_cents)}</span>
               </div>
             )}
             <div style={{ display: "flex", gap: 32, fontWeight: 700, fontSize: 16, marginTop: 4 }}>

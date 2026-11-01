@@ -132,6 +132,8 @@ describe("POST /visits/[id]/prepare-quote", () => {
       [1, 4000],
     ]);
     expect(input.scope_assumptions).toBe("Not included: Concealed damage");
+    // The standard deposit books the work (TASK-230); the mocked account has no setting, so 30%.
+    expect(input).toMatchObject({ deposit_required: true, deposit_type: "percentage", deposit_percentage: 30, deposit_due_trigger: "before_scheduling" });
     expect(extra.sourceVisitId).toBe(VISIT);
     expect(extra.lineGroupKeys).toEqual(["bath", "bath"]);
     expect(extra.preparedScope.tasks[0].quantity).toMatchObject({ value: 96, basis: "measured" });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { customerAddOns, showsQuantityAndRate } from "../customer-quote";
+import { customerAddOns, depositLabel, showsQuantityAndRate } from "../customer-quote";
 
 describe("customerAddOns (TASK-224)", () => {
   const scope = {
@@ -36,5 +36,16 @@ describe("showsQuantityAndRate (TASK-224)", () => {
     expect(showsQuantityAndRate("materials")).toBe(true);
     expect(showsQuantityAndRate("equipment")).toBe(true);
     expect(showsQuantityAndRate(null)).toBe(true);
+  });
+});
+
+describe("depositLabel (TASK-230)", () => {
+  it("names the percentage that books the work", () => {
+    expect(depositLabel("percentage", "30.00")).toBe("Deposit to book (30%)");
+    expect(depositLabel("percentage", 33.5)).toBe("Deposit to book (33.5%)");
+  });
+  it("falls back without a percentage", () => {
+    expect(depositLabel("fixed", null)).toBe("Deposit to book");
+    expect(depositLabel("materials", 0)).toBe("Deposit to book");
   });
 });

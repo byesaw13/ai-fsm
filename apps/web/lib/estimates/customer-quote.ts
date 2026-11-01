@@ -19,3 +19,15 @@ export function customerAddOns(rawScope: unknown): CustomerAddOn[] {
 export function showsQuantityAndRate(lineItemType: string | null | undefined): boolean {
   return lineItemType !== "labor";
 }
+
+/**
+ * What the customer sees next to the deposit amount (TASK-230): "Deposit to book (30%)".
+ * The deposit is what reserves a spot on the schedule.
+ */
+export function depositLabel(depositType: string | null | undefined, depositPercentage: number | string | null | undefined): string {
+  const pct = depositPercentage == null ? NaN : Number(depositPercentage);
+  if (depositType === "percentage" && Number.isFinite(pct) && pct > 0) {
+    return `Deposit to book (${Math.round(pct * 100) / 100}%)`;
+  }
+  return "Deposit to book";
+}

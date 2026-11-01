@@ -18,7 +18,7 @@ import {
   documentLocationSelect,
   resolveServiceLocation,
 } from "@/lib/documents/service-location";
-import { customerAddOns, showsQuantityAndRate } from "@/lib/estimates/customer-quote";
+import { customerAddOns, showsQuantityAndRate, depositLabel } from "@/lib/estimates/customer-quote";
 import {
   buildInvoicePdf,
   buildEstimatePdf,
@@ -253,7 +253,7 @@ export async function loadEstimatePdf(
 ): Promise<LoadedPdf | null> {
   const { rows, rowCount } = await client.query(
     `SELECT e.id, e.status, e.presentation_mode, e.subtotal_cents, e.tax_cents, e.total_cents,
-            e.deposit_cents, e.expires_at, e.notes, e.sent_at, e.created_at, e.client_id,
+            e.deposit_cents, e.deposit_type, e.deposit_percentage, e.expires_at, e.notes, e.sent_at, e.created_at, e.client_id,
             e.prepared_scope,
             j.title AS job_title,
             a.name AS account_name, a.settings AS account_settings,
@@ -336,6 +336,7 @@ export async function loadEstimatePdf(
     taxCents: Number(est.tax_cents ?? 0),
     totalCents: Number(est.total_cents ?? 0),
     depositCents: Number(est.deposit_cents ?? 0),
+    depositLabel: depositLabel(est.deposit_type, est.deposit_percentage),
     notes: est.notes as string | null,
     lineItems: mapQuoteLineItems(lineItems.rows),
     options,
