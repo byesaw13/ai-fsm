@@ -46,6 +46,9 @@ interface Estimate {
   deposit_label?: string;
   notes: string | null;
   scope_assumptions: string | null;
+  /** Quote terms from Settings, as on the PDF (TASK-231). */
+  terms?: string;
+  deposit_terms?: string | null;
   expires_at: string | null;
   responded_at: string | null;
   client_approved_name: string | null;
@@ -408,6 +411,17 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
           <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, marginBottom: 24 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 6 }}>SERVICE CONDITIONS</div>
             <div style={{ whiteSpace: "pre-wrap", color: "#374151", fontSize: 13 }}>{estimate.scope_assumptions}</div>
+          </div>
+        )}
+
+        {/* Quote terms (TASK-231): the same text the PDF and print copy carry */}
+        {estimate.terms && (
+          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, marginBottom: 24 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 6 }}>QUOTE TERMS</div>
+            <div style={{ whiteSpace: "pre-wrap", color: "#374151", fontSize: 13 }}>{estimate.terms}</div>
+            {estimate.deposit_terms && (
+              <div style={{ whiteSpace: "pre-wrap", color: "#374151", fontSize: 13, marginTop: 12 }}>{estimate.deposit_terms}</div>
+            )}
           </div>
         )}
 

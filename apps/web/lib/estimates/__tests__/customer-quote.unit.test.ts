@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { customerAddOns, depositLabel, showsQuantityAndRate } from "../customer-quote";
+import { customerAddOns, customerQuoteTerms, depositLabel, showsQuantityAndRate } from "../customer-quote";
 
 describe("customerAddOns (TASK-224)", () => {
   const scope = {
@@ -47,5 +47,29 @@ describe("depositLabel (TASK-230)", () => {
   it("falls back without a percentage", () => {
     expect(depositLabel("fixed", null)).toBe("Deposit to book");
     expect(depositLabel("materials", 0)).toBe("Deposit to book");
+  });
+});
+
+describe("customerQuoteTerms (TASK-231)", () => {
+  const settings = {
+    estimate_terms: "A {deposit_percent} deposit is required to book your project.",
+    deposit_terms: "",
+  };
+
+  it("fills the deposit percent into the Settings terms", () => {
+    expect(customerQuoteTerms("Dovetails", settings, 262_500)).toEqual({
+      terms: "A 30% deposit is required to book your project.",
+      depositTerms: null,
+    });
+  });
+
+  it("shows deposit terms only when the quote asks for a deposit", () => {
+    const withDeposit = { ...settings, deposit_terms: "Deposits are non-refundable." };
+    expect(customerQuoteTerms("Dovetails", withDeposit, 262_500).depositTerms).toBe("Deposits are non-refundable.");
+    expect(customerQuoteTerms("Dovetails", withDeposit, 0).depositTerms).toBeNull();
+  });
+
+  it("falls back to the standard terms when Settings has none", () => {
+    expect(customerQuoteTerms("Dovetails", null, 0).terms.length).toBeGreaterThan(20);
   });
 });
