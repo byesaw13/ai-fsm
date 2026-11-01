@@ -1,5 +1,5 @@
 /**
- * Adapters between legacy painting estimators and the unified estimate engine.
+ * Adapters between painting inputs and the unified estimate engine.
  * All money values are in CENTS.
  */
 
@@ -12,7 +12,7 @@ import {
   LABOR_COST_CENTS_PER_HOUR,
 } from "../dovetails";
 import {
-  computePaintingProject,
+  computePaintingMaterials,
   computeRoomMeasurements,
   type RoomSpec as PaintingRoomSpec,
   type ProjectOptions,
@@ -20,10 +20,8 @@ import {
   type RoomPrepLevel,
 } from "../painting";
 import type { ShoppingList } from "../scope";
-import { computeEstimate } from "./engine";
-import { CURRENT_RULES, ENGINE_VERSION } from "./rules";
+import { ENGINE_VERSION } from "./rules";
 import type {
-  AdjustmentSpec,
   EstimateSpec,
   EstimateResult,
   PaintQuality,
@@ -220,36 +218,29 @@ function buildEngineRooms(rooms: PaintingRoomSpec[], options: ProjectOptions): E
 
 /**
  * Converts dimensional room specs (DB room_specs shape) → engine EstimateSpec.
- * Reconciles legacy vs engine coat/material/prime models via a parity adjustment when needed.
+ * Labor is priced by the engine rules (TASK-229: the old $/sq ft total and
+ * its "Pricing reconciliation" line are gone). Paint and primer come from
+ * computePaintingMaterials, the same calculation the shopping list reads.
  */
 export function roomSpecsToEstimateSpec(
   rooms: PaintingRoomSpec[],
   options: ProjectOptions,
   paintQuality?: PaintQuality
 ): EstimateSpec {
-  const legacy = computePaintingProject(rooms, options);
-  const spec: EstimateSpec = {
+  const materials = computePaintingMaterials(rooms, options);
+  return {
     engineVersion: ENGINE_VERSION,
     type: "painting",
     paintQuality: paintQuality ?? dominantPaintQuality(rooms),
     rooms: buildEngineRooms(rooms, options),
+    roomMaterials: materials.items.map((m, i) => ({
+      id: String(i),
+      description: `${m.item} (${m.qty} gal)`,
+      quantity: m.qty,
+      unit: "gal",
+      totalCents: m.cost_cents,
+    })),
   };
-
-  const enginePreview = computeEstimate(spec, CURRENT_RULES);
-  const totalDelta = legacy.total_cents - enginePreview.summary.totalCents;
-  if (totalDelta !== 0) {
-    const adjustments: AdjustmentSpec[] = [
-      {
-        id: "legacy-parity",
-        type: totalDelta > 0 ? "surcharge" : "discount",
-        label: "Pricing reconciliation",
-        amountCents: totalDelta,
-      },
-    ];
-    spec.adjustments = adjustments;
-  }
-
-  return spec;
 }
 
 /** Recover legacy sqft/prep columns from source rooms. */
@@ -282,21 +273,13 @@ export function estimateResultToLegacyFields(
   };
 }
 
-function buildShoppingSummaryFromRooms(
-  rooms: PaintingRoomSpec[],
-  options: ProjectOptions
-): Array<{ item: string; qty: number; unit: string; cost_cents: number }> {
-  const legacy = computePaintingProject(rooms, options);
-  return legacy.shopping_summary;
-}
-
 /** Replaces buildShoppingListFromPaintingSummary for engine results. */
 export function buildShoppingListFromEstimateResult(
   _result: EstimateResult,
   sourceRooms: PaintingRoomSpec[],
   options: ProjectOptions = { coat_count: 2, occupied_home: false, vaulted_ceilings: false }
 ): ShoppingList | null {
-  const shoppingSummary = buildShoppingSummaryFromRooms(sourceRooms, options);
+  const shoppingSummary = computePaintingMaterials(sourceRooms, options).items;
   if (!shoppingSummary.length) return null;
 
   const sectionTotal = shoppingSummary.reduce((sum, item) => sum + item.cost_cents, 0);

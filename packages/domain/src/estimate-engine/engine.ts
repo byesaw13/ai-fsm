@@ -31,7 +31,33 @@ export function computeEstimate(spec: EstimateSpec, rules: PricingRules): Estima
     audit.push(...painting.audit);
     totalLaborCostCents += painting.laborCostCents;
 
-    if (painting.totalGallons > 0) {
+    if (spec.roomMaterials) {
+      const materialCents = spec.roomMaterials.reduce((sum, m) => sum + m.totalCents, 0);
+      for (const m of spec.roomMaterials) {
+        allLines.push({
+          id: `paint-material-${m.id}`,
+          category: "material",
+          description: m.description,
+          quantity: m.quantity,
+          unit: m.unit,
+          unitAmountCents: m.quantity > 0 ? Math.round(m.totalCents / m.quantity) : m.totalCents,
+          totalCents: m.totalCents,
+          costBasisCents: m.totalCents,
+          marginCents: 0,
+          sourceRule: "painting.materials",
+          visibleToCustomer: true,
+        });
+      }
+      if (materialCents > 0) {
+        allLines.push({ ...computeHandlingLine(materialCents, rules.materialHandlingRate), id: "paint-handling" });
+        audit.push({
+          rule: "painting.materials",
+          input: { items: spec.roomMaterials.length, handlingRate: rules.materialHandlingRate },
+          output: { materialCents },
+        });
+      }
+      totalMaterialCostCents += materialCents;
+    } else if (painting.totalGallons > 0) {
       const mats = computePaintMaterials(painting.totalGallons, quality, rules);
       allLines.push(mats.materialLine);
       allLines.push(mats.handlingLine);

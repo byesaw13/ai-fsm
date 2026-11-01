@@ -54,6 +54,14 @@ export interface LineItemSpec {
   visibleToCustomer?: boolean;
 }
 
+export interface RoomMaterialSpec {
+  id: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  totalCents: number;
+}
+
 export interface AdjustmentSpec {
   id: string;
   type: AdjustmentKind;
@@ -77,6 +85,12 @@ export interface EstimateSpec {
 
   rooms?: RoomSpec[];
   paintQuality?: PaintQuality;
+  /**
+   * Paint and primer for the rooms, worked out by the caller (TASK-229:
+   * computePaintingMaterials). When set, even empty, the rooms add no paint
+   * of their own; these become the material lines, plus handling.
+   */
+  roomMaterials?: RoomMaterialSpec[];
 
   lineItems?: LineItemSpec[];
 

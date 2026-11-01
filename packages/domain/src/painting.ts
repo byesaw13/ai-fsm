@@ -5,12 +5,6 @@
  * Imported by the estimate builder and the PDF/print renderer.
  */
 
-import {
-  PAINTING_RATE_LABOR_CENTS,
-  PAINTING_TRIM_ADD_CENTS,
-  MATERIAL_HANDLING_CLIENT_RATE,
-  LABOR_COST_CENTS_PER_HOUR,
-} from "./dovetails";
 import type { AssessmentRoom } from "./assessment-summary";
 
 // ---------------------------------------------------------------------------
@@ -50,41 +44,19 @@ export interface RoomMeasurements {
   gross_wall_sqft: number;   // before door/window deductions (for material waste calc)
 }
 
-export interface RoomPaintingResult {
-  room: RoomSpec;
-  measurements: RoomMeasurements;
-  labor_cents: number;
-  paint_gallons: number;     // 0 if customer-supplied
-  primer_gallons: number;    // 0 if primer_needed = false
-  material_cents: number;    // based on paint_grade pricing
-  subtotal_cents: number;    // labor + material
-}
-
-export interface PaintingProjectResult {
-  rooms: RoomPaintingResult[];
-
-  // Totals
+/**
+ * Paint and primer to buy for a set of rooms (TASK-229). The one place room
+ * paint quantities come from: the quote's material lines, the preview and the
+ * shopping list all read it. Customer-supplied rooms add no paint.
+ */
+export interface PaintingMaterials {
   total_wall_sqft: number;
   total_ceiling_sqft: number;
   total_trim_lf: number;
   total_paint_gallons: number;
   total_primer_gallons: number;
-
-  // Customer-facing pricing
-  labor_cents: number;
-  material_subtotal_cents: number;
-  material_handling_cents: number;
-  total_cents: number;
-  deposit_cents: number;
-  balance_cents: number;
-
-  // Internal
-  internal_labor_cost_cents: number;
-  gross_margin_cents: number;
-  gross_margin_pct: number;           // 0–100
-
-  // Shopping list summary (for display; full list via buildShoppingList)
-  shopping_summary: Array<{
+  material_cents: number;
+  items: Array<{
     item: string;
     qty: number;
     unit: string;
@@ -110,15 +82,7 @@ export const PAINT_CENTS_PER_GALLON: Record<PaintGrade, number> = {
   designer: 95_00,   // $95/gal
 };
 
-const PREP_MULTIPLIERS: Record<RoomPrepLevel, number> = {
-  clean:    1.00,
-  minor:    1.00,
-  moderate: 1.14,
-  major:    1.38,
-};
-
-// Estimated labor hours per 100 sqft at 2 coats (for internal cost)
-const LABOR_HOURS_PER_100_SQFT = 0.85;
+const PRIMER_CENTS_PER_GALLON = 48_00; // ProMar 200 Primer
 
 // ---------------------------------------------------------------------------
 // Per-room computation
@@ -285,130 +249,59 @@ export function trimPaintGallons(linearFt: number, coats: number = 2): number {
   return wallPaintGallons(linearFt * TRIM_PAINT_SQFT_PER_LF, coats);
 }
 
-export function computeRoomPainting(room: RoomSpec, coatCount: number = 2): RoomPaintingResult {
-  const measurements = computeRoomMeasurements(room);
-  const { wall_sqft, ceiling_sqft, trim_lf } = measurements;
-
-  const prep_mult = PREP_MULTIPLIERS[room.prep_level];
-
-  // Labor: walls + ceiling + trim
-  const wall_labor_cents = Math.round(wall_sqft * PAINTING_RATE_LABOR_CENTS * prep_mult);
-  const ceiling_labor_cents = Math.round(ceiling_sqft * PAINTING_RATE_LABOR_CENTS * prep_mult);
-  const trim_labor_cents = Math.round(trim_lf * PAINTING_TRIM_ADD_CENTS);
-  // Extra coat adds 70% of base labor per additional coat beyond the standard 2
-  const coat_mult = coatCount <= 2 ? 1 : 1 + (coatCount - 2) * 0.70;
-  const labor_cents = Math.round((wall_labor_cents + ceiling_labor_cents + trim_labor_cents) * coat_mult);
-
-  // Materials
-  let paint_gallons = 0;
-  let primer_gallons = 0;
-  let material_cents = 0;
-
-  if (room.paint_supplied_by === "dovetails") {
-    const paintable_sqft = (wall_sqft + ceiling_sqft) * coatCount;
-    paint_gallons = Math.ceil((paintable_sqft / COVERAGE_SQFT_PER_GAL) * WASTE_FACTOR);
-    material_cents = paint_gallons * PAINT_CENTS_PER_GALLON[room.paint_grade];
-  }
-
-  if (room.primer_needed) {
-    const primer_sqft = wall_sqft + ceiling_sqft;
-    // Dark-to-light needs a second primer pass
-    const primer_coats = room.dark_to_light ? 2 : 1;
-    primer_gallons = Math.ceil(((primer_sqft * primer_coats) / PRIMER_COVERAGE_SQFT_PER_GAL) * WASTE_FACTOR);
-    material_cents += primer_gallons * 48_00; // $48/gal primer (ProMar 200 Primer)
-  }
-
-  return {
-    room,
-    measurements,
-    labor_cents,
-    paint_gallons,
-    primer_gallons,
-    material_cents,
-    subtotal_cents: labor_cents + material_cents,
-  };
+function roomPaint(room: RoomSpec, coatCount: number): { paint_gallons: number; primer_gallons: number } {
+  const { wall_sqft, ceiling_sqft } = computeRoomMeasurements(room);
+  const paint_gallons =
+    room.paint_supplied_by === "dovetails"
+      ? Math.ceil((((wall_sqft + ceiling_sqft) * coatCount) / COVERAGE_SQFT_PER_GAL) * WASTE_FACTOR)
+      : 0;
+  // Dark-to-light needs a second primer pass
+  const primer_gallons = room.primer_needed
+    ? Math.ceil((((wall_sqft + ceiling_sqft) * (room.dark_to_light ? 2 : 1)) / PRIMER_COVERAGE_SQFT_PER_GAL) * WASTE_FACTOR)
+    : 0;
+  return { paint_gallons, primer_gallons };
 }
 
-// ---------------------------------------------------------------------------
-// Full project computation
-// ---------------------------------------------------------------------------
+export function computePaintingMaterials(rooms: RoomSpec[], options: ProjectOptions): PaintingMaterials {
+  const coatCount = options.coat_count ?? 2;
+  let total_wall_sqft = 0;
+  let total_ceiling_sqft = 0;
+  let total_trim_lf = 0;
+  let total_primer_gallons = 0;
+  const gallonsByGrade: Partial<Record<PaintGrade, number>> = {};
 
-export function computePaintingProject(
-  rooms: RoomSpec[],
-  options: ProjectOptions
-): PaintingProjectResult {
-  const { coat_count = 2 } = options;
-
-  const roomResults = rooms.map((r) => computeRoomPainting(r, coat_count));
-
-  const total_wall_sqft = roomResults.reduce((s, r) => s + r.measurements.wall_sqft, 0);
-  const total_ceiling_sqft = roomResults.reduce((s, r) => s + r.measurements.ceiling_sqft, 0);
-  const total_trim_lf = roomResults.reduce((s, r) => s + r.measurements.trim_lf, 0);
-  const total_paint_gallons = roomResults.reduce((s, r) => s + r.paint_gallons, 0);
-  const total_primer_gallons = roomResults.reduce((s, r) => s + r.primer_gallons, 0);
-
-  const labor_cents = roomResults.reduce((s, r) => s + r.labor_cents, 0);
-  const material_subtotal_cents = roomResults.reduce((s, r) => s + r.material_cents, 0);
-  const material_handling_cents = Math.round(material_subtotal_cents * MATERIAL_HANDLING_CLIENT_RATE);
-
-  const total_cents = labor_cents + material_subtotal_cents + material_handling_cents;
-  const deposit_cents = 0;
-  const balance_cents = total_cents;
-
-  // Internal cost estimate (labor hours from production rate)
-  const total_paintable_sqft = total_wall_sqft + total_ceiling_sqft;
-  const est_hours = (total_paintable_sqft / 100) * LABOR_HOURS_PER_100_SQFT * coat_count;
-  const internal_labor_cost_cents = Math.round(est_hours * LABOR_COST_CENTS_PER_HOUR);
-  const gross_margin_cents = labor_cents - internal_labor_cost_cents;
-  const gross_margin_pct =
-    labor_cents > 0
-      ? Math.round((gross_margin_cents / labor_cents) * 100 * 10) / 10
-      : 0;
-
-  // Shopping summary
-  const shopping_summary: PaintingProjectResult["shopping_summary"] = [];
-  if (total_paint_gallons > 0) {
-    // Group by paint grade (use most common grade)
-    const gradeCount: Partial<Record<PaintGrade, number>> = {};
-    for (const r of roomResults) {
-      if (r.room.paint_supplied_by === "dovetails") {
-        gradeCount[r.room.paint_grade] = (gradeCount[r.room.paint_grade] ?? 0) + r.paint_gallons;
-      }
+  for (const room of rooms) {
+    const m = computeRoomMeasurements(room);
+    total_wall_sqft += m.wall_sqft;
+    total_ceiling_sqft += m.ceiling_sqft;
+    total_trim_lf += m.trim_lf;
+    const { paint_gallons, primer_gallons } = roomPaint(room, coatCount);
+    if (paint_gallons > 0) {
+      gallonsByGrade[room.paint_grade] = (gallonsByGrade[room.paint_grade] ?? 0) + paint_gallons;
     }
-    for (const [grade, qty] of Object.entries(gradeCount) as [PaintGrade, number][]) {
-      shopping_summary.push({
-        item: `Interior paint — ${grade}`,
-        qty,
-        unit: "gallon",
-        cost_cents: qty * PAINT_CENTS_PER_GALLON[grade],
-      });
-    }
+    total_primer_gallons += primer_gallons;
+  }
+
+  const items: PaintingMaterials["items"] = [];
+  for (const [grade, qty] of Object.entries(gallonsByGrade) as [PaintGrade, number][]) {
+    items.push({ item: `Interior paint — ${grade}`, qty, unit: "gallon", cost_cents: qty * PAINT_CENTS_PER_GALLON[grade] });
   }
   if (total_primer_gallons > 0) {
-    shopping_summary.push({
+    items.push({
       item: "Interior primer (ProMar 200 or equiv.)",
       qty: total_primer_gallons,
       unit: "gallon",
-      cost_cents: total_primer_gallons * 48_00,
+      cost_cents: total_primer_gallons * PRIMER_CENTS_PER_GALLON,
     });
   }
 
   return {
-    rooms: roomResults,
     total_wall_sqft,
     total_ceiling_sqft,
     total_trim_lf,
-    total_paint_gallons,
+    total_paint_gallons: Object.values(gallonsByGrade).reduce((s, g) => s + g, 0),
     total_primer_gallons,
-    labor_cents,
-    material_subtotal_cents,
-    material_handling_cents,
-    total_cents,
-    deposit_cents,
-    balance_cents,
-    internal_labor_cost_cents,
-    gross_margin_cents,
-    gross_margin_pct,
-    shopping_summary,
+    material_cents: items.reduce((s, i) => s + i.cost_cents, 0),
+    items,
   };
 }
