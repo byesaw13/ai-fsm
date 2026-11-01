@@ -481,6 +481,19 @@ export function useEstimateForm({
 
   const { settings: pricingSettings } = usePricingSettings();
 
+  // Rates can arrive after rooms were entered. Recalculate hours the owner has
+  // not typed over, so saved hours never miss rate 5012 (TASK-193 PR 2).
+  const rateHoursPerDay = paintingRates.hoursPerDay ?? pricingSettings.hours_per_day;
+  useEffect(() => {
+    if (paintingMode !== "room_by_room" || roomSpecs.length === 0 || !roomRateHours) return;
+    if (laborHours.trim() !== roomRateHours.hours.toFixed(1)) return;
+    const next = paintingRateHours(roomSpecs, projectOptions, paintingRates.rates, rateHoursPerDay);
+    setRoomRateHours(next);
+    setLaborHours(next.hours.toFixed(1));
+    // Only a change in the rates or hours per day should trigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paintingRates.rates, rateHoursPerDay]);
+
   const pricing = useEstimatePricing({
     serviceType, mode, lineItems, tiers, flatRate, taxRate,
     sqFt, prepLevel, includesTrim, includesCeiling,
@@ -547,7 +560,7 @@ export function useEstimateForm({
       rooms,
       opts,
       paintingRates.rates,
-      paintingRates.hoursPerDay ?? pricingSettings.hours_per_day,
+      rateHoursPerDay,
     );
     setRoomRateHours(rateHours);
     setLaborHours(rateHours.hours.toFixed(1));

@@ -81,6 +81,66 @@ describe.skipIf(!RUN)("production-rate snapshot on create", () => {
     expect(row.production_rate_snapshot).toMatchObject({ parts: [{ base_rate: 400, rate_unit: "sqft_per_day" }] });
   });
 
+  // The room-by-room form sends painting fields and an engine spec. The engine
+  // rewrites the lines, so this is the path that must keep the snapshot.
+  async function createPainting(hours: number, lineHours: number) {
+    const res = await api("POST", "/api/v1/estimates", {
+      client_id: clientId,
+      sq_ft: 302,
+      prep_level: 3,
+      material_cost_cents: 0,
+      labor_hours_estimate: hours,
+      engine_spec: {
+        engineVersion: "2026.05",
+        type: "painting",
+        paintQuality: "standard",
+        rooms: [{ id: "room-0", name: "Bedroom", coats: 2, surfaces: [
+          { type: "walls", sqft: 302, condition: "good", prep: "minor", prime: false, textureMatch: false },
+        ] }],
+      },
+      line_items: [{
+        description: "Painting labor", quantity: 1, unit_price_cents: 60000, line_item_type: "labor",
+        hours_low: lineHours, hours_high: lineHours, hours_source: "production_rate", production_rate_snapshot: SNAPSHOT,
+      }],
+    });
+    expect(res.status).toBe(201);
+    return res.data.id as string;
+  }
+
+  it("keeps the snapshot when the engine rewrites the painting lines", async () => {
+    const id = await createPainting(6, 6);
+    const c = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await c.connect();
+    try {
+      const { rows } = await c.query(
+        `SELECT hours_high::float AS hours_high, hours_source, production_rate_snapshot
+         FROM estimate_line_items WHERE estimate_id = $1 AND hours_high IS NOT NULL`,
+        [id],
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ hours_high: 6, hours_source: "production_rate" });
+      expect(rows[0].production_rate_snapshot).toMatchObject({ parts: [{ base_rate: 400 }] });
+    } finally {
+      await c.end();
+    }
+  });
+
+  it("stamps engine-rewritten hours as the owner's when they differ from the calculation", async () => {
+    const id = await createPainting(7, 6);
+    const c = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await c.connect();
+    try {
+      const { rows } = await c.query(
+        `SELECT hours_source, production_rate_snapshot FROM estimate_line_items
+         WHERE estimate_id = $1 AND hours_high IS NOT NULL`,
+        [id],
+      );
+      expect(rows[0]).toMatchObject({ hours_source: "owner", production_rate_snapshot: null });
+    } finally {
+      await c.end();
+    }
+  });
+
   it("drops a snapshot sent with the owner's hours", async () => {
     const id = await create({ hours_low: 7, hours_high: 7, hours_source: "owner", production_rate_snapshot: SNAPSHOT });
     expect((await snapshotOf(id)).production_rate_snapshot).toBeNull();

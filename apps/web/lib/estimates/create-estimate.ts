@@ -372,6 +372,24 @@ export async function createEstimate(
   const estimateHours = storedHourRange(labor_hours_low, labor_hours_high);
   const estimateHourSource = storedHourSource(labor_hours_source);
 
+  /**
+   * The engine rewrites painting lines, so the calculator's production-rate
+   * source and snapshot ride along to the stamped labor line (TASK-193 PR 2).
+   * Only when the hours sent still match the calculated hours.
+   */
+  function paintingRateProvenance(
+    items: typeof line_items,
+    hours: number | null | undefined,
+  ): { source: "production_rate"; snapshot: Record<string, unknown> } | null {
+    const line = items.find(
+      (item) => (item.line_item_type ?? "labor") === "labor" &&
+        item.hours_source === "production_rate" &&
+        item.production_rate_snapshot,
+    );
+    if (!line?.production_rate_snapshot || hours == null || line.hours_high !== hours) return null;
+    return { source: "production_rate", snapshot: line.production_rate_snapshot };
+  }
+
   /** A snapshot only means something next to production-rate hours. */
   function rateSnapshotFor(item: (typeof line_items)[number], source: string | null): string | null {
     return source === "production_rate" && item.production_rate_snapshot
@@ -638,6 +656,7 @@ export async function createEstimate(
         // rows would turn materials back into labor and drop their cost.
         preserveItemizedLines: !is_painting && !is_multi_option && flat_rate_cents === undefined,
         stampLaborHours: is_painting ? labor_hours_estimate ?? null : null,
+        stampHoursProvenance: is_painting ? paintingRateProvenance(line_items, labor_hours_estimate) : null,
       });
     } catch (engErr) {
       logger.error("Engine compute failed after insert", engErr, { estimateId: estimate });
