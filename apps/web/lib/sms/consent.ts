@@ -10,7 +10,6 @@ export const BUSINESS_LEGAL_NAME = "Dovetails Services LLC";
 export const BUSINESS_PHONE_DISPLAY = "(603) 479-1094";
 export const BUSINESS_PHONE_E164 = "+16034791094";
 export const BUSINESS_SUPPORT_EMAIL = "hello@mydovetails.com";
-export const PUBLIC_APP_ORIGIN = "https://app.mydovetails.com";
 
 /** Plain-text consent shown next to the opt-in checkbox (and stored on clients). */
 export const SMS_CONSENT_TEXT =

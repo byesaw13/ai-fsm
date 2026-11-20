@@ -22,4 +22,4 @@ export function getStandardEstimateTerms() {
   };
 }
 
-export { formatCents } from "@/lib/money";
+export { formatCents } from "@ai-fsm/money";

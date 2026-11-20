@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 
 interface Props {

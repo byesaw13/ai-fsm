@@ -57,19 +57,3 @@ export async function endPortalPreview(): Promise<void> {
   );
   if (ended.length > 0) jar.delete(PORTAL_SESSION_COOKIE);
 }
-
-export async function setPortalSessionCookie(token: string): Promise<void> {
-  const jar = await cookies();
-  jar.set(PORTAL_SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.SECURE_COOKIES !== "false" && process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: SESSION_DAYS * 24 * 60 * 60,
-    path: "/",
-  });
-}
-
-export async function clearPortalSessionCookie(): Promise<void> {
-  const jar = await cookies();
-  jar.delete(PORTAL_SESSION_COOKIE);
-}

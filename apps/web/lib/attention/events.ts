@@ -51,15 +51,3 @@ export async function markAllAttentionEventsRead(
   );
   return r.rowCount ?? 0;
 }
-
-export async function pruneOldAttentionEvents(
-  client: PoolClient,
-  retentionDays = ATTENTION_RETENTION_DAYS,
-): Promise<number> {
-  const r = await client.query(
-    `DELETE FROM attention_events
-     WHERE created_at < now() - ($1::text || ' days')::interval`,
-    [String(retentionDays)],
-  );
-  return r.rowCount ?? 0;
-}

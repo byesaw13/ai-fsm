@@ -1,6 +1,6 @@
 // Presentation helpers shared across the Reports sections.
 
-export { formatCents } from "@/lib/money";
+export { formatCents } from "@ai-fsm/money";
 
 export function pctOf(num: number, den: number): string {
   if (den === 0) return "0%";

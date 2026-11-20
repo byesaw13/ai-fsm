@@ -297,25 +297,3 @@ export function resolveOverlapRebalance(opts: {
     requires_delete_confirm: rebalanceHasDeletes(proposed),
   };
 }
-
-/** Load day-scoped entries for proposeRebalance (account ledger). */
-export async function loadTimelineEntriesForRebalance(
-  client: PoolClient,
-  accountId: string,
-  changeStartIso: string,
-  changeEndIso: string,
-): Promise<TimelineEntry[]> {
-  // Pull anything that could overlap the window, plus a bit of padding so
-  // proposal matches assertNoOverlap (open rows have infinite end).
-  const { rows } = await client.query<TimelineEntry>(
-    `SELECT id, activity_type, started_at::text, ended_at::text
-       FROM activity_entries
-      WHERE account_id = $1
-        AND voided_at IS NULL
-        AND started_at < $3::timestamptz
-        AND COALESCE(ended_at, 'infinity'::timestamptz) > $2::timestamptz
-      ORDER BY started_at ASC`,
-    [accountId, changeStartIso, changeEndIso],
-  );
-  return rows;
-}

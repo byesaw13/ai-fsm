@@ -187,18 +187,6 @@ export async function createSquarePaymentLink(
 }
 
 /**
- * Fetch a payment's current state (used by the webhook to confirm completion).
- */
-export async function getSquarePayment(
-  row: SquareSettingsRow,
-  paymentId: string
-) {
-  const client = buildClient(toSettings(row));
-  const res = await client.payments.get({ paymentId });
-  return res.payment ?? null;
-}
-
-/**
  * Verify a Square webhook signature. `notificationUrl` must exactly match the
  * endpoint URL registered in the Square dashboard.
  */

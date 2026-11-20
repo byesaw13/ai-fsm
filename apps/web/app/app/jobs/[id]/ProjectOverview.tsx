@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Card, SectionHeader } from "@/components/ui";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import type { TaskScheduleMismatch } from "@/lib/jobs/project-launch";
 
 /**

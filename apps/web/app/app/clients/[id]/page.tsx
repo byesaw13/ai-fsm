@@ -28,7 +28,7 @@ import { ClientActivityTimeline } from "./ClientActivityTimeline";
 import type { ActivityEvent } from "./ClientActivityTimeline";
 import { SendSmsButton } from "./SendSmsButton";
 import { dollars } from "./client360-helpers";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 import { VAULT_CATEGORY_LABELS } from "@ai-fsm/domain";
 import type { VaultCategory } from "@ai-fsm/domain";

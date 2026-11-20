@@ -6,7 +6,7 @@ import type { Route } from "next";
 import { Input, Select, Textarea, Button } from "@/components/ui";
 import type { ExpenseCategory } from "@ai-fsm/domain";
 import { formatJobPickerLabel } from "@ai-fsm/domain";
-import { parseDollarsToCents, formatCentsToDollars } from "@/lib/expenses/math";
+import { parseDollarsToCents, formatCents } from "@/lib/expenses/math";
 import {
   isFuelExpenseCategory,
   parseGallonsFromFuelText,
@@ -181,7 +181,7 @@ export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categor
         required
         disabled={pending}
         error={fieldErrors.amount}
-        hint={`Current: ${formatCentsToDollars(expense.amount_cents)}`}
+        hint={`Current: ${formatCents(expense.amount_cents)}`}
       />
 
       <Input

@@ -48,13 +48,6 @@ export type IntakeRoutingPath =
   | "remote_estimate"
   | "pending";
 
-export const INTAKE_ROUTING_PATHS = [
-  "site_visit",
-  "book_work",
-  "remote_estimate",
-  "pending",
-] as const;
-
 export const INTAKE_PATH_LABELS: Record<IntakeRoutingPath, string> = {
   site_visit: "Book a look",
   book_work: "Book work appointment",

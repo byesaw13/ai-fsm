@@ -17,7 +17,7 @@ export function todayNowKind(input: {
   return "van";
 }
 
-/** FieldRightNowCard (NowBar + vehicle row) is the stacked second Now. */
+/** FieldRightNowCard (activity bar + vehicle row) is the stacked second Now. */
 export function todayShowsFieldRightNow(_kind: TodayNowKind): boolean {
   return false;
 }

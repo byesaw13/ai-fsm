@@ -1,4 +1,4 @@
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import type { ApprovedAddOn } from "@/lib/estimates/add-on-choice";
 
 /** Add-ons the customer ticked when approving (TASK-225). The final bill adds them. */

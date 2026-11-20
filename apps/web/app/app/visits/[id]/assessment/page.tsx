@@ -7,7 +7,7 @@ import { Card, LinkButton, PageContainer, PageHeader, SectionHeader } from "@/co
 import { AssessmentForm } from "./AssessmentForm";
 import type { Assessment } from "./AssessmentForm";
 import { formatVisitDateLabel } from "@/lib/visits/formatting";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 
 export const dynamic = "force-dynamic";
 
