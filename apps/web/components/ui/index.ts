@@ -28,3 +28,4 @@ export * from "./StatusStepper";
 export * from "./Timeline";
 export * from "./Toast";
 export * from "./LocalTime";
+export * from "./ClientTypeahead";

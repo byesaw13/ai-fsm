@@ -5,6 +5,8 @@ export function formatCents(cents: number | string | null | undefined): string {
   return USD.format(Number(cents ?? 0) / 100);
 }
 
+export const formatCentsToDollars = formatCents;
+
 /** Parse dollar string to cents. Returns 0 for invalid/negative. */
 export function parseDollarsToCents(value: string): number {
   const parsed = parseFloat(value);
