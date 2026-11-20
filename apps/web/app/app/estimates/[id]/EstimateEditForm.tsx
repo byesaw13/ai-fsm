@@ -28,6 +28,7 @@ import {
 } from "@ai-fsm/domain";
 import type { RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
 import type { OptionTier } from "@/lib/estimates/form-helpers";
+import { QuoteSaveAlert } from "@/components/QuoteSaveAlert";
 import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import {
   parseCents,
@@ -537,11 +538,7 @@ function StandardEstimateEditForm({
     <Card data-testid="estimate-edit-form">
       <SectionHeader title="Edit Estimate" as="h2" />
       <form onSubmit={handleSubmit} className="p7-form-stack">
-        {error && (
-          <Card className="p7-card-danger" padding="sm" role="alert">
-            <p style={{ margin: 0 }} data-testid="edit-form-error">{error}</p>
-          </Card>
-        )}
+        {error && <QuoteSaveAlert message={error} />}
 
         <div className="p7-form-grid p7-form-grid-2">
           <Select
@@ -749,9 +746,9 @@ function StandardEstimateEditForm({
         {/* Generic Pricing */}
         {serviceType === "generic" && (
         <div style={{ marginTop: "var(--space-4)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
+          <div className="estimate-mode-bar">
             <SectionHeader
-              title={mode === "flat_rate" ? "Fixed Bid" : "Line Items"}
+              title={mode === "flat_rate" ? "Fixed Bid" : "Change the lines"}
               count={mode === "itemized" ? lineItems.length : undefined}
               as="h3"
             />
@@ -1039,7 +1036,7 @@ function TierEditor({
     <Card>
       <SectionHeader title="Edit Tiers" />
       <form onSubmit={handleSave} className="p7-form-stack">
-        {error && <div className="p7-card-danger" role="alert">{error}</div>}
+        {error && <QuoteSaveAlert message={error} />}
 
         <EstimateTierEditor
           tiers={tiers as unknown as OptionTier[]}

@@ -74,7 +74,7 @@ export function LineItemsTable({
           No line items. Add at least one.
         </p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
+        <div className="line-items-editor" style={{ overflowX: "auto" }}>
           {items.some(lineShowsHours) && (
             <p className="muted" style={{ fontSize: "var(--text-xs)", margin: "0 0 var(--space-2)" }}>
               {PERSON_HOURS_LABEL}. {PERSON_HOURS_HINT}
@@ -93,7 +93,7 @@ export function LineItemsTable({
             <tbody>
               {items.map((row, i) => (
                 <tr key={i}>
-                  <td>
+                  <td data-label="Description">
                     <input
                       className="p7-input"
                       type="text"
@@ -123,12 +123,12 @@ export function LineItemsTable({
                       </div>
                     )}
                     {lineShowsHours(row) && (
-                      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)", alignItems: "center" }}>
-                        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", whiteSpace: "nowrap" }}>
+                      <div className="line-item-hours">
+                        <span className="line-item-hours-label">
                           {PERSON_HOURS_LABEL}
                         </span>
                         <input
-                          className="p7-input"
+                          className="p7-input line-item-hours-input"
                           type="number"
                           min="0"
                           step="0.25"
@@ -139,10 +139,9 @@ export function LineItemsTable({
                           onChange={(e) => onUpdate(i, "hours_low", e.target.value)}
                           disabled={disabled}
                           data-testid={`${p}line-item-hours-low-${i}`}
-                          style={{ width: 72 }}
                         />
                         <input
-                          className="p7-input"
+                          className="p7-input line-item-hours-input"
                           type="number"
                           min="0"
                           step="0.25"
@@ -153,11 +152,10 @@ export function LineItemsTable({
                           onChange={(e) => onUpdate(i, "hours_high", e.target.value)}
                           disabled={disabled}
                           data-testid={`${p}line-item-hours-high-${i}`}
-                          style={{ width: 72 }}
                         />
                         {(!row.line_item_type || row.line_item_type === "labor") && hoursAreMissing(row.hours_low, row.hours_high) && (
                           <span
-                            style={{ fontSize: "var(--text-xs)", color: "var(--color-danger)", whiteSpace: "nowrap" }}
+                            className="line-item-hours-missing"
                             data-testid={`${p}line-item-hours-missing-${i}`}
                           >
                             {HOURS_MISSING_LABEL}
@@ -166,7 +164,7 @@ export function LineItemsTable({
                       </div>
                     )}
                   </td>
-                  <td>
+                  <td data-label="Qty">
                     <input
                       className="p7-input"
                       type="number"
@@ -178,7 +176,7 @@ export function LineItemsTable({
                       data-testid={`${p}line-item-qty-${i}`}
                     />
                   </td>
-                  <td>
+                  <td data-label="Unit price">
                     <input
                       className="p7-input"
                       type="number"
@@ -202,7 +200,7 @@ export function LineItemsTable({
                       </div>
                     )}
                   </td>
-                  <td style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", paddingLeft: "var(--space-2)" }}>
+                  <td data-label="Total" style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", paddingLeft: "var(--space-2)" }}>
                     {row.unit_price.trim() === "" ? "Price needed" : formatCents(lineTotal(row))}
                   </td>
                   <td>

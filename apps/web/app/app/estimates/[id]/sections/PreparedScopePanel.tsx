@@ -18,7 +18,8 @@ import { Button, useToast } from "@/components/ui";
 import { formatCents } from "@ai-fsm/money";
 import type { RevisionChange } from "@/lib/estimates/revise-quote";
 import { hoursSourceLabel, kindLabel, methodLabel, quantityLabel, tmRangeLabel, workAreaFlags, workAreaRows } from "@/lib/estimates/prepared-scope-display";
-import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
+import { QuoteSaveAlert } from "@/components/QuoteSaveAlert";
+import { quoteSaveOffersReload, rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import { PreparedOptionsEditor } from "@/components/features/estimates/PreparedOptionsEditor";
 
 interface Props {
@@ -91,6 +92,13 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
   const [scope, setScope] = useState(initialScope);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState<"save" | "apply" | null>(null);
+  const [conflict, setConflict] = useState<string | null>(null);
+
+  function reportFailure(data: { error?: { message?: string } }, fallback: string) {
+    const message = data.error?.message ?? fallback;
+    if (quoteSaveOffersReload(message)) setConflict(message);
+    else toast.error(message);
+  }
   const summary = useMemo(() => summarizePreparedScope(scope), [scope]);
   const pricing = scope.pricing ?? DEFAULT_PREPARED_PRICING;
   const profit = useMemo(
@@ -160,9 +168,10 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
       const data = await res.json();
       rememberQuoteVersion(data, setUpdatedAt);
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Materials could not be listed");
+        reportFailure(data, "Materials could not be listed");
         return;
       }
+      setConflict(null);
       setScope(data.prepared_scope);
       setDirty(false);
       const failed = (data.failed ?? []) as Array<{ group_key: string }>;
@@ -200,9 +209,10 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
       const data = await res.json();
       rememberQuoteVersion(data, setUpdatedAt);
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Revision failed");
+        reportFailure(data, "Revision failed");
         return;
       }
+      setConflict(null);
       setScope(data.prepared_scope);
       setDirty(false);
       if (accept) {
@@ -230,9 +240,10 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
       const data = await res.json();
       rememberQuoteVersion(data, setUpdatedAt);
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Save failed");
+        reportFailure(data, "Save failed");
         return;
       }
+      setConflict(null);
       setScope(data.prepared_scope);
       setDirty(false);
       toast.success(apply ? "Quote rebuilt from the prepared scope" : "Prepared scope saved");
@@ -250,6 +261,7 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
 
   return (
     <section className="card" style={{ marginBottom: "var(--space-4)" }} data-testid="prepared-scope-panel">
+      {conflict ? <QuoteSaveAlert message={conflict} /> : null}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-2)", flexWrap: "wrap" }}>
         <h2 style={{ margin: 0 }}>Prepared scope</h2>
         <span style={label}>From the site assessment</span>

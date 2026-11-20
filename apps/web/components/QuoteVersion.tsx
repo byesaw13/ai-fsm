@@ -32,6 +32,11 @@ export function useQuoteVersion(): { updatedAt: string; setUpdatedAt: (value: st
   return ctx ?? { updatedAt, setUpdatedAt };
 }
 
+/** True when the server told this page to reload before another save. */
+export function quoteSaveOffersReload(message: string): boolean {
+  return /reload to see the latest/i.test(message);
+}
+
 export function rememberQuoteVersion(
   data: { updated_at?: unknown },
   setUpdatedAt: (value: string) => void,
