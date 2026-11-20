@@ -4,7 +4,7 @@ import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { withExpenseContext } from "@/lib/expenses/db";
 import { canManageExpenses } from "@/lib/auth/permissions";
-import { formatCentsToDollars } from "@/lib/expenses/math";
+import { formatCents } from "@/lib/expenses/math";
 import { categoryLabel, formatExpenseDate } from "@/lib/expenses/ui";
 import type { ExpenseCategory } from "@ai-fsm/domain";
 import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS } from "@ai-fsm/domain";
@@ -174,7 +174,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
               <div className="p7-detail-row">
                 <dt>Amount</dt>
                 <dd style={{ fontSize: "var(--text-lg)", fontWeight: "var(--font-semibold)" }}>
-                  {formatCentsToDollars(expense.amount_cents)}
+                  {formatCents(expense.amount_cents)}
                 </dd>
               </div>
               <div className="p7-detail-row">

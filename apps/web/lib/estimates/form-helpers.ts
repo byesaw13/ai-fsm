@@ -220,23 +220,6 @@ export const STEP_LABELS = ["Who & What", "Pricing", "Adjustments", "Review & Se
 // Shopping list — generate for manual (non-AI) estimates
 // ---------------------------------------------------------------------------
 
-/**
- * Build a ShoppingList from scope builder state captured during estimate creation.
- * Returns null when no scope materials have been computed yet.
- * Used at submit time so ALL estimates (not just AI drafts) get a shopping_list_json.
- */
-/**
- * Build a ShoppingList from an engine EstimateResult and source room specs.
- * @deprecated Use buildShoppingListFromEstimateResult from @ai-fsm/domain directly.
- */
-export function buildShoppingListFromPaintingSummary(
-  result: EstimateResult,
-  rooms: RoomSpec[],
-  options?: ProjectOptions
-): ShoppingList | null {
-  return buildShoppingListFromEstimateResult(result, rooms, options);
-}
-
 export function buildManualShoppingList(
   priceBookItems: PriceBookEntry[],
   scopeResults: Record<string, ScopeBuilderResult>

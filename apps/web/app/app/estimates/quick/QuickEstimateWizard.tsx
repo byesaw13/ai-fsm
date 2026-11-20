@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";

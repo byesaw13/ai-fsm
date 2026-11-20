@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
 import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
 import { OwnerDashboard } from "./OwnerDashboard";
-import type { CommandVisit } from "./DashboardWidgets";
+import type { CommandVisit } from "./dashboard-types";
 import { loadNeedsAttention } from "@/lib/attention/load-needs-attention";
 import { filterAttentionForSurface } from "@/lib/attention/surfaces";
 import { formatBusinessDate } from "@/lib/time/business-tz";

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { withExpenseContext } from "@/lib/expenses/db";
 import { canManageExpenses } from "@/lib/auth/permissions";
-import { formatCentsToDollars } from "@/lib/expenses/math";
+import { formatCents } from "@/lib/expenses/math";
 import {
   categoryLabel,
   currentMonthKey,
@@ -141,7 +141,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   const metrics: MetricCardData[] = [
     {
       label: `${formatMonthLabel(activeMonth)} Total`,
-      value: formatCentsToDollars(summary.total_cents),
+      value: formatCents(summary.total_cents),
       variant: summary.total_cents > 0 ? "default" : "default",
     },
     {
@@ -151,7 +151,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
     ...topCategories.map(
       (ct): MetricCardData => ({
         label: categoryLabel(ct.category),
-        value: formatCentsToDollars(ct.total_cents),
+        value: formatCents(ct.total_cents),
       })
     ),
   ];
@@ -174,7 +174,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
     <PageContainer>
       <PageHeader
         title="Expenses"
-        subtitle={`${formatMonthLabel(activeMonth)} — ${formatCentsToDollars(summary.total_cents)} across ${summary.count} expense${summary.count === 1 ? "" : "s"}`}
+        subtitle={`${formatMonthLabel(activeMonth)} — ${formatCents(summary.total_cents)} across ${summary.count} expense${summary.count === 1 ? "" : "s"}`}
         actions={
           canManage ? (
             <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
@@ -240,7 +240,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
             return (
               <StatusSection
                 key={cat}
-                title={`${categoryLabel(cat as ExpenseCategory)} — ${formatCentsToDollars(catTotal)}`}
+                title={`${categoryLabel(cat as ExpenseCategory)} — ${formatCents(catTotal)}`}
                 count={items.length}
               >
                 {items.map((expense) => (
@@ -303,7 +303,7 @@ function ExpenseItemCard({ expense }: { expense: ExpenseRow }) {
             color: "var(--fg-base)",
           }}
         >
-          {formatCentsToDollars(expense.amount_cents)}
+          {formatCents(expense.amount_cents)}
         </span>
       }
       data-testid="expense-card"

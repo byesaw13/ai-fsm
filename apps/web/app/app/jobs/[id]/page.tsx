@@ -61,7 +61,7 @@ import {
   EmptyState,
 } from "@/components/ui";
 import type { TimelineEntryData, StatusVariant } from "@/components/ui";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import {
   formatMinutesAsHoursMinutes,
   laborCostForMargin,

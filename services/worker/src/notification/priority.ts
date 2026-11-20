@@ -10,4 +10,3 @@ export type Priority = typeof PRIORITY[keyof typeof PRIORITY];
 
 // Cooldown bypass thresholds
 export const COOLDOWN_BYPASS_MINIMUM = PRIORITY.HIGH;   // HIGH and above ignore the 4h cooldown
-export const DAILY_CAP_BYPASS_MINIMUM = PRIORITY.HIGH;  // HIGH and above ignore the daily cap

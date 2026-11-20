@@ -110,7 +110,7 @@ export function ClockBar() {
       if (!res.ok) throw new Error();
       setPromptActivity(false);
       window.dispatchEvent(new Event("ops:refresh"));
-      // The active-activity display (NowBar) is server-rendered and doesn't listen
+      // Activity displays are server-rendered and don't listen
       // to ops:refresh — re-fetch server props so it reflects the new activity.
       router.refresh();
     } catch {

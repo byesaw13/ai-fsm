@@ -13,7 +13,7 @@ import {
   HubSubnav,
 } from "@/components/ui";
 import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import type { MaterialCatalogRow } from "./page";
 
 const CATEGORY_LABELS: Record<string, string> = {

@@ -17,7 +17,7 @@ import {
   MetricGrid,
   HubSubnav,
 } from "@/components/ui";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import type { FilterDef, StatusVariant, MetricCardData } from "@/components/ui";
 import { WORK_HUB_LINKS } from "@/lib/navigation/hubs";
 import { estimateAttentionPredicate } from "@/lib/attention/counts";

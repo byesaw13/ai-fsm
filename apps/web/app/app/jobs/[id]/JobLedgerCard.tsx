@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import type { JobLedgerSummary } from "@ai-fsm/domain";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import { Card, SectionHeader, LinkButton } from "@/components/ui";
 import { DraftCoFromVarianceButton } from "./DraftCoFromVarianceButton";
 import { buildCoDraftFromLedger } from "@/lib/jobs/job-ledger-co-draft";

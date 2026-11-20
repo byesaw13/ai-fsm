@@ -15,7 +15,7 @@ import {
   type PreparedTask,
 } from "@ai-fsm/domain";
 import { Button, useToast } from "@/components/ui";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import type { RevisionChange } from "@/lib/estimates/revise-quote";
 import { hoursSourceLabel, kindLabel, methodLabel, quantityLabel, tmRangeLabel, workAreaFlags, workAreaRows } from "@/lib/estimates/prepared-scope-display";
 import { rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
