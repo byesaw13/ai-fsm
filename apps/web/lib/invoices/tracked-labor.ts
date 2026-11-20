@@ -246,24 +246,6 @@ export async function trackedLaborMinutesFromActivityEntries(
 }
 
 /**
- * Day-by-day tracked job_work for a job (transparent hours record).
- */
-export async function trackedLaborDaysFromActivityEntries(
-  client: PoolClient,
-  accountId: string,
-  jobId: string,
-): Promise<TrackedLaborDay[]> {
-  const r = await client.query<{
-    work_date: string;
-    started_at: string | Date;
-    ended_at: string | Date;
-    minutes: string;
-    entry_count: number;
-  }>(TRACKED_LABOR_DAYS_SQL, [accountId, jobId]);
-  return mapTrackedLaborDayRows(r.rows);
-}
-
-/**
  * Billable labor cents from tracked minutes — the shared transform BOTH invoice
  * readers apply (quarter-hour rounding × the customer labor rate).
  *

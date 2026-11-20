@@ -5,7 +5,7 @@ import { NeedsAttentionPanel } from "./NeedsAttentionPanel";
 import type { CommandVisit } from "./DashboardWidgets";
 import type { NeedsAttentionItem } from "@/lib/attention/load-needs-attention";
 import type { OpenOwnerPromiseRow } from "@/lib/captures/promise-queue";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import { formatBusinessTime } from "@/lib/time/business-tz";
 
 function fmtTime(iso: string): string {

@@ -8,10 +8,6 @@ export function isCommercialPricingMode(value: string | null | undefined): value
   return value === "flat_rate" || value === "hourly_internal";
 }
 
-export function isEstimatePresentation(value: string | null | undefined): value is EstimatePresentation {
-  return value === "itemized" || value === "flat_rate" || value === "multi_option";
-}
-
 /**
  * Split the overloaded `?pricing_mode=` query.
  * `hourly_internal` is commercial T&M. `itemized` / `multi_option` are layout.

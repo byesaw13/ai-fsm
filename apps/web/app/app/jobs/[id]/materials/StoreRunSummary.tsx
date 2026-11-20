@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import { summarizeStoreRun } from "@/lib/jobs/buy-list";
 import type { BuyListLine } from "./BuyListClient";
 

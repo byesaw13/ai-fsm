@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Card, Input, PageContainer, PageHeader, SectionHeader } from "@/components/ui";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import { ReferenceBlock } from "./ReferenceBlock";
 import {
   PRICE_BOOK_CATEGORY_LABELS,

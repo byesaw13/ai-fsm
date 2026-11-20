@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 
 export type TimelineEventType = "visit" | "estimate" | "invoice" | "payment" | "work_order" | "vault_item" | "membership" | "photo" | "issue" | "note";
 

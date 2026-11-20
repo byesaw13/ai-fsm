@@ -16,10 +16,6 @@ export const LINE_OUTCOME_LABELS: Record<LineOutcome, string> = {
   not_completed: "Not completed",
 };
 
-export function isLineOutcome(value: string | null | undefined): value is LineOutcome {
-  return LINE_OUTCOMES.includes(value as LineOutcome);
-}
-
 /** Deferred and not-completed work must not be billed as if it was done. */
 export function outcomeBlocksBilling(outcome: string | null | undefined): boolean {
   return outcome === "deferred" || outcome === "not_completed" || outcome === "removed_credited";

@@ -127,20 +127,3 @@ export function documentJoins(opts: {
   LEFT JOIN properties p ON p.id = COALESCE(${coalesceParts})
 `;
 }
-
-/** @deprecated Use documentJoins({ root: "i", includeEstimateProperty: true }) */
-export const INVOICE_DOCUMENT_JOINS = documentJoins({
-  root: "i",
-  includeEstimateProperty: true,
-});
-
-/** @deprecated Use documentLocationSelect({ includeEstimateProperty: true }) */
-export const INVOICE_LOCATION_SELECT = documentLocationSelect({
-  includeEstimateProperty: true,
-});
-
-/** @deprecated Use documentJoins({ root: "e" }) */
-export const ESTIMATE_DOCUMENT_JOINS = documentJoins({ root: "e" });
-
-/** @deprecated Use documentLocationSelect() */
-export const ESTIMATE_LOCATION_SELECT = documentLocationSelect();

@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { canManageClients } from "@/lib/auth/permissions";
 import { query } from "@/lib/db";
 import { formatClientContact } from "@/lib/crm/normalization";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import {
   Card,
   DataTable,

@@ -4,7 +4,7 @@ import type { ExpenseCategory } from "@ai-fsm/domain";
 export { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS };
 export type { ExpenseCategory };
 
-export { formatCentsToDollars, parseDollarsToCents } from "@ai-fsm/money";
+export { formatCents, parseDollarsToCents } from "@ai-fsm/money";
 
 /**
  * Check that a category value is in the locked set.

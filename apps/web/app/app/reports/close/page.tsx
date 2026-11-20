@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { canViewReports, canCloseMonth, canReopenMonth } from "@/lib/auth/permissions";
 import { withReportContext } from "@/lib/reports/db";
 import { query } from "@/lib/db";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 import { businessMonthKey, loadBusinessTimeZone, timestampBusinessMonthExpr } from "@/lib/reports/business-month";
 import { collectedCashStatusSql } from "@/lib/reports/collected-cash";
 import {

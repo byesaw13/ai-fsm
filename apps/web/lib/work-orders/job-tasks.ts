@@ -225,22 +225,6 @@ export async function loadVisitPlannedTasks(
   return rows;
 }
 
-/** For FieldCloseout-style gates from visit planned tasks (progress only). */
-export function visitTasksAsCriteria(tasks: VisitTaskRow[]) {
-  return tasksToCriteria(
-    tasks.map((t) => ({
-      id: t.id,
-      work_order_id: t.work_order_id,
-      label: t.label,
-      required: t.required,
-      completed: t.completed,
-      status: (t.status as "open" | "done" | "blocked" | "partial") || "open",
-      note: null,
-      sort_order: 0,
-    })),
-  );
-}
-
 /**
  * Mark a task as started-but-not-finished and create a new remainder task
  * ("what is left to do"). The remainder is open and required.

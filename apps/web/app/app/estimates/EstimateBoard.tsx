@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { StatusKanbanBoard } from "@/components/kanban/StatusKanbanBoard";
 import { canEstimateBoardDrop } from "@/lib/kanban/board-transitions";
-import { formatCents } from "@/lib/money";
+import { formatCents } from "@ai-fsm/money";
 
 export type EstimateBoardRow = {
   id: string;
