@@ -1,79 +1,78 @@
 import { NextResponse } from "next/server";
-import { withAuth } from "@/lib/auth/middleware";
+import { withRole } from "@/lib/auth/middleware";
 import { withEstimateContext } from "@/lib/estimates/db";
-import { reviewEstimate } from "@/lib/estimates/review";
+import { ReviewFailedError, reviewEstimate, ruleBasedReview } from "@/lib/estimates/review";
+import { loadReviewInput, type StoredReview } from "@/lib/estimates/review-input";
+import { quoteUpdatedAt } from "@/lib/estimates/quote-version";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/v1/estimates/[id]/review
+ * POST /api/v1/estimates/[id]/review — run on the owner's button only (TASK-195).
  *
- * Analyze an estimate against Dovetails business rules and return
- * actionable suggestions (pricing gaps, margin warnings, scope checks).
- *
- * Returns: { suggestions[], score, summary }
+ * Reviews the estimate against its hourly baseline, lines and prepared-scope gaps.
+ * The result is stored in review_result with review_for_updated_at; the estimate
+ * page shows it while the estimate is unchanged, so opening a page never calls AI.
+ * Drafts and sent estimates only: later states are immutable.
  */
-export const POST = withAuth(async (request, session) => {
+export const POST = withRole(["owner", "admin"], async (request, session) => {
   const id = request.nextUrl.pathname.split("/").at(-2)!;
 
   try {
-    const estimate = await withEstimateContext(session, async (client) => {
-      const result = await client.query(
-        `SELECT e.id, e.subtotal_cents, e.total_cents, e.notes,
-                e.sq_ft, e.prep_level, e.includes_trim, e.includes_ceiling,
-                e.internal_labor_cost_cents, e.internal_material_cost_cents,
-                e.target_margin_pct,
-                j.job_type
-         FROM estimates e
-         LEFT JOIN jobs j ON j.id = e.job_id
-         WHERE e.id = $1 AND e.account_id = $2`,
-        [id, session.accountId]
-      );
-
-      if (result.rowCount === 0) {
-        throw Object.assign(new Error("Estimate not found"), { code: "NOT_FOUND" });
-      }
-
-      const lineItemCount = await client.query<{ count: string }>(
-        `SELECT COUNT(*) AS count FROM estimate_line_items WHERE estimate_id = $1`,
-        [id]
-      );
-
-      return {
-        ...result.rows[0],
-        line_item_count: parseInt(lineItemCount.rows[0]?.count ?? "0", 10),
-      };
-    });
-
-    const review = await reviewEstimate({
-      sq_ft: estimate.sq_ft !== null ? Number(estimate.sq_ft) : null,
-      prep_level: estimate.prep_level !== null ? Number(estimate.prep_level) : null,
-      includes_trim: estimate.includes_trim ?? false,
-      includes_ceiling: estimate.includes_ceiling ?? false,
-      subtotal_cents: estimate.subtotal_cents,
-      total_cents: estimate.total_cents,
-      internal_labor_cost_cents: estimate.internal_labor_cost_cents,
-      internal_material_cost_cents: estimate.internal_material_cost_cents,
-      job_type: estimate.job_type,
-      notes: estimate.notes,
-      target_margin_pct: estimate.target_margin_pct,
-      line_item_count: estimate.line_item_count,
-    });
-
-    return NextResponse.json(review);
-  } catch (error) {
-    const err = error as Error & { code?: string };
-    if (err.code === "NOT_FOUND") {
+    const loaded = await withEstimateContext(session, (client) => loadReviewInput(client, id, session.accountId));
+    if (!loaded) {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Estimate not found", traceId: session.traceId } },
-        { status: 404 }
+        { status: 404 },
       );
     }
+    if (loaded.status !== "draft" && loaded.status !== "sent") {
+      return NextResponse.json(
+        { error: { code: "INVALID_STATE", message: `A ${loaded.status} estimate is not reviewed.`, traceId: session.traceId } },
+        { status: 409 },
+      );
+    }
+
+    let stored: StoredReview;
+    try {
+      stored = process.env.ANTHROPIC_API_KEY
+        ? { result: await reviewEstimate(loaded.input), source: "ai", reviewed_at: new Date().toISOString() }
+        : { result: ruleBasedReview(loaded.input), source: "rules", reviewed_at: new Date().toISOString() };
+    } catch (error) {
+      logger.error("POST /api/v1/estimates/[id]/review AI review failed", error, { traceId: session.traceId });
+      const message = error instanceof ReviewFailedError ? error.message : "The review could not be completed.";
+      return NextResponse.json(
+        { error: { code: "REVIEW_FAILED", message: `${message} Try again.`, traceId: session.traceId } },
+        { status: 502 },
+      );
+    }
+
+    // Stored only if the estimate did not change while the review ran. review_for_updated_at
+    // and the trigger's updated_at are both now() in this statement, so they match.
+    const saved = await withEstimateContext(session, async (client) => {
+      const { rows } = await client.query<{ updated_at: Date }>(
+        `UPDATE estimates
+         SET review_result = $1::jsonb, review_for_updated_at = now()
+         WHERE id = $2 AND account_id = $3
+           AND date_trunc('milliseconds', updated_at) = date_trunc('milliseconds', $4::timestamptz)
+         RETURNING updated_at`,
+        [JSON.stringify(stored), id, session.accountId, loaded.updatedAt],
+      );
+      return rows[0] ?? null;
+    });
+
+    return NextResponse.json({
+      review: stored,
+      stored: saved !== null,
+      previous_updated_at: quoteUpdatedAt(loaded.updatedAt),
+      updated_at: saved ? quoteUpdatedAt(saved.updated_at) : null,
+    });
+  } catch (error) {
     logger.error("POST /api/v1/estimates/[id]/review error", error, { traceId: session.traceId });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Failed to review estimate", traceId: session.traceId } },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

@@ -38,6 +38,7 @@ import { TravelPanel } from "@/components/travel/TravelPanel";
 import { QuoteVersionProvider } from "@/components/QuoteVersion";
 import { quoteUpdatedAt } from "@/lib/estimates/quote-version";
 import { MarkEntityAttentionRead } from "@/components/attention/MarkEntityAttentionRead";
+import { storedReviewFor } from "@/lib/estimates/review-input";
 import { withEstimateContext } from "@/lib/estimates/db";
 import { beforeSendChecklist, loadEstimateBaseline } from "@/lib/estimates/baseline";
 import { EstimateBaselinePanel } from "./sections/EstimateBaselinePanel";
@@ -114,6 +115,9 @@ export default async function EstimateDetailPage({
     baseline && currentStatus === "draft" && !baseline.optionQuote
       ? beforeSendChecklist(baseline.result.missing, baseline.lines)
       : [];
+
+  const stored = storedReviewFor(estimate);
+  const storedReview = stored ? { ...stored.review, current: stored.current } : null;
 
   const reviewHealth = estimateReviewHealth(
     estimate.presentation_mode === "multi_option"
@@ -362,9 +366,9 @@ export default async function EstimateDetailPage({
         />
       )}
 
-      {/* Review panel */}
-      {canTransition && !["declined", "expired"].includes(currentStatus) && (
-        <EstimateReviewPanel estimateId={estimate.id} />
+      {/* Review panel: runs on its button only; shows the stored review (TASK-195) */}
+      {canTransition && (currentStatus === "draft" || currentStatus === "sent") && (
+        <EstimateReviewPanel estimateId={estimate.id} initial={storedReview} />
       )}
 
       {/* Send / Mark as Sent — owner/admin only, non-terminal estimates */}
