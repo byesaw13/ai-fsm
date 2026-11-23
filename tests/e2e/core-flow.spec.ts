@@ -98,7 +98,7 @@ test.describe("Required release smoke — admin core flow", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
     await page.goto(`${BASE}/app/jobs/${jobId}`);
-    const phone = page.locator(".p7-only-mobile");
+    const phone = page.getByTestId("job-phone-layout");
     await expect(phone.getByTestId("project-what-next-message")).toBeVisible();
     await expect(phone.getByTestId("project-what-next-primary")).toBeVisible();
     // Exactly one primary-styled action on the first screen.

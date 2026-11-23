@@ -911,9 +911,10 @@ export default async function JobDetailPage({
   // TASK-239: one next step leads the page — the status sentence and the one
   // primary button — on the phone and on the computer. Other buttons are secondary.
   const nextLeads = !isTech && !!commercialCounts;
-  const whatNext =
+  const whatNextFor = (statusAnchorId: string) =>
     !isTech && commercialCounts ? (
     <ProjectWhatNext
+      statusAnchorId={statusAnchorId}
       jobId={job.id}
       clientId={job.client_id ?? null}
       jobStatus={currentStatus}
@@ -946,6 +947,32 @@ export default async function JobDetailPage({
       hasCompletedAssessmentVisit={hasCompletedAssessmentVisit}
       hasSalesWalkthroughOnly={hasSalesWalkthroughOnly}
     />
+    ) : null;
+
+  // Close Out panel — admin/owner only (explicit project completion). Both
+  // layouts render it, so the next step's close-out actions work on a phone (TASK-239).
+  const closeOutPanel = (anchorId: string) =>
+    canTransition && allowedTransitions.length > 0 ? (
+      <Card
+        id={anchorId}
+        data-testid={anchorId === "project-status" ? "job-transition-panel" : "job-transition-panel-phone"}
+        style={{ scrollMarginTop: 16 }}
+      >
+        <SectionHeader title="Close Out Project" />
+        <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+          {commercialCounts?.latest_invoice_id
+            ? "Visits and work orders never close this project. If the invoice already exists (or is paid), use Complete project then Mark as Invoiced — that will not create a second invoice."
+            : "Visits and work orders never close this project. When field work is done, use Complete & Invoice — that drafts the final invoice from actuals (T&M time, materials, and lift/equipment) and opens it so you can send or share the link."}
+        </p>
+        <JobTransitionForm
+          jobId={job.id}
+          allowedTransitions={allowedTransitions as JobStatus[]}
+          statusLabels={JOB_STATUS_LABELS}
+          clientId={job.client_id}
+          approvedEstimateId={commercialCounts?.approved_estimate_id ?? null}
+          hasExistingFinalInvoice={!!commercialCounts?.latest_invoice_id}
+        />
+      </Card>
     ) : null;
 
   const scheduleVisitAction = canAddVisit ? (
@@ -1049,7 +1076,7 @@ export default async function JobDetailPage({
             <StatusBadge variant={currentStatus as StatusVariant}>{JOB_STATUS_LABELS[currentStatus]}</StatusBadge>
           </div>
         </header>
-        {whatNext}
+        {whatNextFor("project-status-mobile")}
 
         <section style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "var(--space-2)" }}>
           {job.client_phone ? <MobileJobExternalAction href={`tel:${job.client_phone}`} label="Call" /> : null}
@@ -1141,6 +1168,7 @@ export default async function JobDetailPage({
           )}
         </section>
 
+        {closeOutPanel("project-status-mobile")}
         <AdvancedDetails title="Secondary Details">
           <dl className="p7-detail-list">
             {job.client_name && <div className="p7-detail-row"><dt>Customer</dt><dd>{job.client_name}</dd></div>}
@@ -1278,7 +1306,7 @@ export default async function JobDetailPage({
             hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
             latestInvoiceId={commercialCounts.latest_invoice_id}
           />
-          {whatNext}
+          {whatNextFor("project-status")}
         </>
       )}
 
@@ -1540,25 +1568,7 @@ export default async function JobDetailPage({
             </Card>
           )}
 
-          {/* Status Transitions — admin/owner only (explicit project completion) */}
-          {canTransition && allowedTransitions.length > 0 && (
-            <Card id="project-status" data-testid="job-transition-panel">
-              <SectionHeader title="Close Out Project" />
-              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                {commercialCounts?.latest_invoice_id
-                  ? "Visits and work orders never close this project. If the invoice already exists (or is paid), use Complete project then Mark as Invoiced — that will not create a second invoice."
-                  : "Visits and work orders never close this project. When field work is done, use Complete & Invoice — that drafts the final invoice from actuals (T&M time, materials, and lift/equipment) and opens it so you can send or share the link."}
-              </p>
-              <JobTransitionForm
-                jobId={job.id}
-                allowedTransitions={allowedTransitions as JobStatus[]}
-                statusLabels={JOB_STATUS_LABELS}
-                clientId={job.client_id}
-                approvedEstimateId={commercialCounts?.approved_estimate_id ?? null}
-                hasExistingFinalInvoice={!!commercialCounts?.latest_invoice_id}
-              />
-            </Card>
-          )}
+          {closeOutPanel("project-status")}
 
           {/* Danger Zone — owner only, draft only */}
           {canDelete && currentStatus === "draft" && (
@@ -2003,7 +2013,7 @@ export default async function JobDetailPage({
 
   return (
     <>
-      <div className="p7-only-mobile">{mobileView}</div>
+      <div className="p7-only-mobile" data-testid="job-phone-layout">{mobileView}</div>
       <div className="p7-only-desktop">{desktopView}</div>
     </>
   );

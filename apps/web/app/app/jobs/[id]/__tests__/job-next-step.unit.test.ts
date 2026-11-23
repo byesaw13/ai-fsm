@@ -110,3 +110,13 @@ describe("job page next step (TASK-239)", () => {
     expect(html.indexOf("project-what-next-message")).toBeLessThan(html.indexOf("project-what-next-primary"));
   });
 });
+
+describe("close-out actions reach a panel the layout shows (TASK-239)", () => {
+  it("uses the layout's own Close Out anchor", () => {
+    const ready = { readyForCloseout: true, jobStatus: "in_progress", stage: "in_progress" } as Partial<ProjectWhatNextProps>;
+    expect(computeWhatNext(props(ready)).actionHref).toBe("/app/jobs/job-1#project-status");
+    expect(computeWhatNext(props({ ...ready, statusAnchorId: "project-status-mobile" })).actionHref).toBe(
+      "/app/jobs/job-1#project-status-mobile",
+    );
+  });
+});
