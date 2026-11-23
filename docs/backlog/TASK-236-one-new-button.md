@@ -1,7 +1,7 @@
 # TASK-236: One "New" button with three plain choices
 
 Status:
-Proposed
+In progress
 
 Epic:
 EPIC-006 Role-Based Workspaces

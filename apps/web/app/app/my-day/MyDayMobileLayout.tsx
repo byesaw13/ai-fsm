@@ -30,7 +30,6 @@ export function MyDayMobileLayout({
   currentJobId = null,
   canCapture = false,
   canQuickBook = false,
-  canQuote = true,
   alwaysShowEndDay = false,
   priorDayNeedsMileage = false,
   priorOpenSession = null,
@@ -47,7 +46,6 @@ export function MyDayMobileLayout({
   currentJobId?: string | null;
   canCapture?: boolean;
   canQuickBook?: boolean;
-  canQuote?: boolean;
   alwaysShowEndDay?: boolean;
   priorDayNeedsMileage?: boolean;
   priorOpenSession?: OpenSession | null;
@@ -187,7 +185,7 @@ export function MyDayMobileLayout({
       <details className="field-more" data-testid="today-more">
         <summary>Day details &amp; history</summary>
         <div className="field-more__body">
-          <FieldQuickActions canQuickBook={canQuickBook} canQuote={canQuote} currentJobId={currentJobId} />
+          <FieldQuickActions showNew={canQuickBook} currentJobId={currentJobId} />
           <ClockBar />
           {more}
         </div>
