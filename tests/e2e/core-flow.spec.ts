@@ -200,11 +200,12 @@ test.describe("Required release smoke — admin core flow", () => {
 
     await page.goto(`${BASE}/app/estimates/${estimateId}`);
     // TASK-194: the draft lists what it needs and cannot be sent until that is done.
-    await expect(page.getByTestId("baseline-panel")).toBeVisible();
-    await expect(page.getByTestId("before-send-checklist")).toBeVisible();
+    const main = page.locator("#main-content");
+    await expect(main.getByTestId("baseline-panel")).toBeVisible();
+    await expect(main.getByTestId("before-send-checklist")).toBeVisible();
     await expect(page.getByRole("button", { name: "Mark as Sent", exact: true })).toBeDisabled();
     await makeEstimateSendable(page, estimateId);
-    await expect(page.getByTestId("baseline-effective-rate")).toContainText("/h vs");
+    await expect(main.getByTestId("baseline-effective-rate")).toContainText("/h vs");
     await page.getByRole("button", { name: "Mark as Sent", exact: true }).click();
     await expect(page.locator('#main-content [data-testid="estimate-status"]')).toContainText("Sent");
 

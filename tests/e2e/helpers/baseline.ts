@@ -64,11 +64,12 @@ export async function makeEstimateSendable(page: Page, estimateId: string): Prom
   expect(status).toBe(200);
 
   await page.reload();
-  const panel = page.getByTestId("baseline-panel");
+  const main = page.locator("#main-content");
+  const panel = main.getByTestId("baseline-panel");
   await panel.getByTestId("baseline-other-direct").fill("0");
   await panel.getByTestId("baseline-confirm-costs").click();
   await expect(panel.getByTestId("baseline-costs-confirmed")).toBeVisible();
-  await expect(page.getByTestId("before-send-checklist")).toHaveCount(0);
+  await expect(main.getByTestId("before-send-checklist")).toHaveCount(0);
 }
 
 export function estimateIdFromUrl(url: string): string {
