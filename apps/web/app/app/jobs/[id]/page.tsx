@@ -16,6 +16,8 @@ import type { Job, Visit, JobStatus, JobAcceptanceCategory, JobIntakeDecision } 
 import { JOB_SUB_STATUSES, SUB_STATUS_LABELS } from "@ai-fsm/domain";
 import { workerCostRateCentsPerHour, DEFAULT_PRICING_SETTINGS } from "@ai-fsm/domain";
 import { CopySupplyPoButton } from "@/components/jobs/CopySupplyPoButton";
+import { JobSection } from "@/components/jobs/JobSection";
+import { OpenSectionForHash } from "@/components/jobs/OpenSectionForHash";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { JobEditForm } from "./JobEditFormWrapper";
@@ -1310,262 +1312,583 @@ export default async function JobDetailPage({
         </>
       )}
 
-      {/* The control-panel board: every project artifact indexed exactly once */}
-      {!isTech && commercialCounts && (
-        <ProjectOverview
-          jobId={job.id}
-          mismatch={woMismatch}
-          estimate={
-            commercialCounts.latest_estimate_id
-              ? {
-                  id: commercialCounts.latest_estimate_id,
-                  number: commercialCounts.latest_estimate_number,
-                  status: commercialCounts.latest_estimate_status,
-                  totalCents: commercialCounts.latest_estimate_total_cents,
-                }
-              : null
-          }
-          approvedEstimateId={commercialCounts.approved_estimate_id}
-          deposit={
-            commercialCounts.deposit_invoice_id
-              ? {
-                  id: commercialCounts.deposit_invoice_id,
-                  number: commercialCounts.deposit_invoice_number,
-                  status: commercialCounts.deposit_invoice_status,
-                  paid: commercialCounts.deposit_paid,
-                  totalCents: commercialCounts.deposit_invoice_total_cents,
-                }
-              : null
-          }
-          hasApprovedEstimate={commercialCounts.has_approved_estimate}
-          invoice={
-            commercialCounts.latest_invoice_id
-              ? {
-                  id: commercialCounts.latest_invoice_id,
-                  number: commercialCounts.latest_final_number,
-                  status: commercialCounts.latest_final_status,
-                  totalCents: commercialCounts.invoice_total_cents,
-                }
-              : null
-          }
-          assessment={
-            assessmentVisitId ? { visitId: assessmentVisitId, done: assessmentPacketDone } : null
-          }
-          workDayCount={executionVisits.length}
-          nextDay={
-            nextExecution ? { visitId: nextExecution.id, label: nextExecution.label } : null
-          }
-          tasks={{
-            total: taskProgress.total,
-            done: taskProgress.done,
-            percent: taskProgress.percent,
-            unplanned: unplannedTasks.length,
-          }}
-          workOrderCount={workOrderBoard.length}
-        />
-      )}
-
-      {/* Staged (thirds) billing for long jobs: deposit exists → bill a midpoint
-          progress payment before the final. Hidden once the job is closed out. */}
-      {!isTech &&
-        commercialCounts?.has_approved_estimate &&
-        !commercialCounts.latest_invoice_id &&
-        !["completed", "invoiced", "cancelled"].includes(currentStatus) && (
-          <Card style={{ marginBottom: "var(--space-4)" }} data-testid="progress-billing">
-            <SectionHeader title="Progress billing" />
-            <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--muted)" }}>
-              For a long job, bill a staged payment now. The final invoice credits
-              it so the stages sum to the project total.
-            </p>
-            <NewProgressInvoiceButton jobId={job.id} />
-          </Card>
-        )}
-
-      {job.description ? (
-        <Card style={{ marginBottom: "var(--space-4)" }} data-testid="project-scope">
-          <SectionHeader title="Scope" />
-          <p style={{ margin: 0, fontSize: "var(--text-sm)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-            {job.description}
-          </p>
-        </Card>
-      ) : null}
-
-      {showTmBriefingCard && (
-        <Card
-          data-testid="job-tm-briefing-card"
-          style={{ marginBottom: "var(--space-4)" }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "var(--space-3)",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "var(--text-xs)",
-                  fontWeight: 700,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  color: "var(--fg-muted)",
-                }}
-              >
-                T&amp;M estimate
-              </p>
-              <p style={{ margin: "6px 0 0", fontSize: "var(--text-sm)", color: "var(--fg)" }}>
-                No estimate yet — one click builds a time-and-materials draft from this project’s notes.
-              </p>
-            </div>
-            <UseTmBriefingButton
-              jobId={job.id}
-              clientId={job.client_id ?? null}
-              briefing={tmBriefing}
-              variant={nextLeads ? "secondary" : "primary"}
-              size="sm"
-              label="Use this briefing →"
-            />
-          </div>
-        </Card>
-      )}
-
-      {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}
+      {/* TASK-239: the next step leads; everything else sits in Work, Money and History. */}
+      <OpenSectionForHash />
       <div className="p7-detail-layout">
-        {/* LEFT: Field work first */}
         <div className="p7-detail-primary">
-          <Card>
-            <SectionHeader
-              title="Field schedule"
-              count={visits.length}
-              action={scheduleVisitAction}
-            />
-            {visits.length === 0 ? (
-              <EmptyState
-                title="Nothing on the calendar"
-                description={
-                  canAddVisit
-                    ? "Add a work day to put this project on the schedule, or book an Assessment for scope capture."
-                    : "No visits have been scheduled for this project."
-                }
-                data-testid="visits-empty"
-              />
-            ) : (
-              <>
-                <Timeline entries={timelineEntries} />
-                {canAddVisit ? (
+          <JobSection title="Work" hint="Visits, tasks, materials" testId="job-section-work" defaultOpen={isTech}>
+              {/* The control-panel board: every project artifact indexed exactly once */}
+              {!isTech && commercialCounts && (
+                <ProjectOverview
+                  jobId={job.id}
+                  mismatch={woMismatch}
+                  estimate={
+                    commercialCounts.latest_estimate_id
+                      ? {
+                          id: commercialCounts.latest_estimate_id,
+                          number: commercialCounts.latest_estimate_number,
+                          status: commercialCounts.latest_estimate_status,
+                          totalCents: commercialCounts.latest_estimate_total_cents,
+                        }
+                      : null
+                  }
+                  approvedEstimateId={commercialCounts.approved_estimate_id}
+                  deposit={
+                    commercialCounts.deposit_invoice_id
+                      ? {
+                          id: commercialCounts.deposit_invoice_id,
+                          number: commercialCounts.deposit_invoice_number,
+                          status: commercialCounts.deposit_invoice_status,
+                          paid: commercialCounts.deposit_paid,
+                          totalCents: commercialCounts.deposit_invoice_total_cents,
+                        }
+                      : null
+                  }
+                  hasApprovedEstimate={commercialCounts.has_approved_estimate}
+                  invoice={
+                    commercialCounts.latest_invoice_id
+                      ? {
+                          id: commercialCounts.latest_invoice_id,
+                          number: commercialCounts.latest_final_number,
+                          status: commercialCounts.latest_final_status,
+                          totalCents: commercialCounts.invoice_total_cents,
+                        }
+                      : null
+                  }
+                  assessment={
+                    assessmentVisitId ? { visitId: assessmentVisitId, done: assessmentPacketDone } : null
+                  }
+                  workDayCount={executionVisits.length}
+                  nextDay={
+                    nextExecution ? { visitId: nextExecution.id, label: nextExecution.label } : null
+                  }
+                  tasks={{
+                    total: taskProgress.total,
+                    done: taskProgress.done,
+                    percent: taskProgress.percent,
+                    unplanned: unplannedTasks.length,
+                  }}
+                  workOrderCount={workOrderBoard.length}
+                />
+              )}
+
+              {job.description ? (
+                <Card style={{ marginBottom: "var(--space-4)" }} data-testid="project-scope">
+                  <SectionHeader title="Scope" />
+                  <p style={{ margin: 0, fontSize: "var(--text-sm)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                    {job.description}
+                  </p>
+                </Card>
+              ) : null}
+
+              {showTmBriefingCard && (
+                <Card
+                  data-testid="job-tm-briefing-card"
+                  style={{ marginBottom: "var(--space-4)" }}
+                >
                   <div
                     style={{
-                      marginTop: "var(--space-3)",
                       display: "flex",
                       flexWrap: "wrap",
-                      gap: "var(--space-2)",
+                      gap: "var(--space-3)",
                       alignItems: "center",
+                      justifyContent: "space-between",
                     }}
                   >
-                    <LinkButton
-                      href={addDayHref}
+                    <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "var(--text-xs)",
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          color: "var(--fg-muted)",
+                        }}
+                      >
+                        T&amp;M estimate
+                      </p>
+                      <p style={{ margin: "6px 0 0", fontSize: "var(--text-sm)", color: "var(--fg)" }}>
+                        No estimate yet — one click builds a time-and-materials draft from this project’s notes.
+                      </p>
+                    </div>
+                    <UseTmBriefingButton
+                      jobId={job.id}
+                      clientId={job.client_id ?? null}
+                      briefing={tmBriefing}
                       variant={nextLeads ? "secondary" : "primary"}
                       size="sm"
-                      data-testid="add-day-below-timeline"
-                    >
-                      + Add a day to the schedule
-                    </LinkButton>
-                    <span className="muted" style={{ fontSize: "var(--text-xs)" }}>
-                      Prefills next day from the last work day
-                    </span>
+                      label="Use this briefing →"
+                    />
                   </div>
-                ) : null}
-              </>
-            )}
-          </Card>
+                </Card>
+              )}
 
-          {taskProgress.total > 0 || !isTech ? (
-            <Card id="job-tasks" data-testid="job-tasks-card">
-              <SectionHeader
-                title="Tasks & progress"
-                count={taskProgress.total > 0 ? taskProgress.total : undefined}
-              />
-              <JobTasksPanel
-                jobId={job.id}
-                progress={taskProgress}
-                tasks={taskProgress.tasks}
-                canToggle={session.role === "owner" || session.role === "admin"}
-              />
-            </Card>
-          ) : null}
+              <Card>
+                <SectionHeader
+                  title="Field schedule"
+                  count={visits.length}
+                  action={scheduleVisitAction}
+                />
+                {visits.length === 0 ? (
+                  <EmptyState
+                    title="Nothing on the calendar"
+                    description={
+                      canAddVisit
+                        ? "Add a work day to put this project on the schedule, or book an Assessment for scope capture."
+                        : "No visits have been scheduled for this project."
+                    }
+                    data-testid="visits-empty"
+                  />
+                ) : (
+                  <>
+                    <Timeline entries={timelineEntries} />
+                    {canAddVisit ? (
+                      <div
+                        style={{
+                          marginTop: "var(--space-3)",
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "var(--space-2)",
+                          alignItems: "center",
+                        }}
+                      >
+                        <LinkButton
+                          href={addDayHref}
+                          variant={nextLeads ? "secondary" : "primary"}
+                          size="sm"
+                          data-testid="add-day-below-timeline"
+                        >
+                          + Add a day to the schedule
+                        </LinkButton>
+                        <span className="muted" style={{ fontSize: "var(--text-xs)" }}>
+                          Prefills next day from the last work day
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </Card>
 
-          {!isTech && (taskProgress.total > 0 || unplannedTasks.length > 0) ? (
-            <Card id="job-unplanned" data-testid="job-unplanned-card">
-              <SectionHeader
-                title="Unplanned work"
-                count={unplannedTasks.length > 0 ? unplannedTasks.length : undefined}
-              />
-              <ProjectUnplannedTasks
-                tasks={unplannedTasks}
-                planDays={planDays}
-                canPlan={
-                  canAddVisit ||
-                  session.role === "owner" ||
-                  session.role === "admin" ||
-                  session.role === "tech"
-                }
-              />
-            </Card>
-          ) : null}
+              {taskProgress.total > 0 || !isTech ? (
+                <Card id="job-tasks" data-testid="job-tasks-card">
+                  <SectionHeader
+                    title="Tasks & progress"
+                    count={taskProgress.total > 0 ? taskProgress.total : undefined}
+                  />
+                  <JobTasksPanel
+                    jobId={job.id}
+                    progress={taskProgress}
+                    tasks={taskProgress.tasks}
+                    canToggle={session.role === "owner" || session.role === "admin"}
+                  />
+                </Card>
+              ) : null}
 
-          {!isTech && workOrders.length > 0 && (
-            <Card id="job-work-orders" data-testid="job-work-orders-panel">
-              <SectionHeader title="Work Orders" count={workOrders.length} />
-              <JobWorkOrdersPanel
-                jobId={job.id}
-                workOrders={workOrderBoard.map((wo): JobWorkOrderRow => ({
-                  id: wo.id,
-                  title: wo.title,
-                  status: wo.status,
-                  visit_count: wo.visit_count,
-                  active_visit_count: wo.active_visit_count,
-                  task_total: wo.task_total,
-                  task_open: wo.task_open,
-                }))}
-                canManage={canAddVisit}
-              />
-            </Card>
+              {!isTech && (taskProgress.total > 0 || unplannedTasks.length > 0) ? (
+                <Card id="job-unplanned" data-testid="job-unplanned-card">
+                  <SectionHeader
+                    title="Unplanned work"
+                    count={unplannedTasks.length > 0 ? unplannedTasks.length : undefined}
+                  />
+                  <ProjectUnplannedTasks
+                    tasks={unplannedTasks}
+                    planDays={planDays}
+                    canPlan={
+                      canAddVisit ||
+                      session.role === "owner" ||
+                      session.role === "admin" ||
+                      session.role === "tech"
+                    }
+                  />
+                </Card>
+              ) : null}
+
+              {!isTech && workOrders.length > 0 && (
+                <Card id="job-work-orders" data-testid="job-work-orders-panel">
+                  <SectionHeader title="Work Orders" count={workOrders.length} />
+                  <JobWorkOrdersPanel
+                    jobId={job.id}
+                    workOrders={workOrderBoard.map((wo): JobWorkOrderRow => ({
+                      id: wo.id,
+                      title: wo.title,
+                      status: wo.status,
+                      visit_count: wo.visit_count,
+                      active_visit_count: wo.active_visit_count,
+                      task_total: wo.task_total,
+                      task_open: wo.task_open,
+                    }))}
+                    canManage={canAddVisit}
+                  />
+                </Card>
+              )}
+
+              {/* Materials & spend summary — the full plan (buy list) + receipts +
+                  link-unassigned live on the Materials page (TASK-121). This is the
+                  at-a-glance budget + a way in. */}
+              {!isTech && (
+                <Card id="job-materials" data-testid="job-materials-panel">
+                  <SectionHeader
+                    title="Materials & spend"
+                    count={jobMaterialExpenses.length > 0 ? jobMaterialExpenses.length : undefined}
+                    action={
+                      <LinkButton
+                        href={`/app/jobs/${job.id}/materials?tab=${jobMaterialExpenses.length > 0 ? "purchases" : "buy"}` as Route}
+                        variant="secondary"
+                        size="sm"
+                        data-testid="open-materials"
+                      >
+                        Materials →
+                      </LinkButton>
+                    }
+                  />
+                  <MaterialsBudgetLine
+                    allowanceCents={jobLedger?.rows.find((r) => r.bucket === "materials")?.estimateCents}
+                    spentCents={jobLedger?.rows.find((r) => r.bucket === "materials")?.actualCents ?? 0}
+                    testId="materials-allowance-remaining"
+                  />
+                  <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                    {jobMaterialExpenses.length > 0
+                      ? `${jobMaterialExpenses.length} receipt${jobMaterialExpenses.length === 1 ? "" : "s"} logged. Open Materials to see purchases, plan the buy list, or link expenses.`
+                      : "Open Materials to plan the buy list and log receipts as you buy."}
+                  </p>
+                </Card>
+              )}
+
+              {!isTech && (
+                  <VendorCoordinationCard
+                    jobId={job.id}
+                    vendorCoordination={job.vendor_coordination}
+                    conciergeFeeCents={job.concierge_fee_cents}
+                    canEdit={canTransition}
+                  />
+              )}
+
+              {!isTech && (
+                  <AdvancedDetails title="Home Assets">
+                    <AssetLinksPanel
+                      entityType="job"
+                      entityId={job.id}
+                      initialLinks={assetLinks}
+                      homeboxEnabled={homeboxEnabled}
+                      canLink={!isTech}
+                    />
+                  </AdvancedDetails>
+              )}
+          </JobSection>
+
+          {!isTech && (
+            <JobSection title="Money" hint="Billing, ledger, margin" testId="job-section-money">
+              {/* Staged (thirds) billing for long jobs: deposit exists → bill a midpoint
+                  progress payment before the final. Hidden once the job is closed out. */}
+              {!isTech &&
+                commercialCounts?.has_approved_estimate &&
+                !commercialCounts.latest_invoice_id &&
+                !["completed", "invoiced", "cancelled"].includes(currentStatus) && (
+                  <Card style={{ marginBottom: "var(--space-4)" }} data-testid="progress-billing">
+                    <SectionHeader title="Progress billing" />
+                    <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--muted)" }}>
+                      For a long job, bill a staged payment now. The final invoice credits
+                      it so the stages sum to the project total.
+                    </p>
+                    <NewProgressInvoiceButton jobId={job.id} />
+                  </Card>
+                )}
+
+              {/* Job Ledger — customer commercial spine (estimate vs actual) */}
+              {jobLedger ? (
+                <JobLedgerCard
+                  ledger={jobLedger}
+                  jobId={job.id}
+                  clientId={job.client_id ?? null}
+                  estimateCount={estimateCount}
+                  invoiceCount={invoiceCount}
+                  canCreateInvoice={canTransition || canEstimate}
+                />
+              ) : (
+                <Card>
+                  <SectionHeader
+                    title="Commercial"
+                    action={
+                      <LinkButton
+                        href={`/app/estimates/new?job_id=${job.id}&client_id=${job.client_id ?? ""}&pricing_mode=flat_rate`}
+                        variant="secondary"
+                        size="sm"
+                        data-testid="new-estimate-btn"
+                      >
+                        + New Estimate
+                      </LinkButton>
+                    }
+                  />
+                  <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                    {estimateCount} estimate{estimateCount !== 1 ? "s" : ""} · {invoiceCount} invoice
+                    {invoiceCount !== 1 ? "s" : ""}
+                    {changeOrderCount > 0 ? ` · ${changeOrderCount} change order${changeOrderCount !== 1 ? "s" : ""}` : ""}
+                  </p>
+                </Card>
+              )}
+
+              {/* Internal P&L — burdened cost margin (not customer bill rates) */}
+              {!isTech && (revenueCents !== null || costCents !== null || trackedMinutes > 0) && (
+                <Card data-testid="profitability-card">
+                  <SectionHeader title="Internal P&L" />
+                  {laborVarianceCents !== null && laborMargin.actualLaborCostCents !== null && estimatedLaborCents !== null && (
+                    <div
+                      data-testid="labor-variance-headline"
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "baseline",
+                        gap: "4px 10px",
+                        padding: "var(--space-2) var(--space-3)",
+                        marginBottom: "var(--space-3)",
+                        borderRadius: "var(--radius-md)",
+                        background: "var(--bg-subtle)",
+                        border: "1px solid var(--border-subtle)",
+                      }}
+                    >
+                      <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", color: "var(--fg-muted)" }}>
+                        Labor est → actual
+                      </span>
+                      <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                        {formatCents(estimatedLaborCents)} → {formatCents(laborMargin.actualLaborCostCents)}
+                      </span>
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          fontVariantNumeric: "tabular-nums",
+                          color:
+                            laborVarianceCents === 0
+                              ? "var(--fg-muted)"
+                              : laborVarianceCents > 0
+                                ? "var(--color-warning)"
+                                : "var(--color-success)",
+                        }}
+                      >
+                        {laborVarianceCents === 0
+                          ? "on budget"
+                          : `${laborVarianceCents > 0 ? "▲ +" : "▼ −"}${formatCents(Math.abs(laborVarianceCents))} ${laborVarianceCents > 0 ? "over" : "under"}`}
+                      </span>
+                    </div>
+                  )}
+                  <dl className="p7-detail-list">
+                    {revenueCents !== null && (
+                      <div className="p7-detail-row">
+                        <dt>Revenue</dt>
+                        <dd>${(revenueCents / 100).toFixed(2)}</dd>
+                      </div>
+                    )}
+                    {trackedMinutes > 0 && (
+                      <div className="p7-detail-row" data-testid="tracked-hours">
+                        <dt>Tracked Hours</dt>
+                        <dd>
+                          {laborMargin.trackedHours.toFixed(2)} hrs
+                          <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 6 }}>
+                            ({trackedLaborDays.length || "—"} day
+                            {trackedLaborDays.length === 1 ? "" : "s"} · job_work)
+                          </span>
+                        </dd>
+                      </div>
+                    )}
+                    {laborMargin.actualLaborCostCents !== null && (
+                      <div className="p7-detail-row" data-testid="actual-labor-cost">
+                        <dt>Actual Labor Cost</dt>
+                        <dd>{formatCents(laborMargin.actualLaborCostCents)}</dd>
+                      </div>
+                    )}
+                    {estimatedLaborCents !== null && (
+                      <div className="p7-detail-row">
+                        <dt>Est. Labor Cost</dt>
+                        <dd>{formatCents(estimatedLaborCents)}</dd>
+                      </div>
+                    )}
+                    {materialsForPnl.source === "receipts" && materialsForPnl.materialsCents > 0 && (
+                      <div className="p7-detail-row">
+                        <dt>Materials (receipts)</dt>
+                        <dd>${(materialsForPnl.materialsCents / 100).toFixed(2)}</dd>
+                      </div>
+                    )}
+                    {materialsForPnl.source === "parts_rollup" && materialsForPnl.materialsCents > 0 && (
+                      <div className="p7-detail-row">
+                        <dt>Parts Cost</dt>
+                        <dd>${(materialsForPnl.materialsCents / 100).toFixed(2)}</dd>
+                      </div>
+                    )}
+                    {costCents !== null && (
+                        <div className="p7-detail-row" style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-1)" }}>
+                          <dt>Total Cost</dt>
+                          <dd>
+                            {formatCents(costCents)}
+                            {laborMargin.source === "tracked" && (
+                              <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 6 }}>
+                                uses actual labor
+                              </span>
+                            )}
+                          </dd>
+                        </div>
+                      )}
+                    {grossMarginCents !== null && (
+                      <div className="p7-detail-row">
+                        <dt>Gross Margin</dt>
+                        <dd
+                          style={{ color: grossMarginCents >= 0 ? "var(--color-success, green)" : "var(--color-error, red)", fontWeight: 600 }}
+                          data-testid="gross-margin"
+                        >
+                          ${(grossMarginCents / 100).toFixed(2)}
+                          {grossMarginPct !== null && ` (${grossMarginPct}%)`}
+                        </dd>
+                      </div>
+                    )}
+                    {commercialCounts?.travel_miles !== null && commercialCounts?.travel_miles !== undefined && (
+                      <div className="p7-detail-row">
+                        <dt>Travel Miles</dt>
+                        <dd>{commercialCounts.travel_miles} mi</dd>
+                      </div>
+                    )}
+                    {laborMargin.source === "none" && materialsForPnl.source === "none" && (
+                      <div className="p7-detail-row">
+                        <dt></dt>
+                        <dd style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                          No tracked time, approved estimate, or materials logged yet
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </Card>
+              )}
+            </JobSection>
           )}
 
-          {/* Materials & spend summary — the full plan (buy list) + receipts +
-              link-unassigned live on the Materials page (TASK-121). This is the
-              at-a-glance budget + a way in. */}
           {!isTech && (
-            <Card id="job-materials" data-testid="job-materials-panel">
-              <SectionHeader
-                title="Materials & spend"
-                count={jobMaterialExpenses.length > 0 ? jobMaterialExpenses.length : undefined}
-                action={
-                  <LinkButton
-                    href={`/app/jobs/${job.id}/materials?tab=${jobMaterialExpenses.length > 0 ? "purchases" : "buy"}` as Route}
-                    variant="secondary"
-                    size="sm"
-                    data-testid="open-materials"
+            <JobSection title="History" hint="Tracked days, intake, documents" testId="job-section-history">
+              {/* Tracked work days — transparent day-by-day job_work record */}
+              {trackedLaborDays.length > 0 && (
+                <Card id="tracked-work-days" data-testid="tracked-work-days-card">
+                  <SectionHeader title="Tracked work days" />
+                  <p
+                    style={{
+                      margin: "0 0 var(--space-3)",
+                      color: "var(--fg-muted)",
+                      fontSize: "var(--text-sm)",
+                      lineHeight: 1.45,
+                    }}
                   >
-                    Materials →
-                  </LinkButton>
-                }
-              />
-              <MaterialsBudgetLine
-                allowanceCents={jobLedger?.rows.find((r) => r.bucket === "materials")?.estimateCents}
-                spentCents={jobLedger?.rows.find((r) => r.bucket === "materials")?.actualCents ?? 0}
-                testId="materials-allowance-remaining"
-              />
-              <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                {jobMaterialExpenses.length > 0
-                  ? `${jobMaterialExpenses.length} receipt${jobMaterialExpenses.length === 1 ? "" : "s"} logged. Open Materials to see purchases, plan the buy list, or link expenses.`
-                  : "Open Materials to plan the buy list and log receipts as you buy."}
-              </p>
-            </Card>
+                    Closed job_work from the activity log (used for margin). Invoice labor may
+                    differ if you bill estimated or adjusted hours.
+                  </p>
+                  <div
+                    role="table"
+                    aria-label="Tracked work days"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr auto",
+                      gap: "2px 0",
+                      fontSize: "var(--text-sm)",
+                    }}
+                  >
+                    <div
+                      role="row"
+                      style={{
+                        display: "contents",
+                        fontWeight: 600,
+                        color: "var(--fg-muted)",
+                        fontSize: "var(--text-xs)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.03em",
+                      }}
+                    >
+                      <div role="columnheader" style={{ padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+                        Day
+                      </div>
+                      <div
+                        role="columnheader"
+                        style={{
+                          padding: "6px 0",
+                          borderBottom: "1px solid var(--border)",
+                          textAlign: "right",
+                        }}
+                      >
+                        Hours
+                      </div>
+                    </div>
+                    {trackedLaborDays.map((day) => (
+                      <div
+                        key={day.work_date}
+                        role="row"
+                        data-testid={`tracked-work-day-${day.work_date}`}
+                        style={{ display: "contents" }}
+                      >
+                        <div
+                          role="cell"
+                          style={{
+                            padding: "10px 0",
+                            borderBottom: "1px solid var(--border)",
+                          }}
+                        >
+                          <div style={{ fontWeight: 600 }}>{formatWorkDayLabel(day.work_date)}</div>
+                          <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginTop: 2 }}>
+                            {formatClockRange(day.started_at, day.ended_at)}
+                            {day.entry_count > 1 ? ` · ${day.entry_count} segments` : ""}
+                          </div>
+                        </div>
+                        <div
+                          role="cell"
+                          style={{
+                            padding: "10px 0",
+                            borderBottom: "1px solid var(--border)",
+                            textAlign: "right",
+                            fontVariantNumeric: "tabular-nums",
+                            alignSelf: "center",
+                          }}
+                        >
+                          <div style={{ fontWeight: 600 }}>{day.hours.toFixed(2)} hrs</div>
+                          <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                            {formatMinutesAsHoursMinutes(day.minutes)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <div
+                      role="row"
+                      data-testid="tracked-work-days-total"
+                      style={{ display: "contents", fontWeight: 600 }}
+                    >
+                      <div role="cell" style={{ padding: "12px 0 4px" }}>
+                        Total tracked
+                        <div style={{ fontWeight: 400, color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                          {trackedLaborDays.length} day{trackedLaborDays.length === 1 ? "" : "s"}
+                        </div>
+                      </div>
+                      <div
+                        role="cell"
+                        style={{
+                          padding: "12px 0 4px",
+                          textAlign: "right",
+                          fontVariantNumeric: "tabular-nums",
+                          alignSelf: "center",
+                        }}
+                      >
+                        {laborMargin.trackedHours.toFixed(2)} hrs
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Intake panel — admin/owner only */}
+              <AdvancedDetails title="Intake Scoring">
+                <Card data-testid="job-intake-card">
+                  <JobIntakePanel
+                    jobId={job.id}
+                    initialCategory={job.job_category}
+                    initialDecision={job.intake_decision}
+                    initialNotes={job.intake_notes ?? null}
+                  />
+                </Card>
+              </AdvancedDetails>
+
+              <LinkedDocuments session={session} entityType="job" entityId={job.id} />
+            </JobSection>
           )}
 
           {closeOutPanel("project-status")}
@@ -1668,320 +1991,6 @@ export default async function JobDetailPage({
                 initialTravelMiles={job.travel_miles ?? null}
               />
             </AdvancedDetails>
-
-            {/* Intake panel — admin/owner only */}
-            <AdvancedDetails title="Intake Scoring">
-              <Card data-testid="job-intake-card">
-                <JobIntakePanel
-                  jobId={job.id}
-                  initialCategory={job.job_category}
-                  initialDecision={job.intake_decision}
-                  initialNotes={job.intake_notes ?? null}
-                />
-              </Card>
-            </AdvancedDetails>
-
-            {/* Vendor coordination */}
-            {(
-              <VendorCoordinationCard
-                jobId={job.id}
-                vendorCoordination={job.vendor_coordination}
-                conciergeFeeCents={job.concierge_fee_cents}
-                canEdit={canTransition}
-              />
-            )}
-
-            {/* Job Ledger — customer commercial spine (estimate vs actual) */}
-            {jobLedger ? (
-              <JobLedgerCard
-                ledger={jobLedger}
-                jobId={job.id}
-                clientId={job.client_id ?? null}
-                estimateCount={estimateCount}
-                invoiceCount={invoiceCount}
-                canCreateInvoice={canTransition || canEstimate}
-              />
-            ) : (
-              <Card>
-                <SectionHeader
-                  title="Commercial"
-                  action={
-                    <LinkButton
-                      href={`/app/estimates/new?job_id=${job.id}&client_id=${job.client_id ?? ""}&pricing_mode=flat_rate`}
-                      variant="secondary"
-                      size="sm"
-                      data-testid="new-estimate-btn"
-                    >
-                      + New Estimate
-                    </LinkButton>
-                  }
-                />
-                <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                  {estimateCount} estimate{estimateCount !== 1 ? "s" : ""} · {invoiceCount} invoice
-                  {invoiceCount !== 1 ? "s" : ""}
-                  {changeOrderCount > 0 ? ` · ${changeOrderCount} change order${changeOrderCount !== 1 ? "s" : ""}` : ""}
-                </p>
-              </Card>
-            )}
-
-            {/* Tracked work days — transparent day-by-day job_work record */}
-            {trackedLaborDays.length > 0 && (
-              <Card id="tracked-work-days" data-testid="tracked-work-days-card">
-                <SectionHeader title="Tracked work days" />
-                <p
-                  style={{
-                    margin: "0 0 var(--space-3)",
-                    color: "var(--fg-muted)",
-                    fontSize: "var(--text-sm)",
-                    lineHeight: 1.45,
-                  }}
-                >
-                  Closed job_work from the activity log (used for margin). Invoice labor may
-                  differ if you bill estimated or adjusted hours.
-                </p>
-                <div
-                  role="table"
-                  aria-label="Tracked work days"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: "2px 0",
-                    fontSize: "var(--text-sm)",
-                  }}
-                >
-                  <div
-                    role="row"
-                    style={{
-                      display: "contents",
-                      fontWeight: 600,
-                      color: "var(--fg-muted)",
-                      fontSize: "var(--text-xs)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.03em",
-                    }}
-                  >
-                    <div role="columnheader" style={{ padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-                      Day
-                    </div>
-                    <div
-                      role="columnheader"
-                      style={{
-                        padding: "6px 0",
-                        borderBottom: "1px solid var(--border)",
-                        textAlign: "right",
-                      }}
-                    >
-                      Hours
-                    </div>
-                  </div>
-                  {trackedLaborDays.map((day) => (
-                    <div
-                      key={day.work_date}
-                      role="row"
-                      data-testid={`tracked-work-day-${day.work_date}`}
-                      style={{ display: "contents" }}
-                    >
-                      <div
-                        role="cell"
-                        style={{
-                          padding: "10px 0",
-                          borderBottom: "1px solid var(--border)",
-                        }}
-                      >
-                        <div style={{ fontWeight: 600 }}>{formatWorkDayLabel(day.work_date)}</div>
-                        <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginTop: 2 }}>
-                          {formatClockRange(day.started_at, day.ended_at)}
-                          {day.entry_count > 1 ? ` · ${day.entry_count} segments` : ""}
-                        </div>
-                      </div>
-                      <div
-                        role="cell"
-                        style={{
-                          padding: "10px 0",
-                          borderBottom: "1px solid var(--border)",
-                          textAlign: "right",
-                          fontVariantNumeric: "tabular-nums",
-                          alignSelf: "center",
-                        }}
-                      >
-                        <div style={{ fontWeight: 600 }}>{day.hours.toFixed(2)} hrs</div>
-                        <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-                          {formatMinutesAsHoursMinutes(day.minutes)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  <div
-                    role="row"
-                    data-testid="tracked-work-days-total"
-                    style={{ display: "contents", fontWeight: 600 }}
-                  >
-                    <div role="cell" style={{ padding: "12px 0 4px" }}>
-                      Total tracked
-                      <div style={{ fontWeight: 400, color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-                        {trackedLaborDays.length} day{trackedLaborDays.length === 1 ? "" : "s"}
-                      </div>
-                    </div>
-                    <div
-                      role="cell"
-                      style={{
-                        padding: "12px 0 4px",
-                        textAlign: "right",
-                        fontVariantNumeric: "tabular-nums",
-                        alignSelf: "center",
-                      }}
-                    >
-                      {laborMargin.trackedHours.toFixed(2)} hrs
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
-
-            {/* Internal P&L — burdened cost margin (not customer bill rates) */}
-            {!isTech && (revenueCents !== null || costCents !== null || trackedMinutes > 0) && (
-              <Card data-testid="profitability-card">
-                <SectionHeader title="Internal P&L" />
-                {laborVarianceCents !== null && laborMargin.actualLaborCostCents !== null && estimatedLaborCents !== null && (
-                  <div
-                    data-testid="labor-variance-headline"
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      alignItems: "baseline",
-                      gap: "4px 10px",
-                      padding: "var(--space-2) var(--space-3)",
-                      marginBottom: "var(--space-3)",
-                      borderRadius: "var(--radius-md)",
-                      background: "var(--bg-subtle)",
-                      border: "1px solid var(--border-subtle)",
-                    }}
-                  >
-                    <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", color: "var(--fg-muted)" }}>
-                      Labor est → actual
-                    </span>
-                    <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                      {formatCents(estimatedLaborCents)} → {formatCents(laborMargin.actualLaborCostCents)}
-                    </span>
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        fontVariantNumeric: "tabular-nums",
-                        color:
-                          laborVarianceCents === 0
-                            ? "var(--fg-muted)"
-                            : laborVarianceCents > 0
-                              ? "var(--color-warning)"
-                              : "var(--color-success)",
-                      }}
-                    >
-                      {laborVarianceCents === 0
-                        ? "on budget"
-                        : `${laborVarianceCents > 0 ? "▲ +" : "▼ −"}${formatCents(Math.abs(laborVarianceCents))} ${laborVarianceCents > 0 ? "over" : "under"}`}
-                    </span>
-                  </div>
-                )}
-                <dl className="p7-detail-list">
-                  {revenueCents !== null && (
-                    <div className="p7-detail-row">
-                      <dt>Revenue</dt>
-                      <dd>${(revenueCents / 100).toFixed(2)}</dd>
-                    </div>
-                  )}
-                  {trackedMinutes > 0 && (
-                    <div className="p7-detail-row" data-testid="tracked-hours">
-                      <dt>Tracked Hours</dt>
-                      <dd>
-                        {laborMargin.trackedHours.toFixed(2)} hrs
-                        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 6 }}>
-                          ({trackedLaborDays.length || "—"} day
-                          {trackedLaborDays.length === 1 ? "" : "s"} · job_work)
-                        </span>
-                      </dd>
-                    </div>
-                  )}
-                  {laborMargin.actualLaborCostCents !== null && (
-                    <div className="p7-detail-row" data-testid="actual-labor-cost">
-                      <dt>Actual Labor Cost</dt>
-                      <dd>{formatCents(laborMargin.actualLaborCostCents)}</dd>
-                    </div>
-                  )}
-                  {estimatedLaborCents !== null && (
-                    <div className="p7-detail-row">
-                      <dt>Est. Labor Cost</dt>
-                      <dd>{formatCents(estimatedLaborCents)}</dd>
-                    </div>
-                  )}
-                  {materialsForPnl.source === "receipts" && materialsForPnl.materialsCents > 0 && (
-                    <div className="p7-detail-row">
-                      <dt>Materials (receipts)</dt>
-                      <dd>${(materialsForPnl.materialsCents / 100).toFixed(2)}</dd>
-                    </div>
-                  )}
-                  {materialsForPnl.source === "parts_rollup" && materialsForPnl.materialsCents > 0 && (
-                    <div className="p7-detail-row">
-                      <dt>Parts Cost</dt>
-                      <dd>${(materialsForPnl.materialsCents / 100).toFixed(2)}</dd>
-                    </div>
-                  )}
-                  {costCents !== null && (
-                      <div className="p7-detail-row" style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-1)" }}>
-                        <dt>Total Cost</dt>
-                        <dd>
-                          {formatCents(costCents)}
-                          {laborMargin.source === "tracked" && (
-                            <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 6 }}>
-                              uses actual labor
-                            </span>
-                          )}
-                        </dd>
-                      </div>
-                    )}
-                  {grossMarginCents !== null && (
-                    <div className="p7-detail-row">
-                      <dt>Gross Margin</dt>
-                      <dd
-                        style={{ color: grossMarginCents >= 0 ? "var(--color-success, green)" : "var(--color-error, red)", fontWeight: 600 }}
-                        data-testid="gross-margin"
-                      >
-                        ${(grossMarginCents / 100).toFixed(2)}
-                        {grossMarginPct !== null && ` (${grossMarginPct}%)`}
-                      </dd>
-                    </div>
-                  )}
-                  {commercialCounts?.travel_miles !== null && commercialCounts?.travel_miles !== undefined && (
-                    <div className="p7-detail-row">
-                      <dt>Travel Miles</dt>
-                      <dd>{commercialCounts.travel_miles} mi</dd>
-                    </div>
-                  )}
-                  {laborMargin.source === "none" && materialsForPnl.source === "none" && (
-                    <div className="p7-detail-row">
-                      <dt></dt>
-                      <dd style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-                        No tracked time, approved estimate, or materials logged yet
-                      </dd>
-                    </div>
-                  )}
-                </dl>
-              </Card>
-            )}
-
-
-            {/* Asset links (Homebox) */}
-            {(
-              <AdvancedDetails title="Home Assets">
-                <AssetLinksPanel
-                  entityType="job"
-                  entityId={job.id}
-                  initialLinks={assetLinks}
-                  homeboxEnabled={homeboxEnabled}
-                  canLink={!isTech}
-                />
-              </AdvancedDetails>
-            )}
-
-            <LinkedDocuments session={session} entityType="job" entityId={job.id} />
           </div>
         )}
 

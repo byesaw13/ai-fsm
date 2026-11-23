@@ -19,13 +19,12 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : E4 TASK-237 Verified: #759 (9fcc6b20) deployed
-                      ~18:02 UTC, no migration; health ok, /login 200.
-In-flight PR        : E5 TASK-239 PR 1 (next step leads the job page)
-Next step           : E5 PR 2 (Work / Money / History sections) after
-                      PR 1 is Verified; then E6 TASK-240.
+Last step           : E5 TASK-239 PR 1 Verified: #760 (c2e76d6a) deployed
+                      ~18:54 UTC, no migration; health ok, /login 200.
+In-flight PR        : E5 TASK-239 PR 2 (Work / Money / History sections)
+Next step           : E6 TASK-240 once E5 PR 2 is Verified.
 Blocked on          : nothing
-Last known-good     : 9fcc6b20 (deploy-good/310eced7 before it)
+Last known-good     : c2e76d6a (deploy-good/9fcc6b20 before it)
 Notes               : Main checkout holds another session's uncommitted
                       drafts of TASK-235..240 (duplicates of #755); left
                       untouched. Owner checks after deploy (non-blocking):
@@ -151,7 +150,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | E2 | TASK-238 | 2026-11-23 (#757, CI green incl. phone/logo e2e) | 2026-11-23 (#757, 4365bb3a) | 2026-11-23 (~16:39 UTC) | 2026-11-23 (health ok, /login 200, /app and /app/my-work 307 to /login signed out; bounce and logo behavior covered by the CI e2e) |
 | E3 | TASK-236 | 2026-11-23 (#758, CI green incl. New-button e2e) | 2026-11-23 (#758, 310eced7) | 2026-11-23 (~17:20 UTC) | 2026-11-23 (health ok, /login 200, /app/jobs, /app/intake/new, /app/capture 307 to /login signed out; menu covered by CI e2e) |
 | E4 | TASK-237 | 2026-11-23 (#759, CI green incl. menu e2e) | 2026-11-23 (#759, 9fcc6b20) | 2026-11-23 (~18:02 UTC) | 2026-11-23 (health ok, /login 200, hub pages 307 to /login signed out, no web errors; the Money page queries run read-only on production) |
-| E5 | TASK-239 | | | | |
+| E5 | TASK-239 | PR 1 2026-11-23 (#760, CI green incl. phone e2e) | PR 1 2026-11-23 (#760, c2e76d6a) | PR 1 2026-11-23 (~18:54 UTC) | PR 1 2026-11-23 (health ok, /login 200, job page 307 signed out, no web errors) |
 | E6 | TASK-240 | | | | |
 | D5 | TASK-228 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC) | 2026-10-31 (health ok, /login 200) |
 
@@ -691,6 +690,10 @@ Per step:
 
 ## Log
 
+- 2026-11-23 · E5 · In progress · TASK-239 PR 2: computer layout groups panels into Work / Money / History (closed; Work open for techs); links into a section open it
+- 2026-11-23 · E5 PR 1 · Verified · health ok, /login 200, no web errors; known-good deploy-good/9fcc6b20 before it
+- 2026-11-23 · E5 PR 1 · Deployed · c2e76d6a · ~18:54 UTC, no migration
+- 2026-11-23 · E5 PR 1 · Merged · #760 · squash c2e76d6a; Codex finding (close-out actions unreachable on phones) fixed before merge
 - 2026-11-23 · E5 · In progress · TASK-239 PR 1: the next-step block leads both layouts (it was missing on phones); other primaries become secondary
 - 2026-11-23 · E4 · Verified · health ok, /login 200, Money queries run read-only on production; known-good deploy-good/310eced7 before it
 - 2026-11-23 · E4 · Deployed · 9fcc6b20 · ~18:02 UTC, no migration

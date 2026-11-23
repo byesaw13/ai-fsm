@@ -114,11 +114,29 @@ test.describe("Required release smoke — admin core flow", () => {
     expect(primariesOnFirstScreen).toBe(1);
   });
 
+  test("3c. On a computer the job groups its panels into Work, Money and History (TASK-239)", async ({ page }) => {
+    expect(jobId).toBeTruthy();
+    await login(page);
+    await page.goto(`${BASE}/app/jobs/${jobId}`);
+    const desk = page.locator("body");
+    for (const id of ["job-section-work", "job-section-money", "job-section-history"]) {
+      await expect(desk.locator(`[data-testid="${id}"]:visible`)).toHaveCount(1);
+      await expect(desk.locator(`[data-testid="${id}"]:visible`)).not.toHaveAttribute("open", "");
+    }
+    await expect(desk.locator('[data-testid="project-what-next-primary"]:visible')).toHaveCount(1);
+    // A link into a closed section opens it.
+    await page.goto(`${BASE}/app/jobs/${jobId}#job-tasks`);
+    await expect(desk.locator('[data-testid="job-section-work"]:visible')).toHaveAttribute("open", "");
+    await expect(desk.locator('[data-testid="job-tasks-card"]:visible')).toBeVisible();
+  });
+
   test("4. Admin can schedule a visit for the job", async ({ page }) => {
     expect(jobId).toBeTruthy();
     await login(page);
 
     await page.goto(`${BASE}/app/jobs/${jobId}`);
+    // Scheduling sits in the Work section (TASK-239).
+    await page.locator('[data-testid="job-section-work"]:visible > summary').click();
     await page.getByRole("link", { name: "+ Add a day", exact: true }).click();
 
     const tomorrow = new Date();
