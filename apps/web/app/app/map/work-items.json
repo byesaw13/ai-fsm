@@ -96,8 +96,7 @@
   { "id": "TASK-115", "title": "Promise capture", "branch": "desk", "status": "progress", "phase": "Phase 1", "fit": "A promise you make in the office has to land on a request, quote, job, or bill." },
   { "id": "TASK-173", "title": "UX direction on the working screens", "branch": "desk", "status": "progress", "phase": "Cross-cutting", "fit": "The direction applies to every screen. Desk is where you notice it failing." },
   { "id": "TASK-176", "title": "This map", "branch": "desk", "status": "progress", "phase": "Cross-cutting", "fit": "The map is how you see the system. It stays current in the same change as the work." },
-  { "id": "TASK-237", "title": "A shorter menu, Money on one page", "branch": "desk", "status": "progress", "phase": "Cross-cutting", "fit": "Five places to go, the same on phone and computer. Money shows owed, spent and mileage together." },
-  { "id": "TASK-239", "title": "The job page leads with one next step", "branch": "job", "status": "backlog", "phase": "Cross-cutting", "fit": "Standing in the driveway, the job page tells you where it stands and gives you one big button." },
+  { "id": "TASK-239", "title": "The job page leads with one next step", "branch": "job", "status": "progress", "phase": "Cross-cutting", "fit": "Standing in the driveway, the job page tells you where it stands and gives you one big button." },
   { "id": "TASK-240", "title": "A progress line on every job and customer", "branch": "job", "status": "backlog", "phase": "Cross-cutting", "fit": "You see Call, Estimate, Approved, Working, Invoiced, Paid at a glance instead of reading status labels." },
   { "id": "TASK-049", "title": "One inbox for things to review", "branch": "desk", "status": "backlog", "phase": "Phase 1", "fit": "Review leftovers belong on the office home, not on a second queue." },
 

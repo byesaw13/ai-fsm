@@ -517,6 +517,7 @@ export function ProjectWhatNext(props: ProjectWhatNextProps) {
             <LinkButton
               href={content.actionHref as Route}
               variant="primary"
+              size="lg"
               data-testid="project-what-next-primary"
             >
               {content.actionLabel} →
