@@ -13,6 +13,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { estimateIdFromUrl, makeEstimateSendable } from "./helpers/baseline";
 
 const BASE = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 const ADMIN_EMAIL = "admin@test.com";
@@ -111,6 +112,7 @@ test.describe("Estimates smoke — admin role", () => {
     ).toBeVisible();
 
     // Click → Sent
+    await makeEstimateSendable(page, estimateIdFromUrl(page.url()));
     await page.click('[data-testid="transition-btn-sent"]');
 
     // Status should update to Sent

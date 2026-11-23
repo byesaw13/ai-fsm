@@ -41,6 +41,7 @@ export function rowToPricingSettings(
     ),
     card_fee_pct: num(row.card_fee_pct, DEFAULT_PRICING_SETTINGS.card_fee_pct),
     hours_per_day: num(row.hours_per_day, DEFAULT_PRICING_SETTINGS.hours_per_day),
+    baseline_warning_pct: num(row.baseline_warning_pct, DEFAULT_PRICING_SETTINGS.baseline_warning_pct),
   };
 }
 

@@ -15,6 +15,12 @@ import { quoteReadyText, serviceSmsPhone } from "@/lib/sms/messages";
 import { logOutboundSms } from "@/lib/sms/outbound";
 import { loadEstimatePdf } from "@/lib/pdf/load";
 import {
+  baselineSnapshot,
+  beforeSendChecklist,
+  loadEstimateBaseline,
+  sendBaselineGate,
+} from "@/lib/estimates/baseline";
+import {
   resolveEstimateExpiryDays,
   sendEstimateCascade,
 } from "@/lib/workflow/cascades";
@@ -34,10 +40,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
   // Optional body: { markOnly: true } marks the estimate sent without emailing
   // (in-person delivery, no client email, or staff override).
+  // { acknowledgeCostFloor: true } sends a complete quote whose effective rate is
+  // below the cost floor (TASK-194).
   let markOnly = false;
+  let acknowledgeCostFloor = false;
   try {
-    const body = (await request.json()) as { markOnly?: unknown };
+    const body = (await request.json()) as { markOnly?: unknown; acknowledgeCostFloor?: unknown };
     markOnly = body?.markOnly === true;
+    acknowledgeCostFloor = body?.acknowledgeCostFloor === true;
   } catch {
     /* empty body is fine — email delivery when possible */
   }
@@ -84,6 +94,47 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       if (["approved", "declined", "expired"].includes(est.status)) {
         return { status: 422, message: `Cannot send a ${est.status} estimate` };
+      }
+
+      // Hourly baseline (TASK-194): missing hours or costs block a first send; a price
+      // below the cost floor needs an acknowledgment; the result is frozen at send.
+      let frozenBaseline: string | null = null;
+      if (est.status === "draft") {
+        const baseline = await loadEstimateBaseline(client, id, session.accountId);
+        if (baseline) {
+          const gate = sendBaselineGate({
+            optionQuote: baseline.optionQuote,
+            input: baseline.input,
+            result: baseline.result,
+            acknowledged: acknowledgeCostFloor || baseline.costFloorAckAt != null,
+          });
+          if (gate.kind === "incomplete") {
+            const checklist = beforeSendChecklist(gate.missing, baseline.lines);
+            return {
+              status: 422,
+              code: "BASELINE_INCOMPLETE",
+              message: `Before you can send: ${checklist.map((row) => row.label).join("; ")}.`,
+              details: { missing: gate.missing, checklist },
+            };
+          }
+          if (gate.kind === "ack_required") {
+            return {
+              status: 409,
+              code: "COST_FLOOR_ACK_REQUIRED",
+              message: `This price pays $${(gate.effectiveRateCents / 100).toFixed(2)}/h after costs, below your $${(gate.costFloorCents / 100).toFixed(2)}/h cost floor. Confirm to send it anyway.`,
+              details: { effectiveRateCents: gate.effectiveRateCents, costFloorCents: gate.costFloorCents },
+            };
+          }
+          if (gate.kind === "ok") {
+            if (baseline.result.belowCostFloor && baseline.costFloorAckAt == null) {
+              await client.query(
+                `UPDATE estimates SET cost_floor_ack_at = now(), cost_floor_ack_by = $2 WHERE id = $1`,
+                [id, session.userId],
+              );
+            }
+            frozenBaseline = JSON.stringify(baselineSnapshot(baseline.input, baseline.result));
+          }
+        }
       }
 
       const { rules: pricingRules } = await loadPricingRules(client, session.accountId);
@@ -150,8 +201,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             jobId: est.job_id,
           });
           await client.query(
-            `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
-            [id],
+            `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now(),
+                    baseline_snapshot = COALESCE($2::jsonb, baseline_snapshot)
+             WHERE id = $1`,
+            [id, frozenBaseline],
           );
         }
         await appendAuditLog(client, {
@@ -177,8 +230,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             jobId: est.job_id,
           });
           await client.query(
-            `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
-            [id],
+            `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now(),
+                    baseline_snapshot = COALESCE($2::jsonb, baseline_snapshot)
+             WHERE id = $1`,
+            [id, frozenBaseline],
           );
         }
         await appendAuditLog(client, {
@@ -320,8 +375,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           jobId: est.job_id,
         });
         await client.query(
-          `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
-          [id],
+          `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now(),
+                  baseline_snapshot = COALESCE($2::jsonb, baseline_snapshot)
+           WHERE id = $1`,
+          [id, frozenBaseline],
         );
       }
 

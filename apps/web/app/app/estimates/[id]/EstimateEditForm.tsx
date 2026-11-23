@@ -366,6 +366,12 @@ function StandardEstimateEditForm({
     });
   }
 
+  function updateLineCost(index: number, cents: number | null) {
+    setLineItems((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, unit_cost_cents: cents } : row))
+    );
+  }
+
   function removeLineItem(index: number) {
     setLineItems((prev) => prev.filter((_, i) => i !== index));
   }
@@ -419,6 +425,8 @@ function StandardEstimateEditForm({
                     description: "Materials",
                     quantity: 1,
                     unit_price_cents: parseCents(materialCostDollars),
+                    unit_cost_cents: parseCents(materialCostDollars),
+                    line_item_type: "materials" as const,
                     sort_order: 1,
                   },
                 ]
@@ -429,6 +437,7 @@ function StandardEstimateEditForm({
                     description: "Material handling fee (15%)",
                     quantity: 1,
                     unit_price_cents: paintingResult.material_handling_cents,
+                    line_item_type: "handling_fee" as const,
                     sort_order: 2,
                   },
                 ]
@@ -818,6 +827,7 @@ function StandardEstimateEditForm({
                 onAdd={addLineItem}
                 onRemove={removeLineItem}
                 onDuplicate={duplicateLineItem}
+                onCostChange={updateLineCost}
               />
             </>
           )}

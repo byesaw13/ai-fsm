@@ -24,6 +24,22 @@ interface LineItemsTableProps {
   onAdd: () => void;
   onRemove: (idx: number) => void;
   onDuplicate?: (idx: number) => void;
+  /** When set, materials and equipment rows get a cost field (what you pay). Null = not entered. */
+  onCostChange?: (idx: number, cents: number | null) => void;
+}
+
+function lineHasCost(row: LineItemRow): boolean {
+  return row.line_item_type === "materials" || row.line_item_type === "equipment";
+}
+
+function costInputValue(cents: number | null | undefined): string {
+  return cents == null ? "" : String(cents / 100);
+}
+
+function costFromInput(raw: string): number | null {
+  if (raw.trim() === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
 }
 
 export function LineItemsTable({
@@ -34,6 +50,7 @@ export function LineItemsTable({
   onAdd,
   onRemove,
   onDuplicate,
+  onCostChange,
 }: LineItemsTableProps) {
   const p = testIdPrefix ? `${testIdPrefix}-` : "";
 
@@ -135,6 +152,7 @@ export function LineItemsTable({
                           inputMode="decimal"
                           placeholder="Low"
                           aria-label={`${PERSON_HOURS_LABEL} low`}
+                          id={`${p}line-hours-${i}`}
                           value={row.hours_low ?? ""}
                           onChange={(e) => onUpdate(i, "hours_low", e.target.value)}
                           disabled={disabled}
@@ -188,6 +206,24 @@ export function LineItemsTable({
                       disabled={disabled}
                       data-testid={`${p}line-item-price-${i}`}
                     />
+                    {onCostChange && lineHasCost(row) && (
+                      <label style={{ display: "block", marginTop: "var(--space-1)", fontSize: "var(--text-xs)" }}>
+                        <span className="muted">Your cost ($)</span>
+                        <input
+                          className="p7-input"
+                          id={`${p}line-cost-${i}`}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputMode="decimal"
+                          placeholder="Cost needed"
+                          value={costInputValue(row.unit_cost_cents)}
+                          onChange={(e) => onCostChange(i, costFromInput(e.target.value))}
+                          disabled={disabled}
+                          data-testid={`${p}line-item-cost-${i}`}
+                        />
+                      </label>
+                    )}
                     {markupLabel({
                       unit_price_cents: parseCents(row.unit_price),
                       unit_cost_cents: row.unit_cost_cents ?? null,

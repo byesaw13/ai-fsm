@@ -1,7 +1,7 @@
 # TASK-194: Baseline panel, send rules and freeze at send
 
 Status:
-Proposed
+In progress
 
 Epic:
 EPIC-002 Estimating & Assessments

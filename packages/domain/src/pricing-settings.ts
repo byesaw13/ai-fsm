@@ -34,6 +34,8 @@ export interface BusinessPricingSettings {
   card_fee_pct: number;
   /** Working hours in a day, for per-day production rates (TASK-193; owner default 8). */
   hours_per_day: number;
+  /** Stronger baseline warning from this % below the midpoint (TASK-194; default 10). */
+  baseline_warning_pct: number;
 }
 
 /** Seed / fallback when no DB row exists. Cost default $50 matches solo owner pay. */
@@ -48,6 +50,7 @@ export const DEFAULT_PRICING_SETTINGS: BusinessPricingSettings = {
   material_handling_pct: Math.round(MATERIAL_HANDLING_CLIENT_RATE * 100),
   card_fee_pct: 0,
   hours_per_day: 8,
+  baseline_warning_pct: 10,
 };
 
 /** Customer bill rate for a job state (NH baseline or MA premium). */

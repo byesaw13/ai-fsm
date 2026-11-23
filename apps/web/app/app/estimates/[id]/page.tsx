@@ -38,6 +38,11 @@ import { TravelPanel } from "@/components/travel/TravelPanel";
 import { QuoteVersionProvider } from "@/components/QuoteVersion";
 import { quoteUpdatedAt } from "@/lib/estimates/quote-version";
 import { MarkEntityAttentionRead } from "@/components/attention/MarkEntityAttentionRead";
+import { withEstimateContext } from "@/lib/estimates/db";
+import { beforeSendChecklist, loadEstimateBaseline } from "@/lib/estimates/baseline";
+import { EstimateBaselinePanel } from "./sections/EstimateBaselinePanel";
+import { BeforeSendChecklist } from "./sections/BeforeSendChecklist";
+import { baselinePanelProps } from "./baseline-panel-props";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +105,15 @@ export default async function EstimateDetailPage({
     (preparedSource?.rooms ?? []).map((r) => [r.id, r.name || "Unnamed area"]),
   );
   const preparedRateCents = resolveLaborRateCents(location?.property_state ?? null, pricingSettings).labor_rate_cents;
+
+  // Hourly baseline (TASK-194): owner and admin only.
+  const baseline = canTransition
+    ? await withEstimateContext(session, (client) => loadEstimateBaseline(client, estimate.id, session.accountId))
+    : null;
+  const sendChecklist =
+    baseline && currentStatus === "draft" && !baseline.optionQuote
+      ? beforeSendChecklist(baseline.result.missing, baseline.lines)
+      : [];
 
   const reviewHealth = estimateReviewHealth(
     estimate.presentation_mode === "multi_option"
@@ -260,6 +274,8 @@ export default async function EstimateDetailPage({
         options={options}
       />
 
+      {baseline && <EstimateBaselinePanel {...baselinePanelProps(baseline, estimate.id)} />}
+
       {canTransition && (
         <TravelPanel
           entityType="estimate"
@@ -358,11 +374,13 @@ export default async function EstimateDetailPage({
           <p className="muted" style={{ marginTop: 0 }}>
             Email the customer when you have an address, or manually mark as sent after offline delivery (PDF, portal link, in person).
           </p>
+          <BeforeSendChecklist rows={sendChecklist} />
           <SendEstimateButton
             estimateId={estimate.id}
             clientEmail={estimate.client_email}
             sentAt={estimate.sent_at}
             emailConfigured={isEmailConfigured()}
+            blocked={sendChecklist.length > 0}
           />
         </div>
       )}
