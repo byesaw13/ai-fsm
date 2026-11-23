@@ -1,7 +1,7 @@
 # TASK-240: A progress line on every job and customer
 
 Status:
-In progress
+Done (2026-11-23, #762, verified on production)
 
 Epic:
 EPIC-006 Role-Based Workspaces
