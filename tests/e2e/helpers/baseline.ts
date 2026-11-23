@@ -66,9 +66,18 @@ export async function makeEstimateSendable(page: Page, estimateId: string): Prom
   await page.reload();
   const main = page.locator("#main-content");
   const panel = main.getByTestId("baseline-panel");
-  await panel.getByTestId("baseline-other-direct").fill("0");
-  await panel.getByTestId("baseline-confirm-costs").click();
-  await expect(panel.getByTestId("baseline-costs-confirmed")).toBeVisible();
+  // A click before hydration does nothing, so retry until the save really happened.
+  await expect(async () => {
+    await panel.getByTestId("baseline-other-direct").fill("0");
+    const saved = page.waitForResponse(
+      (r) => r.request().method() === "PATCH" && r.url().endsWith(`/api/v1/estimates/${estimateId}`),
+      { timeout: 4000 },
+    );
+    await panel.getByTestId("baseline-confirm-costs").click();
+    const response = await saved;
+    expect(response.status(), await response.text()).toBe(200);
+    await expect(panel.getByTestId("baseline-costs-confirmed")).toBeVisible({ timeout: 5000 });
+  }).toPass({ timeout: 30000 });
   await expect(main.getByTestId("before-send-checklist")).toHaveCount(0);
 }
 
