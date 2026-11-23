@@ -149,8 +149,13 @@ export function NewButton({ placement }: { placement: "fab" | "sidebar" }) {
             data-testid="new-menu-fab"
             style={{
               position: "fixed",
-              bottom: "calc(76px + env(safe-area-inset-bottom))",
+              // Clear the whole 56px + button (bottom 72px) plus a gap, so the
+              // last row (More) is never under it.
+              bottom: "calc(140px + env(safe-area-inset-bottom))",
               right: "var(--space-4)",
+              maxHeight: "calc(100dvh - 160px - env(safe-area-inset-bottom))",
+              overflowY: "auto",
+              padding: "var(--space-1)",
               zIndex: 401,
               display: "flex",
               flexDirection: "column",
