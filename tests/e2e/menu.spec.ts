@@ -40,7 +40,8 @@ test.describe("shorter menu (computer)", () => {
   test("estimates are one tab away inside Jobs", async ({ page }) => {
     await page.getByRole("navigation", { name: "Primary navigation" }).getByRole("link", { name: /^Jobs\b/ }).click();
     await page.waitForURL(/\/app\/jobs/);
-    await page.locator(".p7-hub-subnav").getByRole("link", { name: "Estimates", exact: true }).click();
+    // Hub tabs are links marked role="listitem", so match by text.
+    await page.locator(".p7-hub-subnav").getByText("Estimates", { exact: true }).click();
     await page.waitForURL(/\/app\/estimates/);
   });
 });
