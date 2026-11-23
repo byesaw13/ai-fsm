@@ -55,6 +55,11 @@ export interface ProjectWhatNextProps {
    * Sales walkthrough completed but no site_visit assessment — gap path.
    */
   hasSalesWalkthroughOnly?: boolean;
+  /**
+   * Anchor of the Close Out panel the close-out actions jump to. The phone and
+   * computer layouts each render their own panel (TASK-239).
+   */
+  statusAnchorId?: string;
 }
 
 export interface WhatNextContent {
@@ -86,6 +91,7 @@ function clientQ(clientId: string | null): string {
  * Deposits never count as project billed. Visits never auto-complete projects.
  */
 export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
+  const statusHref = `/app/jobs/${props.jobId}#${props.statusAnchorId ?? "project-status"}`;
   const {
     jobId,
     clientId,
@@ -155,7 +161,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
         detail:
           "Status is still Completed. Mark as Invoiced so this leaves the active work queue.",
         actionLabel: "Mark as Invoiced",
-        actionHref: `/app/jobs/${jobId}#project-status`,
+        actionHref: statusHref,
         secondary: latestInvoiceId
           ? { label: "Open paid invoice", href: `/app/invoices/${latestInvoiceId}` }
           : { label: "All invoices", href: `/app/invoices?job_id=${jobId}` },
@@ -166,7 +172,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
       detail:
         "Close in order: Complete project (won’t create a second invoice) → Mark as Invoiced. Visits don’t close the project.",
       actionLabel: "Complete project",
-      actionHref: `/app/jobs/${jobId}#project-status`,
+      actionHref: statusHref,
       secondary: latestInvoiceId
         ? { label: "Open paid invoice", href: `/app/invoices/${latestInvoiceId}` }
         : { label: "All invoices", href: `/app/invoices?job_id=${jobId}` },
@@ -219,7 +225,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
       message: "Ready for closeout — complete & invoice when work is truly done",
       detail: "Visits and work orders do not close the project. Complete & Invoice drafts the invoice from actuals and opens it to send.",
       actionLabel: "Complete & Invoice",
-      actionHref: `/app/jobs/${jobId}#project-status`,
+      actionHref: statusHref,
       secondary: { label: "Schedule another work day", href: `/app/jobs/${jobId}/visits/new` },
       extras: estimateExtras,
     };
@@ -517,6 +523,7 @@ export function ProjectWhatNext(props: ProjectWhatNextProps) {
             <LinkButton
               href={content.actionHref as Route}
               variant="primary"
+              size="lg"
               data-testid="project-what-next-primary"
             >
               {content.actionLabel} →

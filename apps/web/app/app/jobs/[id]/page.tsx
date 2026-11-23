@@ -908,11 +908,78 @@ export default async function JobDetailPage({
     })),
   ) as Route;
 
+  // TASK-239: one next step leads the page — the status sentence and the one
+  // primary button — on the phone and on the computer. Other buttons are secondary.
+  const nextLeads = !isTech && !!commercialCounts;
+  const whatNextFor = (statusAnchorId: string) =>
+    !isTech && commercialCounts ? (
+    <ProjectWhatNext
+      statusAnchorId={statusAnchorId}
+      jobId={job.id}
+      clientId={job.client_id ?? null}
+      jobStatus={currentStatus}
+      stage={pipelineStage}
+      pricingMode={commercialCounts.booking_pricing_mode as "flat_rate" | "hourly_internal" | null}
+      bookingRequestId={commercialCounts.booking_request_id}
+      estimateCount={estimateCount}
+      hasSentEstimate={commercialCounts.has_sent_estimate}
+      lastEstimateSentAt={commercialCounts.last_estimate_sent_at}
+      hasApprovedEstimate={commercialCounts.has_approved_estimate}
+      approvedEstimateId={commercialCounts.approved_estimate_id}
+      hasDepositInvoice={commercialCounts.has_deposit_invoice}
+      depositPaid={commercialCounts.deposit_paid}
+      hasActiveVisit={activeExecutionVisits.length > 0}
+      activeVisitId={activeExecutionVisits[0]?.id ?? null}
+      latestVisitId={latestVisit?.id ?? null}
+      readyForCloseout={readyForCloseout}
+      hasCompletedExecutionVisit={completedExecutionVisitCount > 0}
+      hasOpenWorkOrder={openWorkOrderCount > 0}
+      hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
+      hasPaidInvoice={commercialCounts.has_paid_invoice}
+      latestInvoiceId={commercialCounts.latest_invoice_id}
+      hasOpenPreSaleSiteVisit={openPreSaleSiteVisits.length > 0}
+      hasCompletedPreSaleSiteVisit={hasCompletedPreSaleSiteVisit}
+      hasExpiredEstimate={expiredEstimateCount > 0}
+      latestExpiredEstimateId={commercialCounts.latest_expired_estimate_id}
+      hasDraftWorkOrderWithPricing={commercialCounts.has_draft_work_order_with_pricing}
+      preSaleSiteVisitId={openPreSaleSiteVisit?.id ?? null}
+      assessmentFormIncomplete={assessmentFormIncomplete}
+      hasCompletedAssessmentVisit={hasCompletedAssessmentVisit}
+      hasSalesWalkthroughOnly={hasSalesWalkthroughOnly}
+    />
+    ) : null;
+
+  // Close Out panel — admin/owner only (explicit project completion). Both
+  // layouts render it, so the next step's close-out actions work on a phone (TASK-239).
+  const closeOutPanel = (anchorId: string) =>
+    canTransition && allowedTransitions.length > 0 ? (
+      <Card
+        id={anchorId}
+        data-testid={anchorId === "project-status" ? "job-transition-panel" : "job-transition-panel-phone"}
+        style={{ scrollMarginTop: 16 }}
+      >
+        <SectionHeader title="Close Out Project" />
+        <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+          {commercialCounts?.latest_invoice_id
+            ? "Visits and work orders never close this project. If the invoice already exists (or is paid), use Complete project then Mark as Invoiced — that will not create a second invoice."
+            : "Visits and work orders never close this project. When field work is done, use Complete & Invoice — that drafts the final invoice from actuals (T&M time, materials, and lift/equipment) and opens it so you can send or share the link."}
+        </p>
+        <JobTransitionForm
+          jobId={job.id}
+          allowedTransitions={allowedTransitions as JobStatus[]}
+          statusLabels={JOB_STATUS_LABELS}
+          clientId={job.client_id}
+          approvedEstimateId={commercialCounts?.approved_estimate_id ?? null}
+          hasExistingFinalInvoice={!!commercialCounts?.latest_invoice_id}
+        />
+      </Card>
+    ) : null;
+
   const scheduleVisitAction = canAddVisit ? (
     <span style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
       <LinkButton
         href={addDayHref}
-        variant="primary"
+        variant={nextLeads ? "secondary" : "primary"}
         size="sm"
         data-testid="add-visit-btn"
       >
@@ -1009,6 +1076,7 @@ export default async function JobDetailPage({
             <StatusBadge variant={currentStatus as StatusVariant}>{JOB_STATUS_LABELS[currentStatus]}</StatusBadge>
           </div>
         </header>
+        {whatNextFor("project-status-mobile")}
 
         <section style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "var(--space-2)" }}>
           {job.client_phone ? <MobileJobExternalAction href={`tel:${job.client_phone}`} label="Call" /> : null}
@@ -1026,19 +1094,19 @@ export default async function JobDetailPage({
               jobId={job.id}
               clientId={job.client_id ?? null}
               briefing={tmBriefing}
-              variant="primary"
+              variant={nextLeads ? "secondary" : "primary"}
               label="Use this briefing (T&M) →"
             />
           ) : null}
         </section>
 
         <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <MobileJobAction href={actionHrefs.scope} label="Scope" detail="This job's scope" primary />
+          <MobileJobAction href={actionHrefs.scope} label="Scope" detail="This job's scope" primary={!nextLeads} />
           <MobileJobAction href={actionHrefs.photos} label="Photos" detail="Photos from this job" />
           <MobileJobAction href={actionHrefs.materials} label="Materials" detail="Buy list and receipts for this job" />
           <MobileJobAction href={actionHrefs.notes} label="Notes" detail="Notes for this project" />
           {actionHrefs.complete ? (
-            <MobileJobAction href={actionHrefs.complete} label="Complete Visit" detail="Finish and close out the current visit" primary />
+            <MobileJobAction href={actionHrefs.complete} label="Complete Visit" detail="Finish and close out the current visit" primary={!nextLeads} />
           ) : (
             <div style={{ padding: "var(--space-4)", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
               No visit is scheduled for this job yet.
@@ -1100,6 +1168,7 @@ export default async function JobDetailPage({
           )}
         </section>
 
+        {closeOutPanel("project-status-mobile")}
         <AdvancedDetails title="Secondary Details">
           <dl className="p7-detail-list">
             {job.client_name && <div className="p7-detail-row"><dt>Customer</dt><dd>{job.client_name}</dd></div>}
@@ -1237,39 +1306,7 @@ export default async function JobDetailPage({
             hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
             latestInvoiceId={commercialCounts.latest_invoice_id}
           />
-          <ProjectWhatNext
-            jobId={job.id}
-            clientId={job.client_id ?? null}
-            jobStatus={currentStatus}
-            stage={pipelineStage}
-            pricingMode={commercialCounts.booking_pricing_mode as "flat_rate" | "hourly_internal" | null}
-            bookingRequestId={commercialCounts.booking_request_id}
-            estimateCount={estimateCount}
-            hasSentEstimate={commercialCounts.has_sent_estimate}
-            lastEstimateSentAt={commercialCounts.last_estimate_sent_at}
-            hasApprovedEstimate={commercialCounts.has_approved_estimate}
-            approvedEstimateId={commercialCounts.approved_estimate_id}
-            hasDepositInvoice={commercialCounts.has_deposit_invoice}
-            depositPaid={commercialCounts.deposit_paid}
-            hasActiveVisit={activeExecutionVisits.length > 0}
-            activeVisitId={activeExecutionVisits[0]?.id ?? null}
-            latestVisitId={latestVisit?.id ?? null}
-            readyForCloseout={readyForCloseout}
-            hasCompletedExecutionVisit={completedExecutionVisitCount > 0}
-            hasOpenWorkOrder={openWorkOrderCount > 0}
-            hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
-            hasPaidInvoice={commercialCounts.has_paid_invoice}
-            latestInvoiceId={commercialCounts.latest_invoice_id}
-            hasOpenPreSaleSiteVisit={openPreSaleSiteVisits.length > 0}
-            hasCompletedPreSaleSiteVisit={hasCompletedPreSaleSiteVisit}
-            hasExpiredEstimate={expiredEstimateCount > 0}
-            latestExpiredEstimateId={commercialCounts.latest_expired_estimate_id}
-            hasDraftWorkOrderWithPricing={commercialCounts.has_draft_work_order_with_pricing}
-            preSaleSiteVisitId={openPreSaleSiteVisit?.id ?? null}
-            assessmentFormIncomplete={assessmentFormIncomplete}
-            hasCompletedAssessmentVisit={hasCompletedAssessmentVisit}
-            hasSalesWalkthroughOnly={hasSalesWalkthroughOnly}
-          />
+          {whatNextFor("project-status")}
         </>
       )}
 
@@ -1388,7 +1425,7 @@ export default async function JobDetailPage({
               jobId={job.id}
               clientId={job.client_id ?? null}
               briefing={tmBriefing}
-              variant="primary"
+              variant={nextLeads ? "secondary" : "primary"}
               size="sm"
               label="Use this briefing →"
             />
@@ -1431,7 +1468,7 @@ export default async function JobDetailPage({
                   >
                     <LinkButton
                       href={addDayHref}
-                      variant="primary"
+                      variant={nextLeads ? "secondary" : "primary"}
                       size="sm"
                       data-testid="add-day-below-timeline"
                     >
@@ -1531,25 +1568,7 @@ export default async function JobDetailPage({
             </Card>
           )}
 
-          {/* Status Transitions — admin/owner only (explicit project completion) */}
-          {canTransition && allowedTransitions.length > 0 && (
-            <Card id="project-status" data-testid="job-transition-panel">
-              <SectionHeader title="Close Out Project" />
-              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                {commercialCounts?.latest_invoice_id
-                  ? "Visits and work orders never close this project. If the invoice already exists (or is paid), use Complete project then Mark as Invoiced — that will not create a second invoice."
-                  : "Visits and work orders never close this project. When field work is done, use Complete & Invoice — that drafts the final invoice from actuals (T&M time, materials, and lift/equipment) and opens it so you can send or share the link."}
-              </p>
-              <JobTransitionForm
-                jobId={job.id}
-                allowedTransitions={allowedTransitions as JobStatus[]}
-                statusLabels={JOB_STATUS_LABELS}
-                clientId={job.client_id}
-                approvedEstimateId={commercialCounts?.approved_estimate_id ?? null}
-                hasExistingFinalInvoice={!!commercialCounts?.latest_invoice_id}
-              />
-            </Card>
-          )}
+          {closeOutPanel("project-status")}
 
           {/* Danger Zone — owner only, draft only */}
           {canDelete && currentStatus === "draft" && (
@@ -1994,7 +2013,7 @@ export default async function JobDetailPage({
 
   return (
     <>
-      <div className="p7-only-mobile">{mobileView}</div>
+      <div className="p7-only-mobile" data-testid="job-phone-layout">{mobileView}</div>
       <div className="p7-only-desktop">{desktopView}</div>
     </>
   );

@@ -93,6 +93,27 @@ test.describe("Required release smoke — admin core flow", () => {
     await expect(page.locator('#main-content [data-testid="job-status"]')).toContainText("Draft");
   });
 
+  test("3b. On a phone the job leads with one next step (TASK-239)", async ({ page }) => {
+    expect(jobId).toBeTruthy();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page);
+    await page.goto(`${BASE}/app/jobs/${jobId}`);
+    // Only the visible copy counts (a streamed page can briefly hold a hidden one).
+    const phone = page.locator('[data-testid="job-phone-layout"]:visible');
+    await expect(phone.locator('[data-testid="project-what-next-message"]:visible')).toHaveCount(1);
+    await expect(phone.locator('[data-testid="project-what-next-primary"]:visible')).toHaveCount(1);
+    // Exactly one primary-styled action on the first screen.
+    const primariesOnFirstScreen = await phone
+      .locator(".p7-btn-primary, .mobile-work-item-primary")
+      .evaluateAll((els) =>
+        els.filter((el) => {
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && r.top < window.innerHeight;
+        }).length,
+      );
+    expect(primariesOnFirstScreen).toBe(1);
+  });
+
   test("4. Admin can schedule a visit for the job", async ({ page }) => {
     expect(jobId).toBeTruthy();
     await login(page);
