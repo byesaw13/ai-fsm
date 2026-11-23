@@ -1,7 +1,7 @@
 # TASK-238: Today and Desk never bounce you away
 
 Status:
-Proposed
+In progress
 
 Epic:
 EPIC-006 Role-Based Workspaces

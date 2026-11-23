@@ -93,9 +93,11 @@ export default async function AppPage() {
             >
               {todayLabel}
             </span>
-            <LinkButton href="/app/my-work" variant="secondary" size="sm">
-              Today
-            </LinkButton>
+            {session.role === "owner" && (
+              <LinkButton href="/app/my-work" variant="secondary" size="sm" data-testid="switch-to-today">
+                Switch to Today
+              </LinkButton>
+            )}
             <LinkButton href="/app/intake/new" variant="primary" size="sm">
               + New Request
             </LinkButton>

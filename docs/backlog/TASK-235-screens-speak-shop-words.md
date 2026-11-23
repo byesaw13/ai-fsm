@@ -1,7 +1,7 @@
 # TASK-235: Customer, Property, Estimate, Invoice on every screen
 
 Status:
-In progress
+Done (2026-11-23, #756, verified on production)
 
 Epic:
 EPIC-006 Role-Based Workspaces

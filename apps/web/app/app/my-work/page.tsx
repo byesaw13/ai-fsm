@@ -203,7 +203,16 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
 
   return (
     <PageContainer>
-      <PageHeader title="Today" />
+      <PageHeader
+        title="Today"
+        actions={
+          isOwner ? (
+            <LinkButton href="/app" variant="secondary" size="sm" data-testid="switch-to-desk">
+              Switch to Desk
+            </LinkButton>
+          ) : undefined
+        }
+      />
 
       {proposals.length > 0 && (() => {
         const active = fieldDay.activityEntries?.find((e) => e.ended_at === null && e.user_id === session.userId) ?? null;

@@ -85,3 +85,25 @@ export function resolvePostLoginHref(
         : "office";
   return mode === "field" ? FIELD_ROOT : OFFICE_ROOT;
 }
+
+/** Query flag the logo adds so the next home load is steered (TASK-238). */
+export const HOME_ENTRY_PARAM = "home";
+
+/** The logo link: the role's home, marked as a deliberate "take me home". */
+export function homeEntryHref(home: string): string {
+  return `${home}?${HOME_ENTRY_PARAM}=1`;
+}
+
+/**
+ * TASK-238: steer an owner to their preferred home only when the app opens
+ * (first page of the browser session) or from the logo. A tap on Desk or Today
+ * in the menu is a choice, so it is never replaced.
+ */
+export function shouldSteerToPreferredHome(input: {
+  pathname: string;
+  firstInSession: boolean;
+  homeEntry: boolean;
+}): boolean {
+  const onHome = input.pathname === OFFICE_ROOT || input.pathname === FIELD_ROOT;
+  return onHome && (input.firstInSession || input.homeEntry);
+}
