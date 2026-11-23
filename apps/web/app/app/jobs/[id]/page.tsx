@@ -17,6 +17,8 @@ import { JOB_SUB_STATUSES, SUB_STATUS_LABELS } from "@ai-fsm/domain";
 import { workerCostRateCentsPerHour, DEFAULT_PRICING_SETTINGS } from "@ai-fsm/domain";
 import { CopySupplyPoButton } from "@/components/jobs/CopySupplyPoButton";
 import { JobSection } from "@/components/jobs/JobSection";
+import { ProgressLine } from "@/components/jobs/ProgressLine";
+import { jobProgressSteps } from "@/lib/jobs/progress-line";
 import { OpenSectionForHash } from "@/components/jobs/OpenSectionForHash";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
@@ -913,6 +915,20 @@ export default async function JobDetailPage({
   // TASK-239: one next step leads the page — the status sentence and the one
   // primary button — on the phone and on the computer. Other buttons are secondary.
   const nextLeads = !isTech && !!commercialCounts;
+  // TASK-240: where the job stands, as one line under the next step.
+  const progressSteps =
+    !isTech && commercialCounts
+      ? jobProgressSteps({
+          jobStatus: currentStatus,
+          requestId: commercialCounts.booking_request_id,
+          estimateId: commercialCounts.latest_estimate_id,
+          estimateSent: commercialCounts.has_sent_estimate,
+          approvedEstimateId: commercialCounts.approved_estimate_id,
+          invoiceId: commercialCounts.latest_invoice_id,
+          invoiceStatus: commercialCounts.latest_final_status,
+        })
+      : [];
+
   const whatNextFor = (statusAnchorId: string) =>
     !isTech && commercialCounts ? (
     <ProjectWhatNext
@@ -1079,6 +1095,7 @@ export default async function JobDetailPage({
           </div>
         </header>
         {whatNextFor("project-status-mobile")}
+        <ProgressLine steps={progressSteps} />
 
         <section style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "var(--space-2)" }}>
           {job.client_phone ? <MobileJobExternalAction href={`tel:${job.client_phone}`} label="Call" /> : null}
@@ -1309,6 +1326,7 @@ export default async function JobDetailPage({
             latestInvoiceId={commercialCounts.latest_invoice_id}
           />
           {whatNextFor("project-status")}
+          <ProgressLine steps={progressSteps} />
         </>
       )}
 

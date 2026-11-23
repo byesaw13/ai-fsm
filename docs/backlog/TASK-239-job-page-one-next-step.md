@@ -1,7 +1,7 @@
 # TASK-239: The job page leads with one next step
 
 Status:
-In progress
+Done (2026-11-23, #760 and #761, verified on production)
 
 Epic:
 EPIC-006 Role-Based Workspaces

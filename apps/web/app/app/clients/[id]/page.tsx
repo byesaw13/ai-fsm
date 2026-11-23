@@ -32,6 +32,9 @@ import { formatCents } from "@ai-fsm/money";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 import { VAULT_CATEGORY_LABELS } from "@ai-fsm/domain";
 import type { VaultCategory } from "@ai-fsm/domain";
+import { ProgressLine } from "@/components/jobs/ProgressLine";
+import { jobProgressSteps } from "@/lib/jobs/progress-line";
+import { loadJobProgressInput } from "@/lib/jobs/load-progress-input";
 
 export const dynamic = "force-dynamic";
 
@@ -318,6 +321,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     ),
   ]);
 
+  // TASK-240: where the customer's top open job stands.
+  const topJob = activeJobs[0] ?? null;
+  const topJobProgress = topJob ? await loadJobProgressInput(session, topJob.id) : null;
+  const topJobSteps = topJobProgress ? jobProgressSteps(topJobProgress) : [];
+
   const canCreateJobs = canTransitionJob(session.role);
   const canCreateEstimate = canCreateEstimates(session.role);
   const canCreateInvoice = canCreateInvoices(session.role);
@@ -429,6 +437,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           </div>
         }
       />
+
+      {topJob && topJobSteps.length > 0 && (
+        <Card data-testid="client-job-progress">
+          <SectionHeader title={topJob.title} />
+          <ProgressLine steps={topJobSteps} testId="client-progress-line" />
+          <LinkButton href={`/app/jobs/${topJob.id}`} variant="secondary" size="sm">
+            Open job →
+          </LinkButton>
+        </Card>
+      )}
 
       {/* Right now — only real open items, no empty-state grid noise */}
       <Card data-testid="client-right-now">
