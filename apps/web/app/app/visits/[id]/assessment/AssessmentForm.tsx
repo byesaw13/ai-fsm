@@ -235,7 +235,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
       const res = await fetch(`/api/v1/visits/${visitId}/prepare-quote`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error?.message ?? "Could not prepare the quote");
+        setError(data.error?.message ?? "Could not prepare the estimate");
         return;
       }
       router.push(`/app/estimates/${data.id}` as Route);
@@ -998,7 +998,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
             className="p7-btn p7-btn-secondary p7-btn-sm"
             data-testid="prepare-quote"
           >
-            {preparing ? "Preparing quote…" : "Prepare Quote →"}
+            {preparing ? "Preparing estimate…" : "Prepare Estimate →"}
           </button>
           <button
             type="button"

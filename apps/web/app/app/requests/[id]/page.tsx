@@ -48,7 +48,7 @@ const REFERRAL_LABELS: Record<string, string> = {
   online: "Found us online",
   friend_neighbor: "Friend or neighbor",
   realtor: "Realtor referral",
-  repeat: "Previous client",
+  repeat: "Previous customer",
   other: "Other",
 };
 
@@ -449,10 +449,10 @@ export default async function BookingRequestDetailPage({
                 )}
                 {br.client_id && (
                   <div className="p7-detail-row">
-                    <dt>Client</dt>
+                    <dt>Customer</dt>
                     <dd>
                       <Link href={`/app/clients/${br.client_id}`} style={{ color: "var(--accent)" }}>
-                        View Client Record →
+                        View Customer Record →
                       </Link>
                     </dd>
                   </div>

@@ -210,7 +210,7 @@ export function ClientImportForm() {
             Import complete
           </p>
           <p style={{ fontSize: "var(--text-base)", color: "var(--fg-muted)", marginBottom: "var(--space-6)" }}>
-            <strong>{result.imported}</strong> new client{result.imported !== 1 ? "s" : ""}
+            <strong>{result.imported}</strong> new customer{result.imported !== 1 ? "s" : ""}
             {(result.updated ?? 0) > 0 && (
               <>
                 , <strong>{result.updated}</strong> updated with Square history
@@ -224,7 +224,7 @@ export function ClientImportForm() {
             .
           </p>
           <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
-            <LinkButton href="/app/clients" variant="primary">View Clients</LinkButton>
+            <LinkButton href="/app/clients" variant="primary">View Customers</LinkButton>
             <Button variant="secondary" onClick={() => { setStep("upload"); setRows([]); setWarnings([]); setResult(null); if (fileRef.current) fileRef.current.value = ""; }}>
               Import Another File
             </Button>
@@ -293,7 +293,7 @@ export function ClientImportForm() {
               Choose Different File
             </Button>
             <Button variant="primary" onClick={handleImport} disabled={importing} loading={importing}>
-              {importing ? "Importing…" : `Import ${rows.length} Client${rows.length !== 1 ? "s" : ""}`}
+              {importing ? "Importing…" : `Import ${rows.length} Customer${rows.length !== 1 ? "s" : ""}`}
             </Button>
           </div>
         </Card>
@@ -333,7 +333,7 @@ export function ClientImportForm() {
             Click to choose a CSV file
           </p>
           <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-            .csv files only · max 1,000 clients per import
+            .csv files only · max 1,000 customers per import
           </p>
           <input
             ref={fileRef}

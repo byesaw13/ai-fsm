@@ -29,7 +29,7 @@ export function houseHeading(name: string | null | undefined, address: string): 
   const named = name?.trim();
   if (named) return named;
   const street = address.trim();
-  return street || "House";
+  return street || "Property";
 }
 
 /** Coming-back note the next person should see before they walk the house. */
@@ -80,21 +80,21 @@ export function houseWhatsNext(input: {
   if (input.unsentBillId) {
     const guide = sendVsHoldGuide();
     return {
-      title: "Send the bill",
+      title: "Send the invoice",
       detail: guide.why,
       why: guide.why,
       href: `/app/invoices/${input.unsentBillId}`,
-      action: "Open bill",
+      action: "Open invoice",
     };
   }
   if (input.openQuoteId) {
-    const detail = "A quote is out. The house is waiting on a yes.";
+    const detail = "An estimate is out. The property is waiting on a yes.";
     return {
-      title: "Follow up the quote",
+      title: "Follow up the estimate",
       detail,
       why: detail,
       href: `/app/estimates/${input.openQuoteId}`,
-      action: "Open quote",
+      action: "Open estimate",
     };
   }
   if (input.nextVisitId && !input.nextVisitAssigned) {
@@ -131,8 +131,8 @@ export function houseWhatsNext(input: {
 }
 
 export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  estimate_pdf:    "Quote",
-  estimate_docx:   "Quote (Word)",
+  estimate_pdf:    "Estimate",
+  estimate_docx:   "Estimate (Word)",
   invoice_pdf:     "Invoice",
   invoice_docx:    "Invoice (Word)",
   receipt:         "Receipt",
@@ -140,7 +140,7 @@ export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   signed_approval: "Signed Approval",
   insurance:       "Insurance",
   contract:        "Contract",
-  client_file:     "Client File",
+  client_file:     "Customer File",
   sop:             "SOP",
   template:        "Template",
   other:           "Document",

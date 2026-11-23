@@ -27,7 +27,7 @@ export function InlineClientForm({ onCreated, onCancel }: InlineClientFormProps)
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error?.message || "Failed to create client");
+        setError(data.error?.message || "Failed to create customer");
         setPending(false);
         return;
       }
@@ -49,7 +49,7 @@ export function InlineClientForm({ onCreated, onCancel }: InlineClientFormProps)
       }}
     >
       <p style={{ margin: "0 0 var(--space-3)", fontWeight: 500, fontSize: "var(--text-sm)" }}>
-        New Client
+        New Customer
       </p>
       {error && (
         <p style={{ margin: "0 0 var(--space-3)", color: "var(--color-red-600)", fontSize: "var(--text-sm)" }}>
@@ -86,7 +86,7 @@ export function InlineClientForm({ onCreated, onCancel }: InlineClientFormProps)
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
           <Button type="button" size="sm" disabled={pending || !name.trim()} loading={pending} onClick={handleSubmit}>
-            Create Client
+            Create Customer
           </Button>
           <Button type="button" variant="secondary" size="sm" onClick={onCancel} disabled={pending}>
             Cancel

@@ -20,10 +20,10 @@ export const propertyContactBody = z
   })
   .superRefine((value, ctx) => {
     if (Boolean(value.client_id) === Boolean(value.external_name)) {
-      ctx.addIssue({ code: "custom", message: "Choose one registered client or one external name" });
+      ctx.addIssue({ code: "custom", message: "Choose one registered customer or one external name" });
     }
     if (value.client_id && (value.external_email || value.external_phone)) {
-      ctx.addIssue({ code: "custom", message: "Registered-client contact details come from the client card" });
+      ctx.addIssue({ code: "custom", message: "Registered-customer contact details come from the customer card" });
     }
   });
 

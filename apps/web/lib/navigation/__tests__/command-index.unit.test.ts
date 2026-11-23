@@ -5,7 +5,7 @@ describe("command index", () => {
   it("exposes Today, Desk, and Tracking for the owner", () => {
     const labels = filterCommands("", "owner").map((c) => c.label);
     expect(labels).toEqual(
-      expect.arrayContaining(["Today", "Desk", "Tracking", "Jobs", "Bills", "People"]),
+      expect.arrayContaining(["Today", "Desk", "Tracking", "Jobs", "Invoices", "Customers"]),
     );
     expect(labels).not.toContain("Clients");
     expect(labels).not.toContain("Work Orders");

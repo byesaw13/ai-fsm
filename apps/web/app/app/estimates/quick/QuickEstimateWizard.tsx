@@ -344,7 +344,7 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
             ←
           </button>
           <div>
-            <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 700 }}>Who&apos;s the client?</h2>
+            <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 700 }}>Who&apos;s the customer?</h2>
             <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
               {selectedService?.name}
             </p>
@@ -353,7 +353,7 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
 
         <input
           type="search"
-          placeholder="Search clients…"
+          placeholder="Search customers…"
           value={clientSearch}
           onChange={(e) => setClientSearch(e.target.value)}
           autoFocus
@@ -388,8 +388,8 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
           ))}
           {filteredClients.length === 0 && (
             <p style={{ textAlign: "center", color: "var(--fg-muted)", fontSize: "var(--text-sm)", padding: "var(--space-6) 0" }}>
-              No clients found.{" "}
-              <Link href={"/app/clients/new" as Route} style={{ color: "var(--accent)" }}>Add a new client →</Link>
+              No customers found.{" "}
+              <Link href={"/app/clients/new" as Route} style={{ color: "var(--accent)" }}>Add a new customer →</Link>
             </p>
           )}
         </div>
@@ -423,7 +423,7 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
           <span style={{ fontWeight: 700 }}>{selectedService?.name}</span>
         </div>
         <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-          Client: <strong style={{ color: "var(--fg)" }}>{selectedClient?.name}</strong>
+          Customer: <strong style={{ color: "var(--fg)" }}>{selectedClient?.name}</strong>
         </div>
       </div>
 
@@ -532,7 +532,7 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
             cursor: submitting ? "wait" : "pointer", opacity: submitting ? 0.7 : 1,
           }}
         >
-          {submitting ? "Working…" : "Send to Client →"}
+          {submitting ? "Working…" : "Send to Customer →"}
         </button>
       </div>
     </div>

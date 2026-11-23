@@ -63,10 +63,10 @@ describe("requestDepositAfterApproval", () => {
   });
 
   it("a failure before contact is recorded as failed and noted on the schedule item", async () => {
-    mockSend.mockResolvedValueOnce({ status: 422, message: "Client has no email address on file" });
+    mockSend.mockResolvedValueOnce({ status: 422, message: "Customer has no email address on file" });
     expect(await requestDepositAfterApproval("e1")).toBe("failed");
-    expect(attemptUpdate()?.slice(0, 2)).toEqual(["failed", "Client has no email address on file"]);
-    expect(itemNote()).toMatch(/deposit request not sent \(Client has no email address on file\)/);
+    expect(attemptUpdate()?.slice(0, 2)).toEqual(["failed", "Customer has no email address on file"]);
+    expect(itemNote()).toMatch(/deposit request not sent \(Customer has no email address on file\)/);
   });
 
   it("a delivery error (502) is unknown, never treated as safe to resend", async () => {

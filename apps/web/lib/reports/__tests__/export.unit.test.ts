@@ -237,7 +237,7 @@ describe("formatInvoicesCsv", () => {
     }]);
     const [header, line] = csv.split("\r\n");
     expect(header).toBe(
-      "Invoice #,Client,Billing Context,Service Property,Work For,Sponsored Purpose,Business Purpose,Work Summary,Paid Date,Status,Subtotal,Tax,Total,Paid,Due Date,Created",
+      "Invoice #,Customer,Billing Context,Service Property,Work For,Sponsored Purpose,Business Purpose,Work Summary,Paid Date,Status,Subtotal,Tax,Total,Paid,Due Date,Created",
     );
     expect(line).toContain('Realtor-sponsored property expense,96 Richardson Road,Emma,Other realtor-sponsored work,"Repair, ""as agreed""",Door repair,2025-09-11');
   });

@@ -79,7 +79,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         error: {
           code: "USE_SEND_ACTION",
           message:
-            "An estimate becomes 'sent' only by delivering it. Use the Send to Client action.",
+            "An estimate becomes 'sent' only by delivering it. Use the Send to Customer action.",
           traceId: session.traceId,
         },
       },

@@ -120,7 +120,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
             ? [
                 {
                   href: `/app/clients/${expense.client_id}`,
-                  label: (expense.client_name as string | null) ?? "Client",
+                  label: (expense.client_name as string | null) ?? "Customer",
                 },
               ]
             : []),
@@ -213,7 +213,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
               )}
               {expense.client_name && (
                 <div className="p7-detail-row">
-                  <dt>Client</dt>
+                  <dt>Customer</dt>
                   <dd>
                     <a
                       href={`/app/clients/${expense.client_id}`}

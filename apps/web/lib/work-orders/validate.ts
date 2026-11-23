@@ -19,7 +19,7 @@ export async function validateWorkOrderForeignKeys(
     `SELECT id FROM clients WHERE id = $1 AND account_id = $2`,
     [refs.client_id, accountId],
   );
-  if (cli.rowCount === 0) return "Unknown client";
+  if (cli.rowCount === 0) return "Unknown customer";
 
   if (refs.job_id) {
     const job = await client.query(

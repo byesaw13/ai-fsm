@@ -132,7 +132,7 @@ export async function applyStopInterview(
 
   if (stopCreatesJob(input.reason)) {
     if (!seg.property_id || !seg.client_id) {
-      throw new StopInterviewError("VALIDATION_ERROR", "New work needs a known house");
+      throw new StopInterviewError("VALIDATION_ERROR", "New work needs a known property");
     }
     const title = (input.jobTitle ?? notes).trim().slice(0, 255) || "New work";
     jobId = await createJobOnProperty(client, session, {

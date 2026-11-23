@@ -134,14 +134,14 @@ export default async function ReferralRoiPage({ searchParams }: PageProps) {
       </div>
 
       <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginBottom: "var(--space-4)" }}>
-        Booking requests created in this month, grouped by how the client found Dovetails.
+        Booking requests created in this month, grouped by how the customer found Dovetails.
         Revenue is invoices linked via the request&apos;s job (void invoices excluded).
       </p>
 
       {sources.length === 0 || totalRequests === 0 ? (
         <EmptyState
           title="No booking requests this month"
-          description="When clients book online with a lead source, totals show up here."
+          description="When customers book online with a lead source, totals show up here."
         />
       ) : (
         <>

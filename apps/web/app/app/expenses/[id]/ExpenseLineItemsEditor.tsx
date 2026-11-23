@@ -154,7 +154,7 @@ export function ExpenseLineItemsEditor({ expenseId, initialLineItems, billed, ca
             </div>
             <label
               style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--text-xs)", paddingBottom: "var(--space-2)", whiteSpace: "nowrap" }}
-              title="Uncheck for items not billed to the client (drinks, storage, items billed elsewhere)"
+              title="Uncheck for items not billed to the customer (drinks, storage, items billed elsewhere)"
             >
               <input
                 type="checkbox"
@@ -163,7 +163,7 @@ export function ExpenseLineItemsEditor({ expenseId, initialLineItems, billed, ca
                 disabled={!canEdit || saving}
                 data-testid={`line-item-billable-${i}`}
               />
-              Bill
+              Charge
             </label>
             {canEdit && (
               <Button variant="ghost" size="sm" onClick={() => removeItem(i)} disabled={saving}>

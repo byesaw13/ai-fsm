@@ -59,7 +59,7 @@ export function EstimateInternalNotesForm({ estimateId, initialNotes }: Props) {
           rows={4}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Private notes (not visible to client)"
+          placeholder="Private notes (not visible to customer)"
           data-testid="internal-notes-input"
         />
       </div>

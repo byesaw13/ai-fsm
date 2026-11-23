@@ -16,7 +16,7 @@ export function ApprovedAddOnsCard({ addOns }: { addOns: ApprovedAddOn[] | null 
         ))}
       </ul>
       <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-        {formatCents(total)} on top of the quote total. The deposit already includes it, and the final bill adds a line for each.
+        {formatCents(total)} on top of the estimate total. The deposit already includes it, and the final invoice adds a line for each.
       </p>
     </div>
   );

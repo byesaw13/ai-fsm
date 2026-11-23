@@ -271,7 +271,7 @@ export default async function ShoppingListPage({
             Materials Plan
           </h1>
           <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-            {estimate.client_name ?? "Client"} · {createdDate}
+            {estimate.client_name ?? "Customer"} · {createdDate}
           </p>
         </div>
         <PrintButton />
@@ -281,7 +281,7 @@ export default async function ShoppingListPage({
       <div className="print-only" style={{ marginBottom: "var(--space-4)" }}>
         <h1 style={{ fontSize: "var(--text-2xl)", fontWeight: 700, margin: 0 }}>Materials Plan</h1>
         <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-          {estimate.client_name ?? "Client"} · {createdDate}
+          {estimate.client_name ?? "Customer"} · {createdDate}
         </p>
       </div>
 
@@ -400,7 +400,7 @@ export default async function ShoppingListPage({
             <div>
               <span style={{ fontSize: "var(--text-base)", fontWeight: 700 }}>Materials Total</span>
               <span style={{ marginLeft: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                + 15% handling fee billed to client
+                + 15% handling fee billed to customer
               </span>
             </div>
             <span style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>
@@ -417,7 +417,7 @@ export default async function ShoppingListPage({
             }}
           >
             Quantities include standard waste factor. Prices are estimates based on current pricing — actual costs may vary.
-            A 15% materials handling fee is added to the client invoice.
+            A 15% materials handling fee is added to the customer invoice.
           </p>
         </>
       )}

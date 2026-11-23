@@ -117,7 +117,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     const cli = await client.query(`SELECT id FROM clients WHERE id = $1 AND account_id = $2`, [d.client_id, session.accountId]);
     if (cli.rowCount === 0) {
       await client.query("ROLLBACK");
-      return err("VALIDATION_ERROR", "Unknown client", 400, session.traceId);
+      return err("VALIDATION_ERROR", "Unknown customer", 400, session.traceId);
     }
     if (d.property_id) {
       const prop = await client.query(
@@ -126,7 +126,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       );
       if (prop.rowCount === 0) {
         await client.query("ROLLBACK");
-        return err("VALIDATION_ERROR", "Property does not belong to that client", 400, session.traceId);
+        return err("VALIDATION_ERROR", "Property does not belong to that customer", 400, session.traceId);
       }
     }
 

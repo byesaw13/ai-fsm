@@ -64,7 +64,7 @@ export function SendEstimateButton({ estimateId, clientEmail, sentAt, emailConfi
             opacity: pending ? 0.7 : 1,
           }}
         >
-          {pending === "send" ? "Sending…" : sentAt ? "Resend to Client" : "Send to Client"}
+          {pending === "send" ? "Sending…" : sentAt ? "Resend to Customer" : "Send to Customer"}
         </button>
       )}
 
@@ -98,7 +98,7 @@ export function SendEstimateButton({ estimateId, clientEmail, sentAt, emailConfi
             ? `Last sent ${new Date(sentAt).toLocaleDateString()} — ${clientEmail}. Or mark sent without re-emailing.`
             : `Email to ${clientEmail} with approve/decline links, or mark as sent if you delivered it in person / offline.`
           : !clientEmail
-            ? "No client email on file — use Mark as Sent after delivering offline (portal link / PDF / in person)."
+            ? "No customer email on file — use Mark as Sent after delivering offline (portal link / PDF / in person)."
             : "Email not configured — Mark as Sent updates status without delivery."}
       </p>
     </div>

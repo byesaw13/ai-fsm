@@ -71,10 +71,10 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
       if (!est) throw Object.assign(new Error("Estimate not found"), { code: "NOT_FOUND" });
       assertQuoteVersion(est.updated_at, body.updated_at);
       if (est.status !== "draft") {
-        throw Object.assign(new Error("Only a draft quote can be changed from its prepared scope"), { code: "IMMUTABLE_ENTITY" });
+        throw Object.assign(new Error("Only a draft estimate can be changed from its prepared scope"), { code: "IMMUTABLE_ENTITY" });
       }
       const stored = parsePreparedScope(est.prepared_scope);
-      if (!stored) throw Object.assign(new Error("This quote has no prepared scope"), { code: "NO_PREPARED_SCOPE" });
+      if (!stored) throw Object.assign(new Error("This estimate has no prepared scope"), { code: "NO_PREPARED_SCOPE" });
 
       const merged = applyScopeEdits(stored, incoming);
       const saved = await client.query<{ updated_at: Date }>(

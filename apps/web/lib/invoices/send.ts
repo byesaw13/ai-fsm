@@ -74,7 +74,7 @@ export async function sendInvoice(session: AuthSession, id: string): Promise<Sen
     const canEmail = Boolean(inv.client_email) && isEmailConfigured();
     if (!canEmail && !textPhone) {
       if (!inv.client_email) {
-        return { status: 422, message: "Client has no email address on file" };
+        return { status: 422, message: "Customer has no email address on file" };
       }
       return { status: 503, message: "Email is not configured on this server" };
     }

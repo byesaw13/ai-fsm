@@ -970,9 +970,9 @@ export default async function JobDetailPage({
         { label: job.title },
       ]
     : [
-        { href: "/app/clients", label: "Clients" },
+        { href: "/app/clients", label: "Customers" },
         ...(job.client_id
-          ? [{ href: `/app/clients/${job.client_id}`, label: job.client_name ?? "Client" }]
+          ? [{ href: `/app/clients/${job.client_id}`, label: job.client_name ?? "Customer" }]
           : []),
         ...(job.property_id
           ? [{
@@ -1102,7 +1102,7 @@ export default async function JobDetailPage({
 
         <AdvancedDetails title="Secondary Details">
           <dl className="p7-detail-list">
-            {job.client_name && <div className="p7-detail-row"><dt>Client</dt><dd>{job.client_name}</dd></div>}
+            {job.client_name && <div className="p7-detail-row"><dt>Customer</dt><dd>{job.client_name}</dd></div>}
             {job.property_address && <div className="p7-detail-row"><dt>Property</dt><dd>{job.property_address}</dd></div>}
             <div className="p7-detail-row"><dt>Status</dt><dd>{JOB_STATUS_LABELS[currentStatus]}</dd></div>
             <div className="p7-detail-row"><dt>Visits</dt><dd>{visits.length}</dd></div>
@@ -1556,7 +1556,7 @@ export default async function JobDetailPage({
             <AdvancedDetails title="Danger Zone">
               <Card className="p7-card-danger" data-testid="danger-zone">
                 <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginBottom: "var(--space-3)" }}>
-                  Permanently delete this draft project. SMS history stays on the client; only the
+                  Permanently delete this draft project. SMS history stays on the customer; only the
                   empty draft is removed. Non-draft projects must be cancelled instead.
                 </p>
                 <DeleteJobButton jobId={job.id} />
@@ -1693,7 +1693,7 @@ export default async function JobDetailPage({
                       size="sm"
                       data-testid="new-estimate-btn"
                     >
-                      + New Quote
+                      + New Estimate
                     </LinkButton>
                   }
                 />
@@ -1974,7 +1974,7 @@ export default async function JobDetailPage({
               <dl className="p7-detail-list">
                 {job.client_name && (
                   <div className="p7-detail-row">
-                    <dt>Client</dt>
+                    <dt>Customer</dt>
                     <dd>{job.client_name}</dd>
                   </div>
                 )}

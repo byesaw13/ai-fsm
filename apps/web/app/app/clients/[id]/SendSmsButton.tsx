@@ -120,7 +120,7 @@ export function SendSmsButton({ clientId, clientName, phone, defaultJobId, draft
             <p style={{ fontSize: 28, margin: "0 0 8px" }}>✓</p>
             <p style={{ fontWeight: 600, margin: "0 0 4px" }}>Message sent</p>
             <p style={{ fontSize: 13, color: "var(--fg-muted)", margin: "0 0 16px" }}>
-              Logged on the client record. If the phone gateway also fires sms:sent, it will
+              Logged on the customer record. If the phone gateway also fires sms:sent, it will
               dedupe by message id.
             </p>
             <Button type="button" onClick={() => setOpen(false)}>

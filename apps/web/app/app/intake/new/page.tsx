@@ -14,7 +14,7 @@ export default async function NewIntakePage() {
     <PageContainer>
       <PageHeader
         title="New Request"
-        subtitle="Capture a service request while speaking with a client."
+        subtitle="Capture a service request while speaking with a customer."
         backHref="/app/requests"
       />
       <IntakeForm />

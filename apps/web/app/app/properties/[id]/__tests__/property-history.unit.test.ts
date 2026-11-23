@@ -109,7 +109,7 @@ describe("houseWhatsNext", () => {
       unsentBillId: "inv1",
       openQuoteId: "est1",
     });
-    expect(next?.title).toBe("Send the bill");
+    expect(next?.title).toBe("Send the invoice");
     expect(next?.href).toBe("/app/invoices/inv1");
     expect(next?.why).toBe("People pay what they still remember.");
   });

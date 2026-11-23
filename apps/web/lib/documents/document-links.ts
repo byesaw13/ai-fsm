@@ -28,7 +28,7 @@ export async function assertClientInAccount(
     [clientId, accountId],
   );
   if (result.rowCount === 0) {
-    throw Object.assign(new Error("Client not found"), { code: "NOT_FOUND" });
+    throw Object.assign(new Error("Customer not found"), { code: "NOT_FOUND" });
   }
   return result.rows[0];
 }
@@ -44,7 +44,7 @@ export async function assertJobForClient(
     [jobId, accountId, clientId],
   );
   if (result.rowCount === 0) {
-    throw Object.assign(new Error("Job not found for this client"), { code: "VALIDATION_ERROR" });
+    throw Object.assign(new Error("Job not found for this customer"), { code: "VALIDATION_ERROR" });
   }
   return result.rows[0];
 }
@@ -60,7 +60,7 @@ export async function assertPropertyForClient(
     [propertyId, accountId, clientId],
   );
   if (result.rowCount === 0) {
-    throw Object.assign(new Error("Property not found for this client"), { code: "VALIDATION_ERROR" });
+    throw Object.assign(new Error("Property not found for this customer"), { code: "VALIDATION_ERROR" });
   }
   return result.rows[0];
 }

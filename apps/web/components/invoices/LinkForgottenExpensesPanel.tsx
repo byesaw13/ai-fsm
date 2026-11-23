@@ -256,7 +256,7 @@ export function LinkForgottenExpensesPanel({
               }}
             >
               Select past material receipts to add as invoice line items. Job receipts are
-              pre-selected; unlinked client receipts can be attached at the same time. Filter by
+              pre-selected; unlinked customer receipts can be attached at the same time. Filter by
               PO / Home Depot job tag when notes include one. Or use{" "}
               <strong>Pull materials from job receipts</strong> below for one-click.
             </p>
@@ -279,7 +279,7 @@ export function LinkForgottenExpensesPanel({
 
             {expenses.length === 0 ? (
               <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                No unbilled material receipts for this job or client.
+                No unbilled material receipts for this job or customer.
               </p>
             ) : (
               <>
@@ -449,7 +449,7 @@ export function LinkForgottenExpensesPanel({
             color: "var(--fg-muted)",
           }}
         >
-          Material receipts for this client that aren’t on a project yet. Attach
+          Material receipts for this customer that aren’t on a project yet. Attach
           here before invoicing. Search by PO or Home Depot job tag when present.
         </p>
 

@@ -205,7 +205,7 @@ export async function updateEstimateById(
     (patch.flat_rate_cents !== undefined || patch.sq_ft !== undefined || patch.room_specs !== undefined)
   ) {
     throw Object.assign(
-      new Error("This quote is priced from its prepared scope. Change the work there, not with painting or flat-rate pricing."),
+      new Error("This estimate is priced from its prepared scope. Change the work there, not with painting or flat-rate pricing."),
       { code: "PREPARED_SCOPE_PRICING" },
     );
   }

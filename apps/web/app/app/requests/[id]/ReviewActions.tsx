@@ -364,7 +364,7 @@ export function ReviewActions({
         return (
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-              Waiting on client — or close if they passed:
+              Waiting on customer — or close if they passed:
             </span>
             <Button
               variant="danger"
@@ -396,7 +396,7 @@ export function ReviewActions({
         }}
       >
         <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-          Book a look for unclear scope. Book work when you can show up and work. Remote quote for notes and photos only.
+          Book a look for unclear scope. Book work when you can show up and work. Remote estimate for notes and photos only.
         </p>
         <div style={{ display: "grid", gap: "var(--space-2)" }}>
           {PATH_OPTIONS.map((path) => {
@@ -648,7 +648,7 @@ export function ReviewActions({
 
       <details>
         <summary style={{ cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-          Send intake form to client
+          Send intake form to customer
         </summary>
         <div style={{ marginTop: "var(--space-2)" }}>
           {intakeSent ? (
@@ -658,7 +658,7 @@ export function ReviewActions({
               {!clientEmail && (
                 <div>
                   <label style={{ fontSize: "var(--text-xs)", display: "block", marginBottom: 4 }}>
-                    Client email (required)
+                    Customer email (required)
                   </label>
                   <input
                     type="email"

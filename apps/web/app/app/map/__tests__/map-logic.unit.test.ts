@@ -45,7 +45,7 @@ describe("system map path", () => {
   });
 
   it("names the line from a quote to a job", () => {
-    expect(nodeById("quote")?.label).toBe("Quote");
+    expect(nodeById("quote")?.label).toBe("Estimate");
     expect(EDGES.find((edge) => edge.from === "quote" && edge.to === "job")?.label).toBe("approves");
     expect(EDGES).toHaveLength(8);
   });

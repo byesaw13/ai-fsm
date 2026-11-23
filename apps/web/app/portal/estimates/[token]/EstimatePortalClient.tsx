@@ -266,7 +266,7 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
         )}
         {status === "expired" || isExpired ? (
           <div style={{ background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#92400e" }}>
-            This estimate has expired. Please contact us for an updated quote.
+            This estimate has expired. Please contact us for an updated estimate.
           </div>
         ) : null}
 

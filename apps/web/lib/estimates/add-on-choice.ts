@@ -22,7 +22,7 @@ export function chosenAddOns(rawScope: unknown, ids: string[]): ApprovedAddOn[] 
   );
   for (const id of wanted) {
     if (!priced.some((a) => a.id === id)) {
-      throw Object.assign(new Error("That add-on is not part of this quote"), { code: "ADD_ON_INVALID" });
+      throw Object.assign(new Error("That add-on is not part of this estimate"), { code: "ADD_ON_INVALID" });
     }
   }
   return priced.filter((a) => wanted.has(a.id)).map((a) => ({ id: a.id, label: a.label, price_cents: a.price_cents }));
@@ -53,7 +53,7 @@ export async function recordAddOnChoice(client: PoolClient, estimateId: string, 
   );
   const est = rows[0];
   if (!est || est.presentation_mode === "multi_option") {
-    throw Object.assign(new Error("That add-on is not part of this quote"), { code: "ADD_ON_INVALID" });
+    throw Object.assign(new Error("That add-on is not part of this estimate"), { code: "ADD_ON_INVALID" });
   }
   const addOns = chosenAddOns(est.prepared_scope, ids);
   const { rows: lines } = await client.query<{ total_cents: number; line_item_type: string; visible_to_customer: boolean }>(

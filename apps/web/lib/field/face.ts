@@ -8,7 +8,7 @@ export function fieldPlaceTitle(
   const street = address?.trim();
   if (street) return street;
   if (client) return client;
-  return "This house";
+  return "This property";
 }
 
 export function fieldPurpose(jobTitle: string | null | undefined, fallback = "Visit"): string {

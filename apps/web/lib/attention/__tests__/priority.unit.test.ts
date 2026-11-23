@@ -8,7 +8,7 @@ function item(label: string, tone: AttentionTone, detail = "", count = 1) {
 describe("attentionPriority", () => {
   it("puts a late promise ahead of overdue money, and overdue money ahead of a receipt", () => {
     const promise = item("Customer Promises", "danger", "Open captured promises");
-    const money = item("Collect overdue bills", "danger", "$2,850 outstanding");
+    const money = item("Collect overdue invoices", "danger", "$2,850 outstanding");
     const receipt = item("Receipts not on a job", "warning", "Today’s receipts still unattached");
 
     expect(attentionPriority(promise).rank).toBeLessThan(attentionPriority(money).rank);
@@ -24,9 +24,9 @@ describe("attentionPriority", () => {
   });
 
   it("raises an expired quote above a quote that is only waiting", () => {
-    const expired = item("Follow up quotes", "warning", "2 expired — revise and resend");
-    const waiting = item("Follow up quotes", "warning", "Sent estimates awaiting response");
-    expect(attentionPriority(expired).reason).toBe("A quote expired");
+    const expired = item("Follow up estimates", "warning", "2 expired — revise and resend");
+    const waiting = item("Follow up estimates", "warning", "Sent estimates awaiting response");
+    expect(attentionPriority(expired).reason).toBe("An estimate expired");
     expect(attentionPriority(expired).rank).toBeLessThan(attentionPriority(waiting).rank);
   });
 });
@@ -36,13 +36,13 @@ describe("compareNeedsAttention", () => {
     const items = [
       item("Receipts not on a job", "warning", "", 4),
       item("Clear exception lanes", "warning", "", 1),
-      item("Collect overdue bills", "danger", "$100 outstanding", 1),
+      item("Collect overdue invoices", "danger", "$100 outstanding", 1),
       item("Customer Promises", "warning", "", 1),
       item("Miles not on a job", "warning", "", 9),
     ];
     expect(items.sort(compareNeedsAttention).map((row) => row.label)).toEqual([
       "Customer Promises",
-      "Collect overdue bills",
+      "Collect overdue invoices",
       "Clear exception lanes",
       "Receipts not on a job",
       "Miles not on a job",

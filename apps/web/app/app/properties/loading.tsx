@@ -3,7 +3,7 @@ import { PageContainer, PageHeader, Card, SkeletonCard, SkeletonText } from "@/c
 export default function PropertiesLoading() {
   return (
     <PageContainer>
-      <PageHeader title="Houses" subtitle="Loading…" />
+      <PageHeader title="Properties" subtitle="Loading…" />
       <SkeletonCard />
       <Card><SkeletonText lines={4} /></Card>
     </PageContainer>

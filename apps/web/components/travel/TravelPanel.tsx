@@ -496,7 +496,7 @@ export function TravelPanel({
                 type="text"
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
-                placeholder="e.g. Preferred client multi-day package"
+                placeholder="e.g. Preferred customer multi-day package"
                 data-testid="travel-override-reason"
               />
             </label>

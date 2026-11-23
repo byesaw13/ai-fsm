@@ -68,8 +68,8 @@ const STATE_DETAILS: Record<RequestStatus, string> = {
   duplicate: "Matches another request and should not be converted again.",
   reviewed: "Classified — continue with the selected path.",
   assessment_booked: "Site visit is on the calendar — measure, then estimate.",
-  estimated: "Estimate is out — waiting for client accept or decline.",
-  converted: "Won — linked to a job (quote accepted or work booked).",
+  estimated: "Estimate is out — waiting for customer accept or decline.",
+  converted: "Won — linked to a job (estimate accepted or work booked).",
   lost: "Did not convert — declined, chose elsewhere, or went idle.",
   cancelled: "Closed by staff (spam / not a lead) and retained in history.",
 };
@@ -105,7 +105,7 @@ const OUTCOME_META: Record<
 > = {
   choose_path: {
     label: "Choose how to proceed",
-    detail: "Book a look, book work, or remote quote — required before the next step.",
+    detail: "Book a look, book work, or remote estimate — required before the next step.",
     destination: "Path",
   },
   create_estimate: {

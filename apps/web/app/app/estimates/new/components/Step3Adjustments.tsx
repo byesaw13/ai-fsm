@@ -122,7 +122,7 @@ export function Step3Adjustments({
       <div>
         <Textarea
           id="scope-assumptions"
-          label="Scope assumptions (visible to client)"
+          label="Scope assumptions (visible to customer)"
           value={scopeAssumptions}
           onChange={(e) => setScopeAssumptions(e.target.value)}
           placeholder="Conditions this estimate relies on — auto-filled from service type. Edit to match this job."
@@ -130,7 +130,7 @@ export function Step3Adjustments({
           disabled={pending}
         />
         <p style={{ marginTop: "var(--space-1)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-          Shown on the estimate and client portal. Documents conditions assumed — protects scope if conditions differ on arrival.
+          Shown on the estimate and customer portal. Documents conditions assumed — protects scope if conditions differ on arrival.
         </p>
       </div>
 
@@ -219,10 +219,10 @@ export function Step3Adjustments({
 
       <Textarea
         id="notes"
-        label="Client notes (optional)"
+        label="Customer notes (optional)"
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
-        placeholder="Visible to the client on the estimate"
+        placeholder="Visible to the customer on the estimate"
         rows={3}
         disabled={pending}
       />

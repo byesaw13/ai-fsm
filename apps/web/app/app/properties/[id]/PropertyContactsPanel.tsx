@@ -116,7 +116,7 @@ export function PropertyContactsPanel({
         <div className="p7-form-grid p7-form-grid-2" style={{ marginTop: "var(--space-4)" }}>
           <Select
             id="property-contact-client"
-            label="Registered client"
+            label="Registered customer"
             value={form.client_id ?? ""}
             placeholder="Use an external contact"
             options={clients.map((client) => ({ value: client.id, label: client.name }))}

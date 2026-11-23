@@ -194,7 +194,7 @@ describe("buildInvoicePdf", () => {
 });
 
 describe("PDF voice", () => {
-  it("labels a quote as Quote, not Estimate", async () => {
+  it("labels an estimate as Estimate, not Quote (owner 2026-11-22)", async () => {
     const bytes = await buildEstimatePdf({
       estimateRef: "Q-1",
       status: "sent",
@@ -205,8 +205,8 @@ describe("PDF voice", () => {
       lineItems: [{ description: "Assemble bed", quantity: 1, unitPriceCents: 10000, totalCents: 10000 }],
     });
     const text = pdfDrawnText(bytes);
-    expect(text).toContain("Quote");
-    expect(text.split("\n")).not.toContain("Estimate");
+    expect(text).toContain("Estimate");
+    expect(text.split("\n")).not.toContain("Quote");
   });
 
   it("embeds a photo recap section on the bill", async () => {

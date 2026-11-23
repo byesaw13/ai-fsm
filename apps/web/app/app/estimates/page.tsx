@@ -67,7 +67,7 @@ const ESTIMATE_FILTERS: FilterDef[] = [
     name: "q",
     type: "text",
     label: "Search",
-    placeholder: "Client name or notes…",
+    placeholder: "Customer name or notes…",
   },
   {
     name: "status",
@@ -208,7 +208,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="Quotes"
+        title="Estimates"
         subtitle={`${estimates.length} ${hasFilter ? "matching" : "total"}`}
         actions={
           canCreate ? (
@@ -225,7 +225,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
                 variant="primary"
                 data-testid="create-estimate-btn"
               >
-                + New Quote
+                + New Estimate
               </LinkButton>
             </div>
           ) : undefined
@@ -246,7 +246,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
             color: "var(--fg)",
           }}
         >
-          Showing sent estimates awaiting client response.{" "}
+          Showing sent estimates awaiting customer response.{" "}
           <Link href={"/app/estimates" as Route} style={{ fontWeight: 600 }}>
             Clear filter
           </Link>
@@ -437,7 +437,7 @@ function EstimateItemCard({ est, showStatus = false }: { est: EstimateRow; showS
   return (
     <ItemCard
       href={`/app/estimates/${est.id}`}
-      title={`${est.estimate_number ? `${est.estimate_number} · ` : ""}${est.client_name ?? "Unknown client"}`}
+      title={`${est.estimate_number ? `${est.estimate_number} · ` : ""}${est.client_name ?? "Unknown customer"}`}
       meta={meta}
       overdue={!!(isExpired && est.status === "sent")}
       actions={

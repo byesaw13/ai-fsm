@@ -649,7 +649,7 @@ export default async function VisitDetailPage({
               ? `/app/jobs/${visit.job_id}`
               : "/app/visits"
         }
-        backLabel={visit.property_address ?? visit.job_title ?? "House"}
+        backLabel={visit.property_address ?? visit.job_title ?? "Property"}
         actions={
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
             {!isRepairFlow && checklistItems.length > 0 &&
@@ -731,7 +731,7 @@ export default async function VisitDetailPage({
               {currentStatus === "scheduled" && (
                 <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
                   <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                    Optional — let the client know you&apos;re heading over:
+                    Optional — let the customer know you&apos;re heading over:
                   </p>
                   <OnMyWayButton visitId={visit.id} />
                 </div>
@@ -780,7 +780,7 @@ export default async function VisitDetailPage({
           {/* ── Property context — shown for active visits with a property ── */}
           {shouldShowPropertyContext(currentStatus) && visit.job_property_id && (
             showMore("property_context") ? (
-              <Disclosure title="More · house history">
+              <Disclosure title="More · property history">
                 <VisitPropertyContext
                   propertyId={visit.job_property_id}
                   propertyAddress={visit.property_address}
@@ -1115,7 +1115,7 @@ export default async function VisitDetailPage({
                   </div>
                 )}
                 {completionPacket.signature_url && (
-                  <div style={{ color: "#16a34a", fontWeight: 500 }}>Client signature on file</div>
+                  <div style={{ color: "#16a34a", fontWeight: 500 }}>Customer signature on file</div>
                 )}
                 {completionPacket.signature_waiver && !completionPacket.signature_url && (
                   <div style={{ color: "var(--fg-muted)" }}>Signature waived</div>
@@ -1220,10 +1220,10 @@ export default async function VisitDetailPage({
               )}
               {visit.job_property_id && (
                 <div className="p7-detail-row">
-                  <dt>House</dt>
+                  <dt>Property</dt>
                   <dd>
                     <LinkButton href={`/app/properties/${visit.job_property_id}`} variant="ghost" size="sm">
-                      {visit.property_address ?? "View house"} →
+                      {visit.property_address ?? "View property"} →
                     </LinkButton>
                   </dd>
                 </div>

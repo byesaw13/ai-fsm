@@ -217,7 +217,7 @@ function ensureSpace(ctx: Ctx, needed: number): void {
 }
 
 interface RenderInput {
-  docType: "Invoice" | "Quote";
+  docType: "Invoice" | "Estimate";
   ref: string;
   /**
    * Internal workflow status (draft/sent/partial/etc). Not shown on the
@@ -336,7 +336,7 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   }
 
   const rightX = PAGE_W - MARGIN;
-  // Title case to match HTML print ("Invoice" / "Quote")
+  // Title case to match HTML print ("Invoice" / "Estimate")
   rightText(input.docType, rightX, ctx.y, 22, bold, INK);
   rightText(input.ref, rightX, ctx.y - 18, 10, font, MUTED);
   rightText(`Document standard: ${DOCUMENT_STANDARD_VERSION}`, rightX, ctx.y - 32, 8, font, MUTED);
@@ -854,12 +854,12 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
   const site = (d.branding?.website?.trim() || DEFAULT_BRAND_URL).replace(/^https?:\/\//, "");
   const terms =
     d.branding?.estimateTerms?.trim() ||
-    "This quote is provided in good faith and may be adjusted if scope or conditions change.";
+    "This estimate is provided in good faith and may be adjusted if scope or conditions change.";
   const footer = `Questions? Reach us at ${site}. Thank you for considering us.`;
 
   return renderDocument({
     optionGroups: multiOption ? d.options : undefined,
-    docType: "Quote",
+    docType: "Estimate",
     ref: d.estimateRef,
     status: d.status,
     clientName: d.clientName,

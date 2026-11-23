@@ -2,7 +2,7 @@
 
 The owner map at `/app/map` is the picture of the product. It is how a change is requested, and how a later change stays visible.
 
-The job path is eight bubbles: Request, Person, House, Quote, Job, Visit, Bill, House history. Today, Desk, and the customer page are ways of looking at those bubbles. Platform work sits under the floor, not on the path.
+The job path is eight bubbles: Request, Customer, Property, Estimate, Job, Visit, Invoice, Property history. Today, Desk, and the customer page are ways of looking at those bubbles. Platform work sits under the floor, not on the path.
 
 ## What a change must update
 

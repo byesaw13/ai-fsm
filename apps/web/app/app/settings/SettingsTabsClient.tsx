@@ -211,7 +211,7 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
             </p>
             <Card padding="default">
               <p style={{ margin: "0 0 var(--space-4)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                Check booking queue, client email dispatching, artificial intelligence integrations, Square status, and database configuration health.
+                Check booking queue, customer email dispatching, artificial intelligence integrations, Square status, and database configuration health.
               </p>
               <Link
                 href={"/app/settings/system-health" as unknown as Route}

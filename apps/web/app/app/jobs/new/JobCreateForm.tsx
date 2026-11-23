@@ -105,7 +105,7 @@ export function JobCreateForm({
     }
 
     if (!form.client_id) {
-      errs.client_id = "Client is required";
+      errs.client_id = "Customer is required";
     }
 
     setErrors(errs);
@@ -183,7 +183,7 @@ export function JobCreateForm({
 
         <Select
           id="client_id"
-          label="Client"
+          label="Customer"
           required
           value={form.client_id}
           onChange={(e) =>
@@ -191,9 +191,9 @@ export function JobCreateForm({
           }
           disabled={pending}
           error={errors.client_id}
-          hint={clients.length === 0 ? "No clients found. Create a client first." : undefined}
+          hint={clients.length === 0 ? "No customers found. Create a customer first." : undefined}
           options={clients.map((c) => ({ value: c.id, label: c.name }))}
-          placeholder="Select a client"
+          placeholder="Select a customer"
         />
 
         <Select
@@ -204,7 +204,7 @@ export function JobCreateForm({
           disabled={pending || !form.client_id}
           hint={
             form.client_id && filteredProperties.length === 0
-              ? "No properties for this client."
+              ? "No properties for this customer."
               : undefined
           }
           options={filteredProperties.map((p) => ({ value: p.id, label: p.address }))}

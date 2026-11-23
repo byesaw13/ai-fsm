@@ -38,12 +38,12 @@ describe("shortHouseLabel", () => {
 describe("companyDayStory", () => {
   it("tells Tuesday in shop English — houses, hours, miles, bills, coming back, leftovers", () => {
     const story = companyDayStory(TUESDAY);
-    expect(story.housesLine).toBe("3 houses. 5h 40m on jobs. 48 miles.");
-    expect(story.billsLine).toBe("Bills: 2 sent, 1 on Hold (Peter — tap to send).");
+    expect(story.housesLine).toBe("3 properties. 5h 40m on jobs. 48 miles.");
+    expect(story.billsLine).toBe("Invoices: 2 sent, 1 on Hold (Peter — tap to send).");
     expect(story.comingBackLine).toBe(
       "Coming back: Thu · 4 Ash · closet doors still in the truck.",
     );
-    expect(story.leftoversLine).toBe("Leftovers: Home Depot $87 — which house?");
+    expect(story.leftoversLine).toBe("Leftovers: Home Depot $87 — which property?");
     expect(story.isQuietNight).toBe(false);
   });
 
@@ -59,8 +59,8 @@ describe("companyDayStory", () => {
       unansweredStops: 0,
       clocksDisagree: false,
     });
-    expect(story.housesLine).toBe("No houses. 0m on jobs.");
-    expect(story.billsLine).toBe("Bills: none.");
+    expect(story.housesLine).toBe("No properties. 0m on jobs.");
+    expect(story.billsLine).toBe("Invoices: none.");
     expect(story.comingBackLine).toBe("Coming back: none.");
     expect(story.leftoversLine).toBe("Leftovers: none.");
     expect(story.isQuietNight).toBe(true);
@@ -74,7 +74,7 @@ describe("companyDayStory", () => {
       miles: 8,
       leftoverReceipts: [],
     });
-    expect(story.housesLine).toBe("1 house. 1h on jobs. 8 miles.");
+    expect(story.housesLine).toBe("1 property. 1h on jobs. 8 miles.");
   });
 
   it("names the house on Hold when there is no person name", () => {
@@ -84,7 +84,7 @@ describe("companyDayStory", () => {
       billsOnHold: [{ houseLabel: "12 Elm St", clientName: null }],
       leftoverReceipts: [],
     });
-    expect(story.billsLine).toBe("Bills: 1 on Hold (12 Elm — tap to send).");
+    expect(story.billsLine).toBe("Invoices: 1 on Hold (12 Elm — tap to send).");
   });
 
   it("does not name a house when more than one bill is on Hold", () => {
@@ -96,7 +96,7 @@ describe("companyDayStory", () => {
       ],
       leftoverReceipts: [],
     });
-    expect(story.billsLine).toBe("Bills: 2 sent, 2 on Hold.");
+    expect(story.billsLine).toBe("Invoices: 2 sent, 2 on Hold.");
   });
 
   it("drops start-here and the date when they are missing", () => {
@@ -153,7 +153,7 @@ describe("companyDayStory", () => {
       clocksDisagree: true,
     });
     expect(story.leftoversLine).toBe(
-      "Leftovers: Home Depot $87 — which house? · 1 stop still needs a reason. · The van and the clock don't match.",
+      "Leftovers: Home Depot $87 — which property? · 1 stop still needs a reason. · The van and the clock don't match.",
     );
     expect(story.isQuietNight).toBe(false);
   });
@@ -171,7 +171,7 @@ describe("companyDayStory", () => {
       story.leftoversLine,
     ].join(" ");
     expect(blob).not.toMatch(
-      /cogs|ar aging|opex|gps|odometer|segment|work order|visit candidate|invoice|accounts receivable/i,
+      /cogs|ar aging|opex|gps|odometer|segment|work order|visit candidate|accounts receivable/i,
     );
   });
 });

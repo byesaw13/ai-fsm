@@ -217,7 +217,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
   if (readyForCloseout || (stage === "completed" && jobStatus !== "completed")) {
     return {
       message: "Ready for closeout — complete & invoice when work is truly done",
-      detail: "Visits and work orders do not close the project. Complete & Invoice drafts the bill from actuals and opens it to send.",
+      detail: "Visits and work orders do not close the project. Complete & Invoice drafts the invoice from actuals and opens it to send.",
       actionLabel: "Complete & Invoice",
       actionHref: `/app/jobs/${jobId}#project-status`,
       secondary: { label: "Schedule another work day", href: `/app/jobs/${jobId}/visits/new` },
@@ -250,8 +250,8 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
 
   if (hasCompletedAssessmentVisit && estimateCount === 0) {
     return {
-      message: "Create quote from assessment",
-      actionLabel: "Create Quote",
+      message: "Create estimate from assessment",
+      actionLabel: "Create Estimate",
       actionHref: `/app/estimates/new?job_id=${jobId}${cq}&pricing_mode=flat_rate`,
       secondary: {
         label: "Or T&M from notes",
@@ -264,7 +264,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     return {
       message: "Pre-sale visit done without assessment packet",
       detail: "Create an estimate from notes, or schedule a full Assessment if more scope capture is needed.",
-      actionLabel: "Create Quote",
+      actionLabel: "Create Estimate",
       actionHref: `/app/estimates/new?job_id=${jobId}${cq}&pricing_mode=flat_rate`,
       secondary: {
         label: "Book a look",
@@ -390,7 +390,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
   if (hasCompletedPreSaleSiteVisit && estimateCount === 0) {
     return {
       message: "Create estimate from walkthrough",
-      actionLabel: "Create Quote",
+      actionLabel: "Create Estimate",
       actionHref: `/app/estimates/new?job_id=${jobId}${cq}&pricing_mode=flat_rate`,
       secondary: {
         label: "Or T&M from notes",
@@ -402,7 +402,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
   if (hasDraftWorkOrderWithPricing && estimateCount === 0) {
     return {
       message: "Create estimate from work order scope",
-      actionLabel: "Create Quote",
+      actionLabel: "Create Estimate",
       actionHref: `/app/estimates/new?job_id=${jobId}${cq}&pricing_mode=flat_rate`,
       secondary: {
         label: "Or T&M from notes",
@@ -449,7 +449,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
   if ((jobStatus === "draft" || jobStatus === "quoted" || stage === "estimate_needed") && estimateCount === 0) {
     return {
       message: "Next step: create an estimate",
-      actionLabel: "Create Quote",
+      actionLabel: "Create Estimate",
       actionHref: `/app/estimates/new?job_id=${jobId}${cq}&pricing_mode=flat_rate`,
       secondary: {
         label: "Or T&M from notes",

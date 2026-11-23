@@ -102,8 +102,8 @@ function universal(offset: number): ChecklistTemplateItem[] {
     { section: "Closing", item_key: "close_cleanup",     label: "Work area cleaned and debris removed",     sort_order: offset },
     { section: "Closing", item_key: "close_photos",      label: "Before and after photos captured",         sort_order: offset + 1 },
     { section: "Closing", item_key: "close_parts",       label: "All parts documented with receipt",        sort_order: offset + 2 },
-    { section: "Closing", item_key: "close_walkthrough", label: "Client walkthrough completed",             sort_order: offset + 3 },
-    { section: "Closing", item_key: "close_approval",    label: "Client verbal approval received",          sort_order: offset + 4 },
+    { section: "Closing", item_key: "close_walkthrough", label: "Customer walkthrough completed",             sort_order: offset + 3 },
+    { section: "Closing", item_key: "close_approval",    label: "Customer verbal approval received",          sort_order: offset + 4 },
     { section: "Closing", item_key: "close_secured",     label: "Property secured (doors, gates, garage)",  sort_order: offset + 5 },
   ];
 }
@@ -132,7 +132,7 @@ export const CLOSING_CHECKLIST_TEMPLATES: Record<string, ChecklistTemplateItem[]
 
   hvac: [
     { section: "Closing", item_key: "hvac_tested",         label: "System tested — heating/cooling confirmed working", sort_order: 0 },
-    { section: "Closing", item_key: "hvac_thermostat",     label: "Thermostat set back to client preference",         sort_order: 1 },
+    { section: "Closing", item_key: "hvac_thermostat",     label: "Thermostat set back to customer preference",         sort_order: 1 },
     { section: "Closing", item_key: "hvac_filter",         label: "Filter replaced and old filter disposed",          sort_order: 2 },
     { section: "Closing", item_key: "hvac_condensate",     label: "Condensate drain checked and clear",               sort_order: 3 },
     { section: "Closing", item_key: "hvac_panels",         label: "All access panels reinstalled and secured",        sort_order: 4 },
@@ -155,7 +155,7 @@ export const CLOSING_CHECKLIST_TEMPLATES: Record<string, ChecklistTemplateItem[]
     { section: "Closing", item_key: "paint_covers",        label: "Outlet covers and switch plates reinstalled",      sort_order: 2 },
     { section: "Closing", item_key: "paint_furniture",     label: "Furniture and fixtures moved back",                sort_order: 3 },
     { section: "Closing", item_key: "paint_dropcloths",    label: "Drop cloths and tape removed and disposed",        sort_order: 4 },
-    { section: "Closing", item_key: "paint_cans",          label: "Paint stored or disposed per client preference",   sort_order: 5 },
+    { section: "Closing", item_key: "paint_cans",          label: "Paint stored or disposed per customer preference",   sort_order: 5 },
     ...universal(10),
   ],
 
@@ -172,7 +172,7 @@ export const CLOSING_CHECKLIST_TEMPLATES: Record<string, ChecklistTemplateItem[]
     { section: "Closing", item_key: "floor_seams",         label: "All seams tight and transitions installed",        sort_order: 0 },
     { section: "Closing", item_key: "floor_gaps",          label: "Expansion gaps maintained at perimeter",           sort_order: 1 },
     { section: "Closing", item_key: "floor_squeaks",       label: "Floor tested — no squeaks or loose areas",         sort_order: 2 },
-    { section: "Closing", item_key: "floor_cure",          label: "Client informed of adhesive/grout cure time",      sort_order: 3 },
+    { section: "Closing", item_key: "floor_cure",          label: "Customer informed of adhesive/grout cure time",      sort_order: 3 },
     { section: "Closing", item_key: "floor_packaging",     label: "Debris and packaging removed",                     sort_order: 4 },
     ...universal(10),
   ],
@@ -190,8 +190,8 @@ export const CLOSING_CHECKLIST_TEMPLATES: Record<string, ChecklistTemplateItem[]
     { section: "Closing", item_key: "appl_powered",        label: "Appliance powers on and tested through full cycle", sort_order: 0 },
     { section: "Closing", item_key: "appl_connections",    label: "All water/gas/electrical connections verified",    sort_order: 1 },
     { section: "Closing", item_key: "appl_level",          label: "Appliance leveled and secured in place",           sort_order: 2 },
-    { section: "Closing", item_key: "appl_old_unit",       label: "Old appliance removed or noted as client's responsibility", sort_order: 3 },
-    { section: "Closing", item_key: "appl_docs",           label: "Manufacturer documentation left with client",      sort_order: 4 },
+    { section: "Closing", item_key: "appl_old_unit",       label: "Old appliance removed or noted as customer's responsibility", sort_order: 3 },
+    { section: "Closing", item_key: "appl_docs",           label: "Manufacturer documentation left with customer",      sort_order: 4 },
     ...universal(10),
   ],
 

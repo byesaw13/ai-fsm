@@ -206,7 +206,7 @@ export function NewInvoiceForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!clientId) { setError("Please select a client."); return; }
+    if (!clientId) { setError("Please select a customer."); return; }
     if (billingContext === "realtor_sponsored" && (!propertyId || !sponsoredPurpose)) {
       setError("Select a service property and sponsored purpose.");
       return;
@@ -308,7 +308,7 @@ export function NewInvoiceForm({
             <div style={{ flex: 1 }}>
               <Select
                 id="client_id"
-                label={billingContext === "realtor_sponsored" ? "Payer client" : "Client"}
+                label={billingContext === "realtor_sponsored" ? "Payer customer" : "Customer"}
                 required
                 value={clientId}
                 onChange={(e) => {
@@ -319,10 +319,10 @@ export function NewInvoiceForm({
                 }}
                 disabled={pending}
                 options={clientList.map((c) => ({ value: c.id, label: c.name }))}
-                placeholder="Select a client"
+                placeholder="Select a customer"
                 hint={
                   clientList.length === 0
-                    ? "No clients yet — use + New to add one."
+                    ? "No customers yet — use + New to add one."
                     : undefined
                 }
               />
@@ -356,7 +356,7 @@ export function NewInvoiceForm({
           placeholder="None"
           hint={
             clientId && filteredJobs.length === 0
-              ? "No jobs for this client."
+              ? "No jobs for this customer."
               : undefined
           }
         />

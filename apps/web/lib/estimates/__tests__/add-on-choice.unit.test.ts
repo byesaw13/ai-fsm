@@ -26,8 +26,8 @@ describe("chosenAddOns (TASK-225)", () => {
   });
 
   it("refuses an add-on that is unknown or has no price", () => {
-    expect(() => chosenAddOns(SCOPE, ["a9"])).toThrow(/not part of this quote/);
-    expect(() => chosenAddOns(SCOPE, ["a3"])).toThrow(/not part of this quote/);
-    expect(() => chosenAddOns(null, ["a1"])).toThrow(/not part of this quote/);
+    expect(() => chosenAddOns(SCOPE, ["a9"])).toThrow(/not part of this estimate/);
+    expect(() => chosenAddOns(SCOPE, ["a3"])).toThrow(/not part of this estimate/);
+    expect(() => chosenAddOns(null, ["a1"])).toThrow(/not part of this estimate/);
   });
 });

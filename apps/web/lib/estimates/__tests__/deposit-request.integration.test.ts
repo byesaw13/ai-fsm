@@ -92,7 +92,7 @@ describe.skipIf(!RUN)("deposit request and scheduling on approval", () => {
     // The invoice Send button uses the same send path: it reports why it could not send.
     const manual = await api("POST", `/api/v1/invoices/${invoice.id}/send`);
     expect(manual.status).toBe(422);
-    expect(manual.data.error.message).toBe("Client has no email address on file");
+    expect(manual.data.error.message).toBe("Customer has no email address on file");
   });
 
   it("a partial payment leaves it waiting; full payment moves it to ready to book", async () => {

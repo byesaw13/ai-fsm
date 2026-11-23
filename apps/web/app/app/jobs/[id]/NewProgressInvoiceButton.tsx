@@ -43,7 +43,7 @@ export function NewProgressInvoiceButton({ jobId }: { jobId: string }) {
       disabled={pending}
       data-testid="new-progress-invoice-btn"
     >
-      {pending ? "Creating…" : "Bill progress payment (⅓)"}
+      {pending ? "Creating…" : "Invoice progress payment (⅓)"}
     </button>
   );
 }

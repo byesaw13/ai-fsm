@@ -107,7 +107,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
       if (ownerClient.rowCount === 0) {
         await client.query("ROLLBACK");
         return NextResponse.json(
-          { error: { code: "NOT_FOUND", message: "Client not found", traceId: session.traceId } },
+          { error: { code: "NOT_FOUND", message: "Customer not found", traceId: session.traceId } },
           { status: 404 }
         );
       }

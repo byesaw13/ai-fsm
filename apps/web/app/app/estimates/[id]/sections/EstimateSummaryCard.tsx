@@ -100,7 +100,7 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
               <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)", color: grossProfitCents > 0 ? "var(--status-success)" : "var(--status-error)" }}>
                 {formatDollars(grossProfitCents)}
               </p>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{grossMarginPct}% of Quote</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{grossMarginPct}% of Estimate</span>
             </div>
           </div>
         </div>
@@ -116,7 +116,7 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
             {/* Fixed Rate Column */}
             <div style={{ padding: "var(--space-2)", borderRadius: 6, border: "1px solid var(--accent)", background: "color-mix(in srgb, var(--accent) 4%, transparent)" }}>
-              <span style={{ fontWeight: 700, fontSize: "var(--text-xs)", color: "var(--accent)" }}>📌 FIXED RATE (Current Quote)</span>
+              <span style={{ fontWeight: 700, fontSize: "var(--text-xs)", color: "var(--accent)" }}>📌 FIXED RATE (Current Estimate)</span>
               <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}>{formatDollars(totalQuoteCents)}</p>
               <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong>{formatDollars(grossProfitCents)}</strong> ({grossMarginPct}% margin)</p>
             </div>
@@ -130,7 +130,7 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
           </div>
 
           <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-secondary)" }}>
-            💡 <strong>Recommendation:</strong> Fixed Rate yields {formatDollars(grossProfitCents - tmGrossProfitCents)} additional margin while giving the client an exact guaranteed price.
+            💡 <strong>Recommendation:</strong> Fixed Rate yields {formatDollars(grossProfitCents - tmGrossProfitCents)} additional margin while giving the customer an exact guaranteed price.
           </p>
         </div>
       )}
@@ -186,7 +186,7 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
                         <td style={{ padding: "3px 8px 3px 0" }}>{m.wall_sqft.toFixed(0)}</td>
                         <td style={{ padding: "3px 8px 3px 0" }}>{room.include_ceiling ? `${m.ceiling_sqft.toFixed(0)} sqft` : "—"}</td>
                         <td style={{ padding: "3px 8px 3px 0" }}>{room.include_trim ? `${m.trim_lf.toFixed(0)} LF` : "—"}</td>
-                        <td style={{ padding: "3px 8px 3px 0" }}>{room.paint_supplied_by === "customer" ? "Client" : "Dovetails"}</td>
+                        <td style={{ padding: "3px 8px 3px 0" }}>{room.paint_supplied_by === "customer" ? "Customer" : "Dovetails"}</td>
                         <td style={{ padding: "3px 8px 3px 0", textTransform: "capitalize" }}>{room.paint_supplied_by === "customer" ? "—" : room.paint_grade}</td>
                         <td style={{ padding: "3px 8px 3px 0", textTransform: "capitalize" }}>{room.prep_level}</td>
                       </tr>

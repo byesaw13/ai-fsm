@@ -118,7 +118,7 @@ export function CompanyForm({ initialName, initialSettings }: Props) {
           data-testid="invoice-terms"
         />
         <small style={{ color: "var(--fg-muted)" }}>
-          Shown on invoice PDFs, print, and the client portal. Leave blank to use the
+          Shown on invoice PDFs, print, and the customer portal. Leave blank to use the
           built-in default (due upon completion, late fees, payment methods, deposit applied,
           warranty). Use <code>{"{deposit_percent}"}</code> if needed.
         </small>

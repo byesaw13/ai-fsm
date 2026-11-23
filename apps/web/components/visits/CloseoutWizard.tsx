@@ -166,14 +166,14 @@ export function CloseoutWizard({
       if (kind === "done" && invoiceId && sendBill && canSend) {
         const sent = await fetch(`/api/v1/invoices/${invoiceId}/send`, { method: "POST" });
         if (sent.ok) {
-          toast.success("Bill sent");
+          toast.success("Invoice sent");
         } else {
-          toast.success("Draft ready — send from the bill");
+          toast.success("Draft ready — send from the invoice");
           router.push(`/app/invoices/${invoiceId}?deliver=1` as never);
           return;
         }
       } else if (kind === "done" && invoiceId) {
-        toast.success("Bill held as draft");
+        toast.success("Invoice held as draft");
       } else {
         toast.success(kind === "done" ? "Job closed" : "Day logged — coming back");
       }

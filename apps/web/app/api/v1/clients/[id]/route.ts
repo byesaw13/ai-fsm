@@ -65,7 +65,7 @@ export const GET = withRole(["owner", "admin"], async (_request: NextRequest, se
 
   if (!row) {
     return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "Client not found", traceId: session.traceId } },
+      { error: { code: "NOT_FOUND", message: "Customer not found", traceId: session.traceId } },
       { status: 404 }
     );
   }
@@ -104,7 +104,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     if (before.rowCount === 0) {
       await client.query("ROLLBACK");
       return NextResponse.json(
-        { error: { code: "NOT_FOUND", message: "Client not found", traceId: session.traceId } },
+        { error: { code: "NOT_FOUND", message: "Customer not found", traceId: session.traceId } },
         { status: 404 }
       );
     }
@@ -118,7 +118,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
       if (mainProperty.rowCount === 0) {
         await client.query("ROLLBACK");
         return NextResponse.json(
-          { error: { code: "VALIDATION_ERROR", message: "Main property must use this client as its primary service contact", traceId: session.traceId } },
+          { error: { code: "VALIDATION_ERROR", message: "Main property must use this customer as its primary service contact", traceId: session.traceId } },
           { status: 422 }
         );
       }
@@ -217,7 +217,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     await client.query("ROLLBACK");
     logger.error("[clients PATCH]", err, { traceId: session.traceId, clientId: id });
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Failed to update client", traceId: session.traceId } },
+      { error: { code: "INTERNAL_ERROR", message: "Failed to update customer", traceId: session.traceId } },
       { status: 500 }
     );
   } finally {
@@ -244,7 +244,7 @@ export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, 
     if (existing.rowCount === 0) {
       await client.query("ROLLBACK");
       return NextResponse.json(
-        { error: { code: "NOT_FOUND", message: "Client not found", traceId: session.traceId } },
+        { error: { code: "NOT_FOUND", message: "Customer not found", traceId: session.traceId } },
         { status: 404 }
       );
     }
@@ -279,7 +279,7 @@ export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, 
         {
           error: {
             code: "DEPENDENT_RECORDS",
-            message: `Cannot delete client "${existing.rows[0].name}" — ${blocked.join(", ")} still reference it.`,
+            message: `Cannot delete customer "${existing.rows[0].name}" — ${blocked.join(", ")} still reference it.`,
             traceId: session.traceId,
           },
         },
@@ -304,7 +304,7 @@ export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, 
     await client.query("ROLLBACK");
     logger.error("[clients DELETE]", err, { traceId: session.traceId, clientId: id });
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Failed to delete client", traceId: session.traceId } },
+      { error: { code: "INTERNAL_ERROR", message: "Failed to delete customer", traceId: session.traceId } },
       { status: 500 }
     );
   } finally {

@@ -546,7 +546,7 @@ export async function linkMaterialExpensesToJob(
       });
     }
     if (row.client_id && row.client_id !== job.client_id) {
-      throw Object.assign(new Error("Expense belongs to a different client"), {
+      throw Object.assign(new Error("Expense belongs to a different customer"), {
         code: "EXPENSE_ON_OTHER_CLIENT",
       });
     }

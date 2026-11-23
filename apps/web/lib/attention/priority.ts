@@ -12,16 +12,16 @@ export type AttentionPriority = {
  */
 const RANK_BY_LABEL: Record<string, AttentionPriority> = {
   "Customer Promises": { rank: 20, reason: "Customer promise" },
-  "Collect overdue bills": { rank: 30, reason: "Money is late" },
+  "Collect overdue invoices": { rank: 30, reason: "Money is late" },
   "Collect deposits": { rank: 40, reason: "Money to collect" },
-  "Hold — send the bill": { rank: 50, reason: "Finished work is not billed" },
-  "Draft bills": { rank: 60, reason: "A bill is ready to send" },
+  "Hold — send the invoice": { rank: 50, reason: "Finished work is not billed" },
+  "Draft invoices": { rank: 60, reason: "An invoice is ready to send" },
   "Clear exception lanes": { rank: 80, reason: "Work is blocked" },
   "Order materials": { rank: 90, reason: "Materials are needed before the visit" },
   "Open, no next visit": { rank: 100, reason: "Nothing is on the calendar" },
   "Schedule jobs": { rank: 100, reason: "Nothing is on the calendar" },
   "Review requests": { rank: 110, reason: "A request is waiting" },
-  "Follow up quotes": { rank: 120, reason: "A quote is waiting on the customer" },
+  "Follow up estimates": { rank: 120, reason: "An estimate is waiting on the customer" },
   "Receipts not on a job": { rank: 150, reason: "Receipt is not attached" },
   "Miles not on a job": { rank: 160, reason: "Miles are not tagged" },
   "Customer reports to send": { rank: 170, reason: "The customer has not seen the report" },
@@ -35,8 +35,8 @@ export function attentionPriority(item: {
   if (item.label === "Customer Promises" && item.tone === "danger") {
     return { rank: 10, reason: "A customer promise is late" };
   }
-  if (item.label === "Follow up quotes" && /expired/i.test(item.detail)) {
-    return { rank: 70, reason: "A quote expired" };
+  if (item.label === "Follow up estimates" && /expired/i.test(item.detail)) {
+    return { rank: 70, reason: "An estimate expired" };
   }
   return RANK_BY_LABEL[item.label] ?? { rank: 200, reason: "Needs a look" };
 }

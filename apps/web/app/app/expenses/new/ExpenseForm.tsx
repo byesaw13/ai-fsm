@@ -288,7 +288,7 @@ export function ExpenseForm({
     })),
   ];
   const clientOptions = [
-    { value: "", label: "No client" },
+    { value: "", label: "No customer" },
     ...clients.map((c) => ({ value: c.id, label: c.name })),
   ];
 
@@ -531,7 +531,7 @@ export function ExpenseForm({
       {clients.length > 0 && (
         <Select
           id="client_id"
-          label="Link to Client (optional)"
+          label="Link to Customer (optional)"
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
           options={clientOptions}

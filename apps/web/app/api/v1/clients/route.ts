@@ -165,7 +165,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     await client.query("ROLLBACK");
     logger.error("[clients POST]", err, { traceId: session.traceId });
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Failed to create client", traceId: session.traceId } },
+      { error: { code: "INTERNAL_ERROR", message: "Failed to create customer", traceId: session.traceId } },
       { status: 500 }
     );
   } finally {

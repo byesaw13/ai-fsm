@@ -178,7 +178,7 @@ export function travelTimeHours(minutes: number): {
 export const PERSON_HOURS_LABEL = "Person-hours";
 export const PERSON_HOURS_HINT = "2 painters x 8 h = 16 h";
 export const HOURS_MISSING_LABEL = "Hours missing";
-export const OPTION_BASELINE_NOTE = "Baseline not available for option quotes yet";
+export const OPTION_BASELINE_NOTE = "Baseline not available for option estimates yet";
 
 export function quickEstimateCanSend(input: {
   hoursLow: string;

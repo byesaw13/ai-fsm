@@ -805,7 +805,7 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
                             Materials subtotal
                           </span>
                           <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: "var(--space-1)" }}>
-                            + 15% handling billed to client
+                            + 15% handling billed to customer
                           </span>
                         </div>
                         <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--accent)" }}>

@@ -283,14 +283,14 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
     <PageContainer>
       <Breadcrumbs
         items={[
-          { href: "/app/estimates", label: "Quotes" },
+          { href: "/app/estimates", label: "Estimates" },
           { label: "New estimate" },
         ]}
       />
-      <PageHeader title="New Quote" backHref="/app/estimates" backLabel="Quotes" />
+      <PageHeader title="New Estimate" backHref="/app/estimates" backLabel="Estimates" />
       <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/estimates" />
       <p style={{ margin: "0 0 var(--space-4)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-        Short steps — defaults from the client, property, and price book when available. Save draft anytime.
+        Short steps — defaults from the customer, property, and price book when available. Save draft anytime.
       </p>
       {assessmentPathWarning && (
         <Card
@@ -325,7 +325,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
                 {walkthroughContext.job_title ?? "Site visit"}
               </h2>
               <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                {walkthroughContext.client_name ?? "Client"}{walkthroughContext.property_address ? ` · ${walkthroughContext.property_address}` : ""}
+                {walkthroughContext.client_name ?? "Customer"}{walkthroughContext.property_address ? ` · ${walkthroughContext.property_address}` : ""}
               </p>
             </div>
             <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>

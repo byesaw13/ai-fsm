@@ -436,7 +436,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                   ["online", "Found us online"],
                   ["friend_neighbor", "Friend or neighbor"],
                   ["realtor", "Realtor referral"],
-                  ["repeat", "Previous client"],
+                  ["repeat", "Previous customer"],
                   ["other", "Other"],
                 ] as const).map(([value, label]) => (
                   <button

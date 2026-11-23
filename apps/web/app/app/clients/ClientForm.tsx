@@ -155,7 +155,7 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
         setPending(false);
         return;
       }
-      toast.success(mode === "create" ? `Client created: ${form.name.trim()}` : "Client updated");
+      toast.success(mode === "create" ? `Customer created: ${form.name.trim()}` : "Customer updated");
       const nextId = data.data?.id ?? clientId;
       if (mode === "create" && nextId) {
         router.push((`/app/clients/${nextId}`) as Route);
@@ -180,7 +180,7 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
       <div className="p7-form-grid p7-form-grid-2">
         <Input
           id="name"
-          label="Client Name"
+          label="Customer Name"
           required
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -238,7 +238,7 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
             >
               <option value="standard">Standard Customer</option>
               <option value="realtor">Realtor</option>
-              <option value="preferred">Preferred Client</option>
+              <option value="preferred">Preferred Customer</option>
               <option value="referral_partner">Referral Partner</option>
             </select>
           </div>
@@ -398,7 +398,7 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
       <div className="p7-form-actions">
         <LinkButton href={cancelHref} variant="secondary">Cancel</LinkButton>
         <Button type="submit" loading={pending} disabled={pending} data-testid={`submit-client-${mode}-btn`}>
-          {mode === "create" ? "Create Client" : "Save Changes"}
+          {mode === "create" ? "Create Customer" : "Save Changes"}
         </Button>
       </div>
     </form>

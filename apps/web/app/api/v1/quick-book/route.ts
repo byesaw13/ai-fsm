@@ -86,7 +86,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       if (!rows[0]) {
         await client.query("ROLLBACK");
         return NextResponse.json(
-          { error: { code: "NOT_FOUND", message: "Client not found", traceId: session.traceId } },
+          { error: { code: "NOT_FOUND", message: "Customer not found", traceId: session.traceId } },
           { status: 404 }
         );
       }
@@ -132,14 +132,14 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       if (!rows[0]) {
         await client.query("ROLLBACK");
         return NextResponse.json(
-          { error: { code: "NOT_FOUND", message: "House not found", traceId: session.traceId } },
+          { error: { code: "NOT_FOUND", message: "Property not found", traceId: session.traceId } },
           { status: 404 },
         );
       }
       if (rows[0].client_id !== clientId) {
         await client.query("ROLLBACK");
         return NextResponse.json(
-          { error: { code: "VALIDATION_ERROR", message: "House does not belong to this client", traceId: session.traceId } },
+          { error: { code: "VALIDATION_ERROR", message: "Property does not belong to this customer", traceId: session.traceId } },
           { status: 422 },
         );
       }

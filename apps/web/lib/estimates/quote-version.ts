@@ -7,7 +7,7 @@
  */
 
 export const STALE_QUOTE_MESSAGE =
-  "This quote changed since you opened it. Reload to see the latest before saving.";
+  "This estimate changed since you opened it. Reload to see the latest before saving.";
 
 /** Instant in milliseconds, or null when the value is not a timestamp. */
 function quoteVersionMs(value: unknown): number | null {

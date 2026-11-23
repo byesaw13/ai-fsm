@@ -85,8 +85,8 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
   if (client_id) currentValues.client_id = client_id;
 
   const filters: FilterDef[] = [
-    { name: "q", type: "text", label: "Search", placeholder: "Address, property, client…" },
-    { name: "client_id", type: "select", label: "Client", options: clients.map((c) => ({ value: c.id, label: c.name })) },
+    { name: "q", type: "text", label: "Search", placeholder: "Address, property, customer…" },
+    { name: "client_id", type: "select", label: "Customer", options: clients.map((c) => ({ value: c.id, label: c.name })) },
   ];
 
   const canCreateJobs = canTransitionJob(session.role);
@@ -105,7 +105,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
     },
     {
       key: "client",
-      label: "Client",
+      label: "Customer",
       render: (row) => row.client_id ? (
         <Link href={`/app/clients/${row.client_id}` as Route} style={{ color: "var(--accent)", textDecoration: "none" }}>{row.client_name}</Link>
       ) : <span style={{ color: "var(--fg-muted)" }}>No primary contact</span>,
@@ -134,7 +134,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="Houses"
+        title="Properties"
         subtitle={`${properties.length} propert${properties.length === 1 ? "y" : "ies"}`}
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
@@ -144,14 +144,14 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
           </div>
         }
       />
-      <HubSubnav hub="People" links={PEOPLE_HUB_LINKS} pathname="/app/properties" />
+      <HubSubnav hub="Customers" links={PEOPLE_HUB_LINKS} pathname="/app/properties" />
 
       <FilterBar filters={filters} baseHref="/app/properties" currentValues={currentValues} />
 
       {properties.length === 0 ? (
         <EmptyState
           title={q || client_id ? "No properties match your filters" : "No properties yet"}
-          description={q || client_id ? "Try adjusting filters or search." : "Add a property for a client to track service locations."}
+          description={q || client_id ? "Try adjusting filters or search." : "Add a property for a customer to track service locations."}
           action={<LinkButton href="/app/properties/new">Create First Property</LinkButton>}
           data-testid="properties-empty"
         />

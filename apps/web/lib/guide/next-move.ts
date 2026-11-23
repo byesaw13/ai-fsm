@@ -87,7 +87,7 @@ export function closeoutHoldSendCopy(canSend: boolean): {
 } {
   const guide = sendVsHoldGuide();
   return {
-    holdLabel: "Hold bill",
+    holdLabel: "Hold invoice",
     sendLabel: canSend ? guide.move : null,
     why: guide.why,
   };

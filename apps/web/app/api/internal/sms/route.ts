@@ -244,7 +244,7 @@ function buildNotification(
   opts: { phone: string; clientName: string; isNewClient: boolean; actionLine: string }
 ): { title: string; body: string } {
   const [emoji, label] = TYPE_LABEL[ai.message_type];
-  const who = opts.isNewClient ? "New client" : "Existing client";
+  const who = opts.isNewClient ? "New customer" : "Existing customer";
   const detail =
     ai.message_type === "new_inquiry"
       ? `🔧 ${ai.job_title ?? "Inquiry"} (${ai.job_type})`
@@ -458,7 +458,7 @@ export async function POST(req: NextRequest) {
       notification: {
         title: `📵 Opted-out SMS: ${existing.name}`,
         body: [
-          `Existing client: ${existing.name}`,
+          `Existing customer: ${existing.name}`,
           `📞 ${phone}`,
           `💬 ${message.slice(0, 200)}`,
           "⚠️ Number is opted out — no auto-reply sent. Reply START to re-subscribe, or contact by phone/email.",
@@ -531,7 +531,7 @@ export async function POST(req: NextRequest) {
   let jobId: string | null = null;
   let estimateToConfirm: string | null = null;
   let needsReview = lowConfidence;
-  let actionLine = "✅ Logged to client record";
+  let actionLine = "✅ Logged to customer record";
 
   if (ai.message_type === "approval") {
     const sentEstimates = context.openEstimates.filter((e) => e.status === "sent");
