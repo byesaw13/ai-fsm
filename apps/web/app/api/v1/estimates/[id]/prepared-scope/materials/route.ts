@@ -59,9 +59,9 @@ async function lockedMerge(
   const est = rows[0];
   if (!est) fail("NOT_FOUND", "Estimate not found");
   assertQuoteVersion(est.updated_at, expectedUpdatedAt);
-  if (est.status !== "draft") fail("IMMUTABLE_ENTITY", "Only a draft quote can be changed");
+  if (est.status !== "draft") fail("IMMUTABLE_ENTITY", "Only a draft estimate can be changed");
   const stored = parsePreparedScope(est.prepared_scope);
-  if (!stored) fail("NO_PREPARED_SCOPE", "This quote has no prepared scope");
+  if (!stored) fail("NO_PREPARED_SCOPE", "This estimate has no prepared scope");
   return applyScopeEdits(stored, incoming);
 }
 
@@ -107,7 +107,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     }
 
     const summary = await loadAssessmentSummary(session, merged.source.visit_id);
-    if (!summary) return errorResponse(session, 400, "NO_ASSESSMENT", "The assessment this quote came from is gone");
+    if (!summary) return errorResponse(session, 400, "NO_ASSESSMENT", "The assessment this estimate came from is gone");
 
     const result = await itemizeGroups(merged, summary, body.group_keys, saved, generateMaterials);
     if (result.failed.length === body.group_keys.length) {

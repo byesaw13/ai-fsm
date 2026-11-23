@@ -25,7 +25,7 @@ describe("Needs Attention surfaces", () => {
   });
 
   it("makes unsent Hold the first Today leftover, louder than Finished, no invoice", () => {
-    expect(HOLD_SEND_BILL_LABEL).toBe("Hold — send the bill");
+    expect(HOLD_SEND_BILL_LABEL).toBe("Hold — send the invoice");
     expect(ATTENTION_TODAY_LABELS[0]).toBe(HOLD_SEND_BILL_LABEL);
     expect(ATTENTION_TODAY_LABELS as readonly string[]).not.toContain("Finished, no invoice");
   });
@@ -33,17 +33,17 @@ describe("Needs Attention surfaces", () => {
   it("filters a mixed list to one surface and keeps Hold first", () => {
     const items = [
       { label: "Receipts not on a job", count: 3 },
-      { label: "Draft bills", count: 2 },
+      { label: "Draft invoices", count: 2 },
       { label: HOLD_SEND_BILL_LABEL, count: 1 },
-      { label: "Follow up quotes", count: 4 },
+      { label: "Follow up estimates", count: 4 },
     ];
     expect(filterAttentionForSurface(items, "today").map((i) => i.label)).toEqual([
       HOLD_SEND_BILL_LABEL,
       "Receipts not on a job",
     ]);
     expect(filterAttentionForSurface(items, "desk").map((i) => i.label)).toEqual([
-      "Draft bills",
-      "Follow up quotes",
+      "Draft invoices",
+      "Follow up estimates",
     ]);
   });
 

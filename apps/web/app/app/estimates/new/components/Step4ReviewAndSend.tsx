@@ -76,7 +76,7 @@ export function Step4ReviewAndSend({
 
         {/* Who */}
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "var(--space-1) var(--space-4)", fontSize: "var(--text-sm)", marginBottom: "var(--space-3)" }}>
-          <span style={{ color: "var(--fg-muted)" }}>Client</span>
+          <span style={{ color: "var(--fg-muted)" }}>Customer</span>
           <span style={{ fontWeight: 600 }}>{selectedClient?.name ?? "—"}</span>
           {selectedJob && (<>
             <span style={{ color: "var(--fg-muted)" }}>Project</span>
@@ -170,7 +170,7 @@ export function Step4ReviewAndSend({
         {notes.trim() && (
           <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
             <p style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              Client notes
+              Customer notes
             </p>
             <p style={{ margin: 0, fontSize: "var(--text-sm)" }}>{notes}</p>
           </div>
@@ -254,7 +254,7 @@ export function Step4ReviewAndSend({
             disabled={pending}
             data-testid="send-immediately-checkbox"
           />
-          <span>Send to client immediately after creating</span>
+          <span>Send to customer immediately after creating</span>
         </label>
       </div>
     </div>

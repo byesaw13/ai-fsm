@@ -176,7 +176,7 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
       setDirty(false);
       const failed = (data.failed ?? []) as Array<{ group_key: string }>;
       if (failed.length > 0) toast.error(`${failed.length} area(s) could not be listed and keep their allowance.`);
-      else if (groupKeys.length > 0) toast.success("Materials listed. Apply to quote to update the lines and buy list.");
+      else if (groupKeys.length > 0) toast.success("Materials listed. Apply to estimate to update the lines and buy list.");
     } catch {
       toast.error("Materials could not be listed. Your edits are still on this page.");
     } finally {
@@ -218,7 +218,7 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
       if (accept) {
         setProposal(null);
         setNote("");
-        toast.success("Changes kept. Apply to quote to update the lines.");
+        toast.success("Changes kept. Apply to estimate to update the lines.");
       } else {
         setProposal(data as RevisionProposal);
       }
@@ -246,7 +246,7 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
       setConflict(null);
       setScope(data.prepared_scope);
       setDirty(false);
-      toast.success(apply ? "Quote rebuilt from the prepared scope" : "Prepared scope saved");
+      toast.success(apply ? "Estimate rebuilt from the prepared scope" : "Prepared scope saved");
       if (apply) router.refresh();
     } catch {
       toast.error("Save failed. Your edits are still on this page.");
@@ -296,7 +296,7 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
           <p style={{ margin: "var(--space-2) 0" }} data-testid="prepared-scope-empty">
             No work is listed on this draft
             {scope.groups.length > 0 ? ` for ${scope.groups.map((g) => g.label).join(", ")}` : ""}. It was prepared
-            without the AI. Delete this draft and press Prepare Quote on the assessment again once the AI is available.
+            without the AI. Delete this draft and press Prepare Estimate on the assessment again once the AI is available.
           </p>
         )}
         {areas.rows.map((area) => {
@@ -594,7 +594,7 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
             Save
           </Button>
           <Button onClick={() => save(true)} loading={saving === "apply"} disabled={saving !== null || fixedTooLow} data-testid="prepared-scope-apply">
-            Apply to quote
+            Apply to estimate
           </Button>
         </div>
       )}

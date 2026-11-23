@@ -151,7 +151,7 @@ test.describe("Today and Active Visit", () => {
     await page.getByTestId("visit-first-up").getByRole("button", { name: "Complete task" }).click();
     await page.getByRole("button", { name: "Finish visit", exact: true }).first().click();
     await expect(page.getByTestId("completion-checklist-panel")).toContainText("after.png");
-    await page.getByText("Client signature waived", { exact: true }).click();
+    await page.getByText("Customer signature waived", { exact: true }).click();
     await page.getByTestId("completion-mark-complete").click();
     await page.getByTestId("closeout-kind-done").click();
     await page.getByTestId("closeout-today-notes").fill("Patched and painted the bedroom");

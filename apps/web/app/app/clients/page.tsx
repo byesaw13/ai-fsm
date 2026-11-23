@@ -99,7 +99,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   const columns: DataTableColumn<ClientRow>[] = [
     {
       key: "name",
-      label: UI.person,
+      label: UI.customer,
       render: (row) => (
         <div>
           <Link href={`/app/clients/${row.id}` as Route} style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>
@@ -118,7 +118,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
     },
     {
       key: "properties",
-      label: "Houses",
+      label: "Properties",
       align: "right",
       render: (row) => Number(row.property_count),
       width: "120px",
@@ -186,28 +186,28 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title={UI.people}
-        subtitle={`${clients.length} ${clients.length === 1 ? "person" : "people"} · Jobs = work in this app (includes invoiced). Square = historical payments from Square export.`}
+        title={UI.customers}
+        subtitle={`${clients.length} ${clients.length === 1 ? "customer" : "customers"} · Jobs = work in this app (includes invoiced). Square = historical payments from Square export.`}
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <LinkButton href="/app/clients/import" variant="secondary">
               Import Square CSV
             </LinkButton>
             <LinkButton href="/app/clients/new" variant="primary" data-testid="create-client-btn">
-              + New person
+              + New customer
             </LinkButton>
           </div>
         }
       />
-      <HubSubnav hub="People" links={PEOPLE_HUB_LINKS} pathname="/app/clients" />
+      <HubSubnav hub={UI.customers} links={PEOPLE_HUB_LINKS} pathname="/app/clients" />
 
       <FilterBar filters={CLIENT_FILTERS} baseHref="/app/clients" currentValues={currentValues} />
 
       {clients.length === 0 ? (
         <EmptyState
-          title={search ? "No people match your search" : "No people yet"}
-          description={search ? "Try a different search term." : "Add a person to start scheduling jobs."}
-          action={<LinkButton href="/app/clients/new">New person</LinkButton>}
+          title={search ? "No customers match your search" : "No customers yet"}
+          description={search ? "Try a different search term." : "Add a customer to start scheduling jobs."}
+          action={<LinkButton href="/app/clients/new">New customer</LinkButton>}
           data-testid="clients-empty"
         />
       ) : (

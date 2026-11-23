@@ -37,7 +37,7 @@ export function PreparedOptionsEditor({ options, editable, onChange }: Props) {
     <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }} data-testid="prepared-options">
       <h3 style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-sm)" }}>Options</h3>
       <p style={{ ...label, margin: "0 0 var(--space-2)" }}>
-        The customer sees these as optional add-ons with their price, apart from the quote total.
+        The customer sees these as optional add-ons with their price, apart from the estimate total.
       </p>
       <div style={{ display: "grid", gap: "var(--space-3)" }}>
         {options.map((a) => (

@@ -145,7 +145,7 @@ describe("POST /visits/[id]/prepare-quote", () => {
     mockExtract.mockRejectedValueOnce(new Error("overloaded"));
     const res = await POST(post());
     expect(res.status).toBe(503);
-    expect((await res.json()).error).toMatchObject({ code: "AI_UNAVAILABLE", message: expect.stringMatching(/No quote was created/) });
+    expect((await res.json()).error).toMatchObject({ code: "AI_UNAVAILABLE", message: expect.stringMatching(/No estimate was created/) });
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
@@ -158,7 +158,7 @@ describe("POST /visits/[id]/prepare-quote", () => {
     expect(res.status).toBe(503);
     const { error } = await res.json();
     expect(error.code).toBe("AI_OUT_OF_CREDIT");
-    expect(error.message).toMatch(/out of credit.*No quote was created/);
+    expect(error.message).toMatch(/out of credit.*No estimate was created/);
     expect(mockCreate).not.toHaveBeenCalled();
   });
 

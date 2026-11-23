@@ -584,7 +584,7 @@ export function useEstimateForm({
 
   function advanceStep() {
     if (step === 1 && !clientId) {
-      setError("Please select a client before continuing.");
+      setError("Please select a customer before continuing.");
       return;
     }
     setError(null);
@@ -610,7 +610,7 @@ export function useEstimateForm({
     e.preventDefault();
     if (step !== 4) return;
     if (!clientId) {
-      setError("Please select a client.");
+      setError("Please select a customer.");
       return;
     }
 

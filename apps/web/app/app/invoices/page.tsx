@@ -211,7 +211,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="Bills"
+        title="Invoices"
         subtitle={`${invoices.length} total`}
         actions={
           canCreate ? (
@@ -253,7 +253,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
         <div data-testid="billing-queue-card">
           <WhatNext
             title={priorityLabel ?? "Follow up on invoice"}
-            description={`${priorityInvoice.invoice_number} · ${priorityInvoice.client_name ?? "Client"} · ${priorityInvoice.due_date ? new Date(priorityInvoice.due_date).toLocaleDateString() : "No due date"}`}
+            description={`${priorityInvoice.invoice_number} · ${priorityInvoice.client_name ?? "Customer"} · ${priorityInvoice.due_date ? new Date(priorityInvoice.due_date).toLocaleDateString() : "No due date"}`}
             href={`/app/invoices/${priorityInvoice.id}`}
             actionLabel="Open & collect"
           />
@@ -266,7 +266,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
           description={
             attentionMode
               ? "No draft finals, unopened sent invoices, or overdue balances right now."
-              : "Create a draft invoice for any client — add line items, hours, and materials. Or convert an approved estimate when you have one."
+              : "Create a draft invoice for any customer — add line items, hours, and materials. Or convert an approved estimate when you have one."
           }
           action={
             !attentionMode && canCreate ? (

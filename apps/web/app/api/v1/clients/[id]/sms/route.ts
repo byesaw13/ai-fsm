@@ -29,7 +29,7 @@ export const POST = withRole(
     const clientId = request.url.match(/\/clients\/([^/]+)\/sms/)?.[1];
     if (!clientId) {
       return NextResponse.json(
-        { error: { code: "NOT_FOUND", message: "Client not found", traceId: session.traceId } },
+        { error: { code: "NOT_FOUND", message: "Customer not found", traceId: session.traceId } },
         { status: 404 }
       );
     }
@@ -83,7 +83,7 @@ export const POST = withRole(
     );
     if (!client) {
       return NextResponse.json(
-        { error: { code: "NOT_FOUND", message: "Client not found", traceId: session.traceId } },
+        { error: { code: "NOT_FOUND", message: "Customer not found", traceId: session.traceId } },
         { status: 404 }
       );
     }
@@ -93,7 +93,7 @@ export const POST = withRole(
           error: {
             code: "SMS_OPTED_OUT",
             message:
-              "This client has not consented to SMS (or opted out via STOP). Use phone/email, or ask them to reply START / re-opt in on booking.",
+              "This customer has not consented to SMS (or opted out via STOP). Use phone/email, or ask them to reply START / re-opt in on booking.",
             traceId: session.traceId,
           },
         },
@@ -105,7 +105,7 @@ export const POST = withRole(
         {
           error: {
             code: "VALIDATION_ERROR",
-            message: "Client has no phone number on file",
+            message: "Customer has no phone number on file",
             traceId: session.traceId,
           },
         },
@@ -119,7 +119,7 @@ export const POST = withRole(
         {
           error: {
             code: "VALIDATION_ERROR",
-            message: `Client phone "${client.phone}" is not a valid mobile number`,
+            message: `Customer phone "${client.phone}" is not a valid mobile number`,
             traceId: session.traceId,
           },
         },
@@ -135,7 +135,7 @@ export const POST = withRole(
       );
       if (!job) {
         return NextResponse.json(
-          { error: { code: "NOT_FOUND", message: "Job not found for this client", traceId: session.traceId } },
+          { error: { code: "NOT_FOUND", message: "Job not found for this customer", traceId: session.traceId } },
           { status: 404 }
         );
       }

@@ -50,7 +50,7 @@ export function EstimateBoard({
           } | null;
           const msg =
             data?.error?.code === "USE_SEND_ACTION"
-              ? "Use Send to Client to mark an estimate as sent."
+              ? "Use Send to Customer to mark an estimate as sent."
               : data?.error?.message ?? "Could not update estimate status";
           return { ok: false, message: msg };
         }
@@ -124,7 +124,7 @@ function EstimateCard({ est }: { est: EstimateBoardRow }) {
     >
       <div style={{ fontWeight: 700, fontSize: "var(--text-sm)", color: "var(--fg)" }}>
         {est.estimate_number ? `${est.estimate_number} · ` : ""}
-        {est.client_name ?? "Unknown client"}
+        {est.client_name ?? "Unknown customer"}
       </div>
       {est.job_title && (
         <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>

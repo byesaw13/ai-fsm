@@ -187,7 +187,7 @@ export function VisitSnapshotPanel({
         >
           <div>
             <p style={{ margin: 0, fontWeight: 600, fontSize: "var(--font-size-sm)" }}>
-              Client Summary Delivery
+              Customer Summary Delivery
             </p>
             <p
               style={{

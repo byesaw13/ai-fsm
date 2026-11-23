@@ -146,7 +146,7 @@ async function assertLinkableJob(
     [jobId, accountId, clientId],
   );
   if (!res.rows[0]) {
-    throw Object.assign(new Error("Job not found to link this quote"), { code: "NOT_FOUND" });
+    throw Object.assign(new Error("Job not found to link this estimate"), { code: "NOT_FOUND" });
   }
 }
 
@@ -278,7 +278,7 @@ export async function createJobFromEstimate({
     if (withInvoice.length > 0) {
       throw Object.assign(
         new Error(
-          `Client already has recent completed work with an invoice ` +
+          `Customer already has recent completed work with an invoice ` +
             `(${withInvoice.map((r) => r.invoiceNumber ?? r.jobTitle).join(", ")}). ` +
             `Link the estimate to that job or pass forceNewProject to create another.`
         ),

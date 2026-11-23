@@ -38,7 +38,7 @@ describe("ReferenceBlock", () => {
       ],
     });
     expect(html).toContain("Reference (Craftsman)");
-    expect(html).toContain("Reference only. Your hours are used on quotes.");
+    expect(html).toContain("Reference only. Your hours are used on estimates.");
     expect(html).toContain("0.75 / 1 / 1.5 h (low / typical / high)");
     expect(html).toContain("Widget, replace");
     expect(html).toContain("Install 0.5 h each");

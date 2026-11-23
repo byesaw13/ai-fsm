@@ -7,7 +7,7 @@ interface Props {
   label?: string;
 }
 
-export function CopyPortalLinkButton({ url, label = "Copy client link" }: Props) {
+export function CopyPortalLinkButton({ url, label = "Copy customer link" }: Props) {
   const [copied, setCopied] = useState(false);
 
   function handleClick() {

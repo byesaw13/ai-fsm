@@ -31,9 +31,9 @@ function presentAttention(
 ): NeedsAttentionItem {
   const priority = attentionPriority(item);
   let action = item.label;
-  if (item.label === HOLD_SEND_BILL_LABEL) action = "Send the bill";
-  if (item.label === "Collect overdue bills") {
-    action = `Collect overdue bills — ${item.detail.replace(/ outstanding$/, "")}`;
+  if (item.label === HOLD_SEND_BILL_LABEL) action = "Send the invoice";
+  if (item.label === "Collect overdue invoices") {
+    action = `Collect overdue invoices — ${item.detail.replace(/ outstanding$/, "")}`;
   }
   if (item.label === "Collect deposits") action = "Collect the deposit";
   if (item.label === "Order materials" && hints.materialTitle) {
@@ -44,7 +44,7 @@ function presentAttention(
     action = "Schedule the next visit";
   }
   if (item.label === "Review requests") action = "Decide the next step";
-  if (item.label === "Draft bills") action = "Send the draft bill";
+  if (item.label === "Draft invoices") action = "Send the draft invoice";
   return { ...item, action, priorityReason: priority.reason };
 }
 
@@ -217,7 +217,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         label: HOLD_SEND_BILL_LABEL,
         count: leftovers.finishedUnbilled,
         href: "/app/invoices?status=draft" as Route,
-        detail: "Work is filed. The bill is still on Hold — send it.",
+        detail: "Work is filed. The invoice is still on Hold — send it.",
         tone: "danger",
       },
       {
@@ -242,10 +242,10 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         tone: "warning",
       },
       {
-        label: "Draft bills",
+        label: "Draft invoices",
         count: draftInvoiceCount,
         href: "/app/invoices?status=draft" as Route,
-        detail: "Completed work waiting for a bill",
+        detail: "Completed work waiting for an invoice",
         tone: "warning",
       },
       {
@@ -256,7 +256,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         tone: "warning",
       },
       {
-        label: "Follow up quotes",
+        label: "Follow up estimates",
         count: sentEstimateCount + expiringEstimateCount + expiredEstimateCount,
         href: "/app/estimates?status=sent" as Route,
         detail:
@@ -294,7 +294,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         tone: "warning",
       },
       {
-        label: "Collect overdue bills",
+        label: "Collect overdue invoices",
         count: overdueCount,
         href: "/app/invoices?status=overdue" as Route,
         detail: `${fmt(overdueTotal)} outstanding`,

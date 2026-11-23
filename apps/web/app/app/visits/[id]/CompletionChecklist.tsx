@@ -355,7 +355,7 @@ export function CompletionChecklist({
           <div style={{ marginTop: "var(--space-2)" }}>
             <span className="p7-label">No photos needed?</span>
             <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-1)" }}>
-              {["Forgot to take photos", "No visual change / not needed", "Client declined photos"].map((preset) => (
+              {["Forgot to take photos", "No visual change / not needed", "Customer declined photos"].map((preset) => (
                 <button
                   key={preset}
                   type="button"
@@ -516,7 +516,7 @@ export function CompletionChecklist({
           onChange={(event) => setSignatureWaiver(event.target.checked)}
           disabled={!canUpdate || saving || completing}
         />
-        <span style={{ fontSize: "var(--text-sm)" }}>Client signature waived</span>
+        <span style={{ fontSize: "var(--text-sm)" }}>Customer signature waived</span>
       </label>
 
       {isQuickJob && (

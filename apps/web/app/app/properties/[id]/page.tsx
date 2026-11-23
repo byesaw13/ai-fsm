@@ -439,11 +439,11 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   return (
     <PageContainer>
       <Breadcrumbs items={property.client_id ? [
-        { href: "/app/clients", label: "Clients" },
-        { href: `/app/clients/${property.client_id}`, label: property.client_name ?? "Client" },
+        { href: "/app/clients", label: "Customers" },
+        { href: `/app/clients/${property.client_id}`, label: property.client_name ?? "Customer" },
         { label: houseHeading(property.name, property.address) },
       ] : [
-        { href: "/app/properties", label: "Houses" },
+        { href: "/app/properties", label: "Properties" },
         { label: houseHeading(property.name, property.address) },
       ]} />
       <PageHeader
@@ -454,7 +454,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             : property.client_name ?? "No primary contact"
         }
         backHref="/app/properties"
-        backLabel="Houses"
+        backLabel="Properties"
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
             {property.client_phone ? (
@@ -473,7 +473,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 variant="secondary"
                 size="sm"
               >
-                + Quote
+                + Estimate
               </LinkButton>
             )}
             {canTransitionJob(session.role) && property.client_id && (
@@ -795,7 +795,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             <SectionHeader title="Property Details" />
             <dl className="p7-detail-list">
               <div className="p7-detail-row">
-                <dt>Client</dt>
+                <dt>Customer</dt>
                 <dd>
                   {property.client_id ? (
                     <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>

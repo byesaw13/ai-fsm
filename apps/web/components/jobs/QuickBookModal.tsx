@@ -159,9 +159,9 @@ export function QuickBookModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!clientQuery.trim()) { setError("Client name is required"); return; }
+    if (!clientQuery.trim()) { setError("Customer name is required"); return; }
     if (!jobTitle.trim()) { setError("Job title is required"); return; }
-    if (!selectedHouse && !address.trim()) { setError("House address is required"); return; }
+    if (!selectedHouse && !address.trim()) { setError("Property address is required"); return; }
     setError(null);
     setSubmitting(true);
 
@@ -237,10 +237,10 @@ export function QuickBookModal({
 
           {/* Client */}
           <div style={{ position: "relative" }}>
-            <label style={labelStyle}>Client</label>
+            <label style={labelStyle}>Customer</label>
             <input
               type="text"
-              placeholder="Search or enter new client name…"
+              placeholder="Search or enter new customer name…"
               value={clientQuery}
               onChange={(e) => handleClientInput(e.target.value)}
               onFocus={() => { if (clientResults.length > 0) setShowDropdown(true); }}
@@ -249,10 +249,10 @@ export function QuickBookModal({
               style={inputStyle}
             />
             {selectedClient && (
-              <div style={{ fontSize: "var(--text-xs)", color: "var(--accent)", marginTop: 3 }}>✓ Existing client</div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--accent)", marginTop: 3 }}>✓ Existing customer</div>
             )}
             {createNew && (
-              <div style={{ fontSize: "var(--text-xs)", color: "#16a34a", marginTop: 3 }}>✓ Will create new client &ldquo;{clientQuery}&rdquo;</div>
+              <div style={{ fontSize: "var(--text-xs)", color: "#16a34a", marginTop: 3 }}>✓ Will create new customer &ldquo;{clientQuery}&rdquo;</div>
             )}
             {showDropdown && (clientResults.length > 0 || clientQuery.trim()) && (
               <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid var(--border)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 10, marginTop: 2 }}>
@@ -272,7 +272,7 @@ export function QuickBookModal({
 
           {/* House — required. GPS and receipts attach here. */}
           <div>
-            <label style={labelStyle}>House</label>
+            <label style={labelStyle}>Property</label>
             {houses.length > 0 && (
               <select
                 value={selectedHouse?.id ?? ""}
@@ -283,7 +283,7 @@ export function QuickBookModal({
                 }}
                 style={{ ...inputStyle, marginBottom: 8 }}
               >
-                <option value="">Choose a house, or type a new address</option>
+                <option value="">Choose a property, or type a new address</option>
                 {houses.map((h) => (
                   <option key={h.id} value={h.id}>{h.address}</option>
                 ))}

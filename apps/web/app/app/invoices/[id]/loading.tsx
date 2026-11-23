@@ -4,7 +4,7 @@ export default function InvoiceDetailLoading() {
   return (
     <PageContainer>
       <PageHeader
-        title="Bill"
+        title="Invoice"
         subtitle="Loading…"
         actions={<Skeleton width="80px" height="24px" rounded />}
       />

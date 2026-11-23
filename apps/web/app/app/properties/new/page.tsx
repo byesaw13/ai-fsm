@@ -29,7 +29,7 @@ export default async function NewPropertyPage({ searchParams }: PageProps) {
 
   return (
     <PageContainer>
-      <PageHeader title="New House" backHref="/app/properties" backLabel="Houses" />
+      <PageHeader title="New Property" backHref="/app/properties" backLabel="Properties" />
       <Card>
         <PropertyForm
           mode="create"

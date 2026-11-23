@@ -170,7 +170,7 @@ function reviewEstimateRuleBased(estimate: EstimateInput): EstimateReviewResult 
         type: "info",
         field: "line_items",
         message: "Flat-rate estimate with no line item breakdown.",
-        suggestion: "Consider adding line items so the client sees the scope of work.",
+        suggestion: "Consider adding line items so the customer sees the scope of work.",
       });
     }
 
@@ -230,7 +230,7 @@ function reviewEstimateRuleBased(estimate: EstimateInput): EstimateReviewResult 
       type: "tip",
       field: "includes_ceiling",
       message: "Ceiling not included.",
-      suggestion: "For rooms over 500 sq ft, ceilings add ~30% more surface area. Ask the client.",
+      suggestion: "For rooms over 500 sq ft, ceilings add ~30% more surface area. Ask the customer.",
     });
   }
 
@@ -289,7 +289,7 @@ function reviewEstimateRuleBased(estimate: EstimateInput): EstimateReviewResult 
     suggestions.push({
       type: "info",
       field: "line_items",
-      message: "No line items — estimate total won't show a breakdown to the client.",
+      message: "No line items — estimate total won't show a breakdown to the customer.",
       suggestion: "Use the painting estimator to auto-generate line items with scope details.",
     });
   }

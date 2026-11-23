@@ -120,7 +120,7 @@ export function formatExpensesCsv(rows: ExpenseExportRow[]): string {
 export function formatInvoicesCsv(rows: InvoiceExportRow[]): string {
   const headers = [
     "Invoice #",
-    "Client",
+    "Customer",
     "Billing Context",
     "Service Property",
     "Work For",
@@ -138,7 +138,7 @@ export function formatInvoicesCsv(rows: InvoiceExportRow[]): string {
   ];
   const mapped: Record<string, unknown>[] = rows.map((r) => ({
     "Invoice #": r.invoice_number ?? "",
-    Client: r.client_name ?? "",
+    Customer: r.client_name ?? "",
     "Billing Context": r.billing_context === "realtor_sponsored" ? "Realtor-sponsored property expense" : "Standard",
     "Service Property": r.property_address ?? "",
     "Work For": r.beneficiary_name ?? "",

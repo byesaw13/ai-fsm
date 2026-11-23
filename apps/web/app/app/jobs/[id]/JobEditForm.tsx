@@ -141,12 +141,12 @@ export function JobEditForm({
           />
           <Select
             id="edit-job-client"
-            label="Client"
+            label="Customer"
             value={form.client_id}
             onChange={e => setForm(f => ({ ...f, client_id: e.target.value, property_id: "" }))}
             disabled={pending || clients.length === 0}
             options={clients.map(c => ({ value: c.id, label: c.name }))}
-            placeholder="Select client"
+            placeholder="Select customer"
           />
           <Select
             id="edit-job-property"

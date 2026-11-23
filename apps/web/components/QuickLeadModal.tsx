@@ -89,7 +89,7 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
                 }}
                 variant="secondary"
               >
-                Send intake form to client
+                Send intake form to customer
               </Button>
               {savedClientId && (
                 <Button
@@ -125,7 +125,7 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Client name"
+            placeholder="Customer name"
             required
           />
 

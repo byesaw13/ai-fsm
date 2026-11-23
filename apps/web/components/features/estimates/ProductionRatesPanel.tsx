@@ -86,8 +86,8 @@ export function ProductionRatesPanel({
   return (
     <div data-testid="production-rates" style={{ display: "grid", gap: "var(--space-4)" }}>
       <p style={{ ...muted, margin: 0 }}>
-        How fast each kind of work goes. Prepare Quote turns measurements into hours with these. Mark a rate calibrated
-        once your own jobs back it up. Changing a rate never changes hours on quotes already saved.
+        How fast each kind of work goes. Prepare Estimate turns measurements into hours with these. Mark a rate calibrated
+        once your own jobs back it up. Changing a rate never changes hours on estimates already saved.
       </p>
       {rates.map((r) => {
         const draft = drafts[r.id];

@@ -213,12 +213,12 @@ export function InvoiceEditForm({
             rows={3}
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            placeholder="Client-visible notes"
+            placeholder="Customer-visible notes"
             disabled={pending}
           />
         </div>
         <div className="form-field">
-          <label htmlFor="invoice-work-summary">Work completed (shown to client, by area)</label>
+          <label htmlFor="invoice-work-summary">Work completed (shown to customer, by area)</label>
           <textarea
             id="invoice-work-summary"
             rows={Math.min(18, Math.max(4, workSummary.split("\n").length + 1))}
@@ -254,12 +254,12 @@ export function InvoiceEditForm({
                 disabled={pending}
                 data-testid="invoice-show-itemized"
               />
-              Show client an itemized receipts link
+              Show customer an itemized receipts link
             </label>
             <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
               Billable receipts: {formatCents(itemizedTotalCents)} ({itemizedReceiptCount}) · Materials on this invoice:{" "}
               {formatCents(materialsBilledCents)}
-              {itemizedTotalCents !== materialsBilledCents && " — these differ; check the receipts' Bill checkboxes or the materials lines."}
+              {itemizedTotalCents !== materialsBilledCents && " — these differ; check the receipts' Charge checkboxes or the materials lines."}
             </p>
           </div>
         )}

@@ -32,8 +32,8 @@ test.describe("Admin smoke — jobs and visits", () => {
 
   test("admin nav shows core business links", async ({ page }) => {
     await page.goto(`${BASE}/app/jobs`);
-    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'People' })).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Quotes' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Customers' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Estimates' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Settings' })).toBeVisible();
   });
 

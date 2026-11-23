@@ -33,7 +33,7 @@ export function SendInvoiceButton({
   if (!clientEmail) {
     return (
       <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-        Add an email address to this client to enable sending.
+        Add an email address to this customer to enable sending.
       </p>
     );
   }
@@ -73,8 +73,8 @@ export function SendInvoiceButton({
     : pending
       ? "Sending…"
       : sentAt
-        ? "Resend to Client"
-        : "Send to Client";
+        ? "Resend to Customer"
+        : "Send to Customer";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>

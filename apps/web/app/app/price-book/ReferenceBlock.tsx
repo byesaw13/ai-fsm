@@ -60,7 +60,7 @@ export function ReferenceBlock({ service }: { service: ReferenceService }) {
     >
       <div style={{ fontWeight: 600 }}>Reference (Craftsman)</div>
       <p style={{ margin: "0 0 var(--space-2)", color: "var(--fg-muted)" }}>
-        Reference only. Your hours are used on quotes. Your hours: {ourHoursLabel(service)}. Craftsman hours are
+        Reference only. Your hours are used on estimates. Your hours: {ourHoursLabel(service)}. Craftsman hours are
         worker-hours per unit, without travel or setup. Captured {captured}.
       </p>
       <ul style={{ margin: 0, paddingLeft: "var(--space-4)" }}>

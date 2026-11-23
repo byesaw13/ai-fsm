@@ -217,7 +217,7 @@ closed in tests; owner-flow AC still open.
 | TASK-232 | [Saving a quote in the edit form keeps its job and property](TASK-232-edit-form-keeps-job-and-property.md) | 002 | Proposed |
 | TASK-233 | [A percentage deposit survives a quote save](TASK-233-percentage-deposit-survives-save.md) | 002 | Proposed |
 | TASK-234 | [Revise and resend a sent quote](TASK-234-revise-and-resend.md) | 002 | Proposed |
-| TASK-235 | [Customer, Property, Estimate, Invoice on every screen](TASK-235-screens-speak-shop-words.md) | 006 | Proposed |
+| TASK-235 | [Customer, Property, Estimate, Invoice on every screen](TASK-235-screens-speak-shop-words.md) | 006 | In progress |
 | TASK-236 | [One "New" button with three plain choices](TASK-236-one-new-button.md) | 006 | Proposed |
 | TASK-237 | [A shorter menu, and Money on one page](TASK-237-trim-the-menu.md) | 006 | Proposed |
 | TASK-238 | [Today and Desk never bounce you away](TASK-238-homes-never-bounce.md) | 006 | Proposed |

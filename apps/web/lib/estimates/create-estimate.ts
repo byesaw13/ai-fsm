@@ -426,7 +426,7 @@ export async function createEstimate(
       [client_id, session.accountId]
     );
     if (clientRow.rowCount === 0) {
-      throw Object.assign(new Error("Client not found"), { code: "NOT_FOUND" });
+      throw Object.assign(new Error("Customer not found"), { code: "NOT_FOUND" });
     }
 
     const result = await client.query<{ id: string }>(

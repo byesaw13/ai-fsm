@@ -114,12 +114,12 @@ export default async function EstimateDetailPage({
       )}
       <Breadcrumbs
         items={[
-          { href: "/app/estimates", label: "Quotes" },
+          { href: "/app/estimates", label: "Estimates" },
           ...(estimate.client_id
             ? [
                 {
                   href: `/app/clients/${estimate.client_id}`,
-                  label: estimate.client_name ?? "Client",
+                  label: estimate.client_name ?? "Customer",
                 },
               ]
             : []),
@@ -140,8 +140,8 @@ export default async function EstimateDetailPage({
       />
       <PageHeader
         backHref="/app/estimates"
-        backLabel="Quotes"
-        title={`${estimate.estimate_number ? `${estimate.estimate_number} — ` : "Estimate — "}${estimate.client_name ?? "Unknown client"}`}
+        backLabel="Estimates"
+        title={`${estimate.estimate_number ? `${estimate.estimate_number} — ` : "Estimate — "}${estimate.client_name ?? "Unknown customer"}`}
         actions={
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
             <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/estimates/${estimate.share_token}`} />
@@ -356,7 +356,7 @@ export default async function EstimateDetailPage({
         <div className="card action-card" data-testid="estimate-send-panel">
           <h2>{currentStatus === "draft" ? "Send or Mark as Sent" : "Resend"}</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            Email the client when you have an address, or manually mark as sent after offline delivery (PDF, portal link, in person).
+            Email the customer when you have an address, or manually mark as sent after offline delivery (PDF, portal link, in person).
           </p>
           <SendEstimateButton
             estimateId={estimate.id}

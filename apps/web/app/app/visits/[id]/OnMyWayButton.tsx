@@ -42,7 +42,7 @@ export function OnMyWayButton({ visitId }: OnMyWayButtonProps) {
         }}
         data-testid="on-my-way-sent"
       >
-        Client notified — on your way!
+        Customer notified — on your way!
       </div>
     );
   }
@@ -60,7 +60,7 @@ export function OnMyWayButton({ visitId }: OnMyWayButtonProps) {
         ? "Sending…"
         : state === "error"
           ? "Failed — tap to retry"
-          : "On My Way — Notify Client"}
+          : "On My Way — Notify Customer"}
     </button>
   );
 }

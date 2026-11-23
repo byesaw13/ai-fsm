@@ -68,7 +68,7 @@ export function PricingHealthSection({ pricingSummary, lowValue, overrideReasonR
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                {["Client / Job", "Total", "Override reason"].map((h) => (
+                {["Customer / Job", "Total", "Override reason"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)", fontSize: "var(--text-xs)" }}>{h}</th>
                 ))}
               </tr>

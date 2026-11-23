@@ -5,18 +5,18 @@ import { MONEY_HUB_LINKS, PEOPLE_HUB_LINKS, WORK_HUB_LINKS } from "@/lib/navigat
 import { filterCommands } from "@/lib/navigation/command-index";
 
 describe("human nouns", () => {
-  it("locks the six words the shop uses", () => {
-    expect(UI.person).toBe("Person");
-    expect(UI.people).toBe("People");
-    expect(UI.house).toBe("House");
-    expect(UI.houses).toBe("Houses");
+  it("locks the words the shop and its customers see (owner 2026-11-22)", () => {
+    expect(UI.customer).toBe("Customer");
+    expect(UI.customers).toBe("Customers");
+    expect(UI.property).toBe("Property");
+    expect(UI.properties).toBe("Properties");
     expect(UI.job).toBe("Job");
     expect(UI.jobs).toBe("Jobs");
     expect(UI.today).toBe("Today");
-    expect(UI.quote).toBe("Quote");
-    expect(UI.quotes).toBe("Quotes");
-    expect(UI.bill).toBe("Bill");
-    expect(UI.bills).toBe("Bills");
+    expect(UI.estimate).toBe("Estimate");
+    expect(UI.estimates).toBe("Estimates");
+    expect(UI.invoice).toBe("Invoice");
+    expect(UI.invoices).toBe("Invoices");
     expect(UI.desk).toBe("Desk");
   });
 });
@@ -36,24 +36,24 @@ describe("nav speaks those nouns", () => {
     expect(tech).toMatchObject({ href: "/app/my-work", label: UI.today });
   });
 
-  it("calls jobs Jobs, estimates Quotes, invoices Bills, properties Houses", () => {
+  it("calls jobs Jobs, estimates Estimates, invoices Invoices, properties Properties", () => {
     const work = getNavSections("admin").find((s) => s.label === "Work");
     expect(work?.items.find((i) => i.href === "/app/jobs")?.label).toBe(UI.jobs);
-    expect(work?.items.find((i) => i.href === "/app/estimates")?.label).toBe(UI.quotes);
+    expect(work?.items.find((i) => i.href === "/app/estimates")?.label).toBe(UI.estimates);
 
     const money = getNavSections("admin").find((s) => s.label === "Money");
-    expect(money?.items.find((i) => i.href === "/app/invoices")?.label).toBe(UI.bills);
+    expect(money?.items.find((i) => i.href === "/app/invoices")?.label).toBe(UI.invoices);
 
-    const people = getNavSections("admin").find((s) => s.label === "People");
-    expect(people?.items.find((i) => i.href === "/app/properties")?.label).toBe(UI.houses);
-    expect(people?.items.find((i) => i.href === "/app/clients")?.label).toBe(UI.people);
+    const people = getNavSections("admin").find((s) => s.label === UI.customers);
+    expect(people?.items.find((i) => i.href === "/app/properties")?.label).toBe(UI.properties);
+    expect(people?.items.find((i) => i.href === "/app/clients")?.label).toBe(UI.customers);
   });
 
-  it("gives the owner phone tabs Today / Jobs / People / Money", () => {
+  it("gives the owner phone tabs Today / Jobs / Customers / Money", () => {
     expect(getBottomNavItems("owner").map((i) => i.label)).toEqual([
       UI.today,
       UI.jobs,
-      UI.people,
+      UI.customers,
       "Money",
     ]);
     expect(getBottomNavItems("owner").map((i) => i.href)).toEqual([
@@ -64,11 +64,11 @@ describe("nav speaks those nouns", () => {
     ]);
   });
 
-  it("gives the admin phone tabs Desk / Jobs / People / Money", () => {
+  it("gives the admin phone tabs Desk / Jobs / Customers / Money", () => {
     expect(getBottomNavItems("admin").map((i) => i.label)).toEqual([
       UI.desk,
       UI.jobs,
-      UI.people,
+      UI.customers,
       "Money",
     ]);
   });
@@ -81,14 +81,14 @@ describe("nav speaks those nouns", () => {
 });
 
 describe("hubs and command palette", () => {
-  it("chips say Jobs, Quotes, Bills, Houses — never Projects or My Day", () => {
+  it("chips say Jobs, Estimates, Invoices, Properties — never Projects or My Day", () => {
     expect(WORK_HUB_LINKS.find((l) => l.href === "/app/jobs")?.label).toBe(UI.jobs);
-    expect(WORK_HUB_LINKS.find((l) => l.href === "/app/estimates")?.label).toBe(UI.quotes);
-    expect(MONEY_HUB_LINKS.find((l) => l.href === "/app/invoices")?.label).toBe(UI.bills);
-    expect(PEOPLE_HUB_LINKS.find((l) => l.href === "/app/properties")?.label).toBe(UI.houses);
+    expect(WORK_HUB_LINKS.find((l) => l.href === "/app/estimates")?.label).toBe(UI.estimates);
+    expect(MONEY_HUB_LINKS.find((l) => l.href === "/app/invoices")?.label).toBe(UI.invoices);
+    expect(PEOPLE_HUB_LINKS.find((l) => l.href === "/app/properties")?.label).toBe(UI.properties);
 
     const labels = [...WORK_HUB_LINKS, ...PEOPLE_HUB_LINKS, ...MONEY_HUB_LINKS].map((l) => l.label);
-    expect(labels).toContain(UI.people);
+    expect(labels).toContain(UI.customers);
     expect(labels).not.toContain("Clients");
     expect(labels).not.toContain("Work Orders");
     expect(labels).not.toContain("Visits");
@@ -97,16 +97,16 @@ describe("hubs and command palette", () => {
     expect(labels).not.toContain("Overview");
   });
 
-  it("command index finds Today, Desk, Jobs, Quotes, Bills, People", () => {
+  it("command index finds Today, Desk, Jobs, Estimates, Invoices, Customers", () => {
     const labels = filterCommands("", "owner").map((c) => c.label);
     expect(labels).toEqual(
       expect.arrayContaining([
         UI.today,
         UI.desk,
         UI.jobs,
-        UI.quotes,
-        UI.bills,
-        UI.people,
+        UI.estimates,
+        UI.invoices,
+        UI.customers,
         "Tracking",
       ]),
     );

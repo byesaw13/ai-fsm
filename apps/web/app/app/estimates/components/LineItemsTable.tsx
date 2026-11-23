@@ -119,7 +119,7 @@ export function LineItemsTable({
                     </select>
                     {row.prepared_group_key && (
                       <div className="muted" style={{ fontSize: "var(--text-xs)", marginTop: "var(--space-1)" }}>
-                        From prepared scope. Apply to quote replaces this line.
+                        From prepared scope. Apply to estimate replaces this line.
                       </div>
                     )}
                     {lineShowsHours(row) && (

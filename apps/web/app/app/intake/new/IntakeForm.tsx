@@ -34,7 +34,7 @@ const REFERRAL_OPTIONS = [
   { value: "online", label: "Found us online" },
   { value: "friend_neighbor", label: "Friend or neighbor" },
   { value: "realtor", label: "Realtor referral" },
-  { value: "repeat", label: "Previous client" },
+  { value: "repeat", label: "Previous customer" },
   { value: "other", label: "Other" },
 ] as const;
 
@@ -114,7 +114,7 @@ export function IntakeForm() {
 
   function validateCapture() {
     const next: IntakeErrors = {};
-    if (!form.name.trim()) next.name = "Client name is required";
+    if (!form.name.trim()) next.name = "Customer name is required";
     if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = "Valid email required";
     if (!form.phone.trim() && !form.email.trim()) next.phone = "A phone number or email is required";
     if (!form.service_description.trim()) next.service_description = "Say what they need, even briefly";
@@ -293,7 +293,7 @@ export function IntakeForm() {
         <Card>
           <SectionHeader title="Read-back Confirmation" />
           <dl className="p7-detail-list">
-            <Detail label="Client" value={form.name} />
+            <Detail label="Customer" value={form.name} />
             <Detail label="Phone" value={form.phone || "None"} />
             <Detail label="Email" value={form.email || "None"} />
             <Detail label="Preferred Contact" value={form.preferred_contact.toUpperCase()} />
@@ -346,7 +346,7 @@ export function IntakeForm() {
         <div className="p7-form-grid p7-form-grid-2">
           <Input
             id="name"
-            label="Client Name"
+            label="Customer Name"
             required
             value={form.name}
             onChange={(e) => update("name", e.target.value)}

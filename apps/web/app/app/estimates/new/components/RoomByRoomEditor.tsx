@@ -295,7 +295,7 @@ function RoomCard({
                       cursor: "pointer",
                     }}
                   >
-                    {s === "dovetails" ? "Dovetails supplies" : "Client supplies"}
+                    {s === "dovetails" ? "Dovetails supplies" : "Customer supplies"}
                   </button>
                 ))}
               </div>
@@ -439,7 +439,7 @@ export function RoomByRoomEditor({ rooms, options, onChange, rateHours }: RoomBy
               { label: "Wall area", value: `${metrics.total_wall_sqft.toFixed(0)} sqft` },
               { label: "Ceiling", value: metrics.total_ceiling_sqft > 0 ? `${metrics.total_ceiling_sqft.toFixed(0)} sqft` : "—" },
               { label: "Trim", value: metrics.total_trim_lf > 0 ? `${metrics.total_trim_lf.toFixed(0)} LF` : "—" },
-              { label: "Paint", value: metrics.total_paint_gallons > 0 ? `${metrics.total_paint_gallons} gal` : "Client supplied" },
+              { label: "Paint", value: metrics.total_paint_gallons > 0 ? `${metrics.total_paint_gallons} gal` : "Customer supplied" },
               ...(metrics.total_primer_gallons > 0 ? [{ label: "Primer", value: `${metrics.total_primer_gallons} gal` }] : []),
               { label: "Labor", value: formatDollars(engineResult.summary.laborCents) },
               ...(engineResult.summary.materialCents > 0 ? [{ label: "Materials", value: formatDollars(engineResult.summary.materialCents) }] : []),

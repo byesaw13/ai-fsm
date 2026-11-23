@@ -378,7 +378,7 @@ function StandardEstimateEditForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!clientId) { setError("Please select a client."); return; }
+    if (!clientId) { setError("Please select a customer."); return; }
     if (mode === "itemized" && lineItems.length === 0) { setError("Add at least one line item."); return; }
     setError(null);
     setPending(true);
@@ -543,7 +543,7 @@ function StandardEstimateEditForm({
         <div className="p7-form-grid p7-form-grid-2">
           <Select
             id="edit-est-client"
-            label="Client"
+            label="Customer"
             required
             value={clientId}
             onChange={(e) => {
@@ -553,7 +553,7 @@ function StandardEstimateEditForm({
             }}
             disabled={loadingOptions || pending}
             options={clients.map((c) => ({ value: c.id, label: c.name }))}
-            placeholder={loadingOptions ? "Loading…" : "Select a client"}
+            placeholder={loadingOptions ? "Loading…" : "Select a customer"}
           />
 
           <Select
@@ -566,7 +566,7 @@ function StandardEstimateEditForm({
             placeholder="None"
             hint={
               clientId && !loadingOptions && filteredJobs.length === 0
-                ? "No open jobs for this client."
+                ? "No open jobs for this customer."
                 : undefined
             }
           />
@@ -581,7 +581,7 @@ function StandardEstimateEditForm({
             placeholder="None"
             hint={
               clientId && !loadingOptions && filteredProperties.length === 0
-                ? "No properties for this client."
+                ? "No properties for this customer."
                 : undefined
             }
           />
@@ -621,10 +621,10 @@ function StandardEstimateEditForm({
 
           <Textarea
             id="edit-est-notes"
-            label="Client notes (optional)"
+            label="Customer notes (optional)"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Visible to the client"
+            placeholder="Visible to the customer"
             rows={3}
             disabled={pending}
             containerClassName="p7-form-grid-span-2"
@@ -1070,7 +1070,7 @@ function TierEditor({
 
         <Textarea
           id="tier-notes"
-          label="Client notes (optional)"
+          label="Customer notes (optional)"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}

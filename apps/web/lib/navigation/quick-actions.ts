@@ -9,6 +9,8 @@
  * route still enforces the owner/admin guard.
  */
 
+import { UI } from "@/lib/vocabulary";
+
 export interface QuickAction {
   label: string;
   /** Internal app path. Components cast this to Next's typed `Route`. */
@@ -21,12 +23,12 @@ export interface QuickAction {
 /** Owner Dashboard (`/app`) quick actions. */
 export const OWNER_QUICK_ACTIONS: QuickAction[] = [
   { label: "Capture", href: "/app/capture", icon: "🎙️" },
-  { label: "New Quote", href: "/app/estimates", icon: "📝" },
+  { label: `New ${UI.estimate}`, href: "/app/estimates", icon: "📝" },
   { label: "Quick Materials", href: "/app/materials/quick", icon: "📦" },
   { label: "New Job", href: "/app/jobs", icon: "🛠️" },
   { label: "Schedule", href: "/app/schedule", icon: "📅" },
-  { label: "Bills", href: "/app/invoices", icon: "🧾" },
-  { label: "People", href: "/app/clients", icon: "👥" },
+  { label: UI.invoices, href: "/app/invoices", icon: "🧾" },
+  { label: UI.customers, href: "/app/clients", icon: "👥" },
   { label: "New Request", href: "/app/intake/new", icon: "⚡" },
 ];
 
@@ -37,7 +39,7 @@ export const OWNER_QUICK_ACTIONS: QuickAction[] = [
 export const FIELD_QUICK_ACTIONS: QuickAction[] = [
   { label: "Job", href: "/app/my-work", icon: "🧰", action: "quick-book" },
   { label: "Receipt", href: "/app/expenses/new", icon: "🧾" },
-  { label: "Quote", href: "/app/estimates/new", icon: "📝" },
+  { label: UI.estimate, href: "/app/estimates/new", icon: "📝" },
 ];
 
 /** Today Receipt tile. Pin to the open job so Home Depot does not float unattached. */
@@ -50,8 +52,8 @@ export function fieldReceiptHref(jobId: string | null | undefined): string {
 export const FAB_QUICK_ACTIONS: QuickAction[] = [
   { label: "Capture", href: "/app/capture", icon: "🎙️" },
   { label: "Quick job", href: "/app/my-work", icon: "🧰", action: "quick-book" },
-  { label: "Quick Quote", href: "/app/estimates/quick", icon: "⚡" },
-  { label: "New Bill", href: "/app/invoices/new", icon: "💵" },
+  { label: `Quick ${UI.estimate}`, href: "/app/estimates/quick", icon: "⚡" },
+  { label: `New ${UI.invoice}`, href: "/app/invoices/new", icon: "💵" },
   { label: "New Job", href: "/app/jobs/new", icon: "🧰" },
   { label: "New Request", href: "/app/intake/new", icon: "📋" },
   { label: "Material Run", href: "/app/expenses/new?mode=run", icon: "🧾" },

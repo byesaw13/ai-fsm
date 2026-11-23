@@ -1,7 +1,7 @@
 export type AttentionSurface = "today" | "desk";
 
 /** Unsent Hold — louder than any other Today leftover. */
-export const HOLD_SEND_BILL_LABEL = "Hold — send the bill";
+export const HOLD_SEND_BILL_LABEL = "Hold — send the invoice";
 
 /** TASK-163: finished jobs whose customer report hasn't gone out. */
 export const CUSTOMER_REPORTS_LABEL = "Customer reports to send";
@@ -18,10 +18,10 @@ export const ATTENTION_TODAY_LABELS = [
 
 /** Money and office leaks — the desk. */
 export const ATTENTION_DESK_LABELS = [
-  "Draft bills",
-  "Follow up quotes",
+  "Draft invoices",
+  "Follow up estimates",
   "Collect deposits",
-  "Collect overdue bills",
+  "Collect overdue invoices",
   "Review requests",
   "Clear exception lanes",
   "Customer Promises",

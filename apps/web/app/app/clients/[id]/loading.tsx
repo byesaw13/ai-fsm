@@ -4,7 +4,7 @@ export default function ClientDetailLoading() {
   return (
     <PageContainer>
       <PageHeader
-        title="Client"
+        title="Customer"
         subtitle="Loading…"
         actions={<Skeleton width="80px" height="24px" rounded />}
       />

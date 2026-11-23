@@ -140,7 +140,7 @@ function flattenSections(sections: ReturnType<typeof getNavSections>) {
 }
 
 describe("getNavSections (nested hubs)", () => {
-  const HUB_LABELS = ["Home", "Work", "People", "Money"];
+  const HUB_LABELS = ["Home", "Work", "Customers", "Money"];
 
   it("returns labeled hub sections for admin role", () => {
     const sections = getNavSections("admin");
@@ -297,15 +297,15 @@ describe("getNavSections (nested hubs)", () => {
     // Work Orders are reached inside a Job, not from the top nav.
     expect(work?.items.map((i) => i.href)).not.toContain("/app/work-orders");
     expect(work?.items.find((i) => i.href === "/app/jobs")?.label).toBe("Jobs");
-    expect(work?.items.find((i) => i.href === "/app/estimates")?.label).toBe("Quotes");
+    expect(work?.items.find((i) => i.href === "/app/estimates")?.label).toBe("Estimates");
   });
 });
 
 describe("getBottomNavItems (mobile hubs)", () => {
-  it("returns 4 hub tabs for admin (Desk Jobs People Money) — More is the 5th slot", () => {
+  it("returns 4 hub tabs for admin (Desk Jobs Customers Money) — More is the 5th slot", () => {
     const items = getBottomNavItems("admin");
     expect(items).toHaveLength(4);
-    expect(items.map((i) => i.label)).toEqual(["Desk", "Jobs", "People", "Money"]);
+    expect(items.map((i) => i.label)).toEqual(["Desk", "Jobs", "Customers", "Money"]);
     expect(items.map((i) => i.href)).toEqual([
       "/app",
       "/app/jobs",
@@ -329,7 +329,7 @@ describe("getBottomNavItems (mobile hubs)", () => {
 
   it("returns 4 hub tabs for owner leading with Today", () => {
     const items = getBottomNavItems("owner");
-    expect(items.map((i) => i.label)).toEqual(["Today", "Jobs", "People", "Money"]);
+    expect(items.map((i) => i.label)).toEqual(["Today", "Jobs", "Customers", "Money"]);
     expect(items.map((i) => i.href)).toEqual([
       "/app/my-work",
       "/app/jobs",

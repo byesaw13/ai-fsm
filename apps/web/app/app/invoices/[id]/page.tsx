@@ -361,12 +361,12 @@ export default async function InvoiceDetailPage({
       )}
       <Breadcrumbs
         items={[
-          { href: "/app/invoices", label: "Bills" },
+          { href: "/app/invoices", label: "Invoices" },
           ...(invoice.client_id
             ? [
                 {
                   href: `/app/clients/${invoice.client_id}`,
-                  label: invoice.client_name ?? "Client",
+                  label: invoice.client_name ?? "Customer",
                 },
               ]
             : []),
@@ -385,7 +385,7 @@ export default async function InvoiceDetailPage({
         title={invoice.invoice_number}
         subtitle={invoice.client_name ?? undefined}
         backHref="/app/invoices"
-        backLabel="Bills"
+        backLabel="Invoices"
         actions={
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
             <CopyPortalLinkButton
@@ -491,7 +491,7 @@ export default async function InvoiceDetailPage({
             dueOnCompletion ? (
               <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>Due on completion</div>
             ) : (
-              <div style={{ fontSize: "var(--text-xs)", color: "var(--color-danger)", marginTop: 2 }}>Client owes this now</div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--color-danger)", marginTop: 2 }}>Customer owes this now</div>
             )
           )}
         </div>
@@ -782,7 +782,7 @@ export default async function InvoiceDetailPage({
           {canSendInvoices(session.role) &&
             ["sent", "partial", "overdue"].includes(currentStatus) && (
               <Card>
-                <SectionHeader title="Email Client" />
+                <SectionHeader title="Email Customer" />
                 <SendInvoiceButton
                   invoiceId={invoice.id}
                   clientEmail={invoice.client_email}
@@ -797,7 +797,7 @@ export default async function InvoiceDetailPage({
             <Card data-testid="email-paid-receipt-panel">
               <SectionHeader title="Email Receipt" />
               <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                Send the paid invoice PDF to the client for their records. No customer portal required.
+                Send the paid invoice PDF to the customer for their records. No customer portal required.
               </p>
               <SendInvoiceButton
                 invoiceId={invoice.id}
@@ -932,7 +932,7 @@ export default async function InvoiceDetailPage({
                   <dt>Itemized receipts</dt>
                   <dd>
                     <a href={`/portal/invoices/${invoice.share_token}/receipts`} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
-                      Client view
+                      Customer view
                     </a>{" "}
                     · {formatCents(itemized.total_cents)} across {itemized.receipts.length} receipts
                   </dd>

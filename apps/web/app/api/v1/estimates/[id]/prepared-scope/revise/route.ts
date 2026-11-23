@@ -64,9 +64,9 @@ async function mergeEdits(
   const est = rows[0];
   if (!est) fail("NOT_FOUND", "Estimate not found");
   assertQuoteVersion(est.updated_at, expectedUpdatedAt);
-  if (est.status !== "draft") fail("IMMUTABLE_ENTITY", "Only a draft quote can be revised");
+  if (est.status !== "draft") fail("IMMUTABLE_ENTITY", "Only a draft estimate can be revised");
   const stored = parsePreparedScope(est.prepared_scope);
-  if (!stored) fail("NO_PREPARED_SCOPE", "This quote has no prepared scope");
+  if (!stored) fail("NO_PREPARED_SCOPE", "This estimate has no prepared scope");
   return applyScopeEdits(stored, incoming);
 }
 
@@ -85,7 +85,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
 
   try {
     const summary = await loadAssessmentSummary(session, incoming.source.visit_id);
-    if (!summary) return errorResponse(session, 400, "NO_ASSESSMENT", "The assessment this quote came from is gone");
+    if (!summary) return errorResponse(session, 400, "NO_ASSESSMENT", "The assessment this estimate came from is gone");
 
     if (body.accept) {
       const parsed = revisionOutputSchema.safeParse(body.accept.output);

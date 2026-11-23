@@ -372,7 +372,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     <PageContainer>
       <Breadcrumbs
         items={[
-          { href: "/app/clients", label: "Clients" },
+          { href: "/app/clients", label: "Customers" },
           { label: client.name },
         ]}
       />
@@ -380,7 +380,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         title={client.name}
         subtitle={formatClientContact(client)}
         backHref="/app/clients"
-        backLabel="Clients"
+        backLabel="Customers"
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
             {/* Billing first — strongest create action on this page */}
@@ -546,7 +546,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               }}
             >
               Square shows more historical payments than projects in this app. Re-import the Square
-              Customers CSV (People → Import Square CSV) to refresh counts. Full job history would
+              Customers CSV (Customers → Import Square CSV) to refresh counts. Full job history would
               need a Square Orders/Payments import — customer export only carries totals.
             </p>
           ) : null}
@@ -557,7 +557,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <div className="p7-detail-primary">
           <Card>
             <SectionHeader
-              title="Houses"
+              title="Properties"
               count={properties.length}
               action={
                 <LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="ghost" size="sm">

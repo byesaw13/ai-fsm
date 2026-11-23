@@ -12,19 +12,19 @@ export type HubLink = {
 
 export const WORK_HUB_LINKS: HubLink[] = [
   { href: "/app/requests", label: "Requests" },
-  { href: "/app/estimates", label: UI.quotes },
+  { href: "/app/estimates", label: UI.estimates },
   { href: "/app/jobs", label: UI.jobs },
   // Work orders and visits are internal packets, not hub nouns.
   { href: "/app/schedule", label: "Schedule" },
 ];
 
 export const PEOPLE_HUB_LINKS: HubLink[] = [
-  { href: "/app/clients", label: UI.people },
-  { href: "/app/properties", label: UI.houses },
+  { href: "/app/clients", label: UI.customers },
+  { href: "/app/properties", label: UI.properties },
 ];
 
 export const MONEY_HUB_LINKS: HubLink[] = [
-  { href: "/app/invoices", label: "Bills" },
+  { href: "/app/invoices", label: UI.invoices },
   { href: "/app/expenses", label: "Expenses" },
   { href: "/app/mileage", label: "Mileage" },
   { href: "/app/materials", label: "Materials" },

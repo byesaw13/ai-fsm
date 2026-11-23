@@ -362,7 +362,7 @@ export function finalizeTmDraft(
       description: `Estimated on-site labor (T&M) — ${formatHourRange(
         extraction.labor_hours_min,
         extraction.labor_hours_max
-      )} hrs @ $${dollarsFromCents(labor_rate_cents)}/hr. Final bill = actual hours.`,
+      )} hrs @ $${dollarsFromCents(labor_rate_cents)}/hr. Final invoice = actual hours.`,
       quantity: labor_mid_hours,
       unit_price_cents: labor_rate_cents,
       line_item_type: "labor",
@@ -381,7 +381,7 @@ export function finalizeTmDraft(
       description: `Estimated travel (T&M) — ${formatHourRange(
         extraction.travel_hours_min,
         extraction.travel_hours_max
-      )} hrs to ${loc}. Final bill = actual travel time.`,
+      )} hrs to ${loc}. Final invoice = actual travel time.`,
       quantity: travel_mid_hours,
       unit_price_cents: travel_rate_cents,
       line_item_type: "labor",

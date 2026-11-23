@@ -23,7 +23,7 @@ export async function GET(
   );
 
   if (!client) {
-    return new NextResponse("Client not found", { status: 404 });
+    return new NextResponse("Customer not found", { status: 404 });
   }
 
   // TASK-160: short-lived, read-only preview session (not a real client login).

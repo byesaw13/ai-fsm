@@ -88,7 +88,7 @@ export function Step1WhoAndWhat({
             <div style={{ flex: 1 }}>
               <Select
                 id="client_id"
-                label="Client"
+                label="Customer"
                 required
                 value={clientId}
                 onChange={(e) => {
@@ -99,7 +99,7 @@ export function Step1WhoAndWhat({
                 }}
                 disabled={pending}
                 options={clientList.map((c) => ({ value: c.id, label: c.name }))}
-                placeholder="Select a client"
+                placeholder="Select a customer"
               />
             </div>
             <button
@@ -133,7 +133,7 @@ export function Step1WhoAndWhat({
                 placeholder="None"
                 hint={
                   clientId && filteredJobs.length === 0
-                    ? "No open jobs for this client."
+                    ? "No open jobs for this customer."
                     : undefined
                 }
               />
@@ -172,7 +172,7 @@ export function Step1WhoAndWhat({
                 placeholder="None"
                 hint={
                   clientId && filteredProperties.length === 0
-                    ? "No properties for this client."
+                    ? "No properties for this customer."
                     : undefined
                 }
               />

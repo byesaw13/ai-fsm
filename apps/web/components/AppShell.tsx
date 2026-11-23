@@ -11,6 +11,7 @@ import { FloatingActionButton } from "./FloatingActionButton";
 import { CommandPalette } from "./CommandPalette";
 import { CAPTURE_HREF, CaptureLink } from "./CaptureLink";
 import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
+import { UI } from "@/lib/vocabulary";
 import { LiveRefresh } from "./LiveRefresh";
 import {
   IconDashboard,
@@ -69,31 +70,31 @@ interface NavSection {
 }
 
 // ---------------------------------------------------------------------------
-// Navigation definitions — ONE model. Nested hubs (Home / Work / People / Money).
+// Navigation definitions — ONE model. Nested hubs (Home / Work / Customers / Money).
 // Sidebar (≥768px) and More sheet (<768px) render the same sections; the bottom
 // bar is a 4-hub shortcut subset (+ More button in AppShell).
 // ---------------------------------------------------------------------------
 
 // The office desk. Labelled "Desk" (not "Today") so it doesn't compete with the field home.
-const NAV_TODAY:      NavItem = { href: "/app",              label: "Desk",       Icon: IconDashboard };
+const NAV_TODAY:      NavItem = { href: "/app",              label: UI.desk,      Icon: IconDashboard };
 // Field home. Owners can switch into it; pure admins (who don't do field work) never see it here.
-const NAV_MY_DAY:     NavItem = { href: "/app/my-work",      label: "Today",      Icon: IconMyDay };
+const NAV_MY_DAY:     NavItem = { href: "/app/my-work",      label: UI.today,     Icon: IconMyDay };
 const NAV_CAPTURE:    NavItem = { href: "/app/capture",      label: "Capture",    Icon: IconCapture };
 const NAV_DAY_REVIEW: NavItem = { href: "/app/day-review",   label: "Day Review", Icon: IconDayReview };
 const NAV_TRACKING:   NavItem = { href: "/app/timeline",     label: "Tracking",   Icon: IconField };
 const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests",   Icon: IconInbox };
-const NAV_CLIENTS:    NavItem = { href: "/app/clients",      label: "People",     Icon: IconClients,   adminOnly: true };
-const NAV_PROPS:      NavItem = { href: "/app/properties",   label: "Houses",     Icon: IconProperties, adminOnly: true };
-const NAV_ESTIMATES:  NavItem = { href: "/app/estimates",    label: "Quotes",     Icon: IconEstimates, adminOnly: true };
-const NAV_JOBS:       NavItem = { href: "/app/jobs",         label: "Jobs",       Icon: IconJobs,       adminOnly: true };
+const NAV_CLIENTS:    NavItem = { href: "/app/clients",      label: UI.customers, Icon: IconClients,   adminOnly: true };
+const NAV_PROPS:      NavItem = { href: "/app/properties",   label: UI.properties, Icon: IconProperties, adminOnly: true };
+const NAV_ESTIMATES:  NavItem = { href: "/app/estimates",    label: UI.estimates, Icon: IconEstimates, adminOnly: true };
+const NAV_JOBS:       NavItem = { href: "/app/jobs",         label: UI.jobs,      Icon: IconJobs,       adminOnly: true };
 // Work orders are reached inside a Job, not from the top nav.
 const NAV_SCHEDULE:   NavItem = { href: "/app/schedule",     label: "Schedule",   Icon: IconSchedule,  adminOnly: true };
-const NAV_INVOICES:   NavItem = { href: "/app/invoices",     label: "Bills",      Icon: IconInvoices,  adminOnly: true };
+const NAV_INVOICES:   NavItem = { href: "/app/invoices",     label: UI.invoices,  Icon: IconInvoices,  adminOnly: true };
 const NAV_REPORTS:    NavItem = { href: "/app/reports",      label: "Reports",    Icon: IconReports,   adminOnly: true };
 const NAV_SETTINGS:   NavItem = { href: "/app/settings",     label: "Settings",   Icon: IconSettings,  adminOnly: true };
 const NAV_MAP:        NavItem = { href: "/app/map",          label: "Map",        Icon: IconMap };
 
-/** Nested hub IA — Home / Work / People / Money (+ Settings). Home item is injected per role/view. */
+/** Nested hub IA — Home / Work / Customers / Money (+ Settings). Home item is injected per role/view. */
 function buildHubSections(home: NavItem): NavSection[] {
   return [
     { label: "Home", items: [home, NAV_CAPTURE, NAV_DAY_REVIEW, NAV_TRACKING] },
@@ -101,7 +102,7 @@ function buildHubSections(home: NavItem): NavSection[] {
       label: "Work",
       items: [NAV_REQUESTS, NAV_ESTIMATES, NAV_JOBS, NAV_SCHEDULE],
     },
-    { label: "People", items: [NAV_CLIENTS, NAV_PROPS] },
+    { label: UI.customers, items: [NAV_CLIENTS, NAV_PROPS] },
     { label: "Money", items: [NAV_INVOICES, NAV_REPORTS] },
     { label: "", items: [NAV_SETTINGS] },
   ];
@@ -115,7 +116,7 @@ function buildHubSections(home: NavItem): NavSection[] {
 export function getNavSections(role: Role, view: "office" | "field" = "field"): NavSection[] {
   if (role === "tech") {
     // Today only. Night is End day on that screen, not a second Day Review tab.
-    const myDay: NavItem = { href: "/app/my-work", label: "Today", Icon: IconMyDay };
+    const myDay: NavItem = { href: "/app/my-work", label: UI.today, Icon: IconMyDay };
     return [{ label: "", items: [myDay] }];
   }
 
@@ -140,7 +141,7 @@ export function getNavSections(role: Role, view: "office" | "field" = "field"): 
  */
 export function getBottomNavItems(role: Role): NavItem[] {
   if (role === "tech") {
-    const myDay: NavItem = { href: "/app/my-work", label: "Today", Icon: IconMyDay };
+    const myDay: NavItem = { href: "/app/my-work", label: UI.today, Icon: IconMyDay };
     return [myDay];
   }
 
@@ -148,20 +149,20 @@ export function getBottomNavItems(role: Role): NavItem[] {
     role === "owner"
       ? {
           href: "/app/my-work",
-          label: "Today",
+          label: UI.today,
           Icon: IconMyDay,
           activePrefixes: ["/app/my-work", "/app/my-day", "/app/day-review", "/app/timeline", "/app/capture"],
         }
       : {
           href: "/app",
-          label: "Desk",
+          label: UI.desk,
           Icon: IconDashboard,
           activePrefixes: ["/app/day-review", "/app/timeline", "/app/capture"],
         };
 
   const work: NavItem = {
     href: "/app/jobs",
-    label: "Jobs",
+    label: UI.jobs,
     Icon: IconJobs,
     activePrefixes: [
       "/app/jobs",
@@ -174,7 +175,7 @@ export function getBottomNavItems(role: Role): NavItem[] {
   };
   const people: NavItem = {
     href: "/app/clients",
-    label: "People",
+    label: UI.customers,
     Icon: IconClients,
     activePrefixes: ["/app/clients", "/app/properties"],
   };

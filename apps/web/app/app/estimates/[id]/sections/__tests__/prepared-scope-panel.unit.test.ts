@@ -81,7 +81,7 @@ describe("PreparedScopePanel options (TASK-224)", () => {
     expect(html).toContain('value="1050.00"');
     expect(html).toContain('value="Same room"');
     expect(html).toContain("Add option");
-    expect(html).toContain("apart from the quote total");
+    expect(html).toContain("apart from the estimate total");
   });
 });
 

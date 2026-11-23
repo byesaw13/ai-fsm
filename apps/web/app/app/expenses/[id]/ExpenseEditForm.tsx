@@ -263,11 +263,11 @@ export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categor
       {clients.length > 0 && (
         <Select
           id="edit_client_id"
-          label="Link to Client"
+          label="Link to Customer"
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
           options={[
-            { value: "", label: "No client" },
+            { value: "", label: "No customer" },
             ...clients.map((c) => ({ value: c.id, label: c.name })),
           ]}
           disabled={pending}
@@ -291,7 +291,7 @@ export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categor
           disabled={pending}
           data-testid="expense-billable"
         />
-        Bill to client (uncheck for duplicates, tools, or receipts billed elsewhere)
+        Charge to customer (uncheck for duplicates, tools, or receipts billed elsewhere)
       </label>
 
       <div className="p7-form-actions">

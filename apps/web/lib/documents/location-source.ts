@@ -32,9 +32,9 @@ export function locationSourceLabel(source: LocationSource): string {
     case "estimate":
       return "From linked estimate";
     case "client_property":
-      return "From client property";
+      return "From customer property";
     case "client_billing":
-      return "Client billing address";
+      return "Customer billing address";
     case "missing":
       return "Not set — tap to link";
   }

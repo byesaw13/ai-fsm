@@ -9,26 +9,26 @@ function readApp(rel: string): string {
 }
 
 describe("Era 2 Wave F — human language on list/create surfaces", () => {
-  it("clients list is People, with a New person path and no visit/work-order empty state", () => {
+  it("customers list is Customers, with a New customer path and no visit/work-order empty state", () => {
     const src = readApp("clients/page.tsx");
-    expect(src).toMatch(/title=\{UI\.people\}|title="People"/);
+    expect(src).toMatch(/title=\{UI\.customers\}|title="Customers"/);
     expect(src).not.toMatch(/title="Clients"/);
-    expect(src).toMatch(/\+ New person|New person/);
+    expect(src).toMatch(/\+ New customer|New customer/);
     expect(src).not.toMatch(/Create First Client|\+ New Client/);
     expect(src.toLowerCase()).not.toMatch(/work order/);
     expect(src).not.toMatch(/scheduling jobs and visits/);
   });
 
-  it("new person page title is New person, back to People", () => {
+  it("new customer page title is New customer, back to Customers", () => {
     const src = readApp("clients/new/page.tsx");
-    expect(src).toMatch(/title="New person"|title=\{`?New person/);
+    expect(src).toMatch(/title="New customer"|title=\{`?New customer/);
     expect(src).not.toMatch(/title="New Client"/);
-    expect(src).toMatch(/backLabel="People"|backLabel=\{UI\.people\}/);
+    expect(src).toMatch(/backLabel="Customers"|backLabel=\{UI\.customers\}/);
   });
 
-  it("import page backs to People", () => {
+  it("import page backs to Customers", () => {
     const src = readApp("clients/import/page.tsx");
-    expect(src).toMatch(/backLabel="People"|backLabel=\{UI\.people\}/);
+    expect(src).toMatch(/backLabel="Customers"|backLabel=\{UI\.customers\}/);
     expect(src).not.toMatch(/backLabel="Clients"/);
   });
 

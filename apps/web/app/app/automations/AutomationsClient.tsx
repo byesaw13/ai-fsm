@@ -347,7 +347,7 @@ export default function AutomationsClient({
     <PageContainer>
       <PageHeader
         title="Automations"
-        subtitle="Manage automated client communications"
+        subtitle="Manage automated customer communications"
       />
 
       {error && <div className="alert alert-error" data-testid="automation-error">{error}</div>}
@@ -380,7 +380,7 @@ export default function AutomationsClient({
 
         <AutomationSection
           title="Review Requests"
-          description="Automatically ask clients for a review after a job is completed."
+          description="Automatically ask customers for a review after a job is completed."
           automation={reviewRequest}
           stats={reviewRequestStats}
           createForm={<CreateReviewRequestForm />}

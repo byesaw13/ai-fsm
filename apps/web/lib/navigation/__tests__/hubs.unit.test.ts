@@ -8,7 +8,7 @@ import {
 } from "../hubs";
 
 describe("hubs navigation", () => {
-  it("exposes Work / People / Money sibling sets", () => {
+  it("exposes Work / Customers / Money sibling sets", () => {
     expect(WORK_HUB_LINKS.map((l) => l.href)).toContain("/app/jobs");
     expect(PEOPLE_HUB_LINKS.map((l) => l.href)).toEqual([
       "/app/clients",
@@ -17,10 +17,10 @@ describe("hubs navigation", () => {
     expect(MONEY_HUB_LINKS.map((l) => l.href)).toContain("/app/invoices");
   });
 
-  it("labels the clients destination People, not Clients", () => {
+  it("labels the clients destination Customers, not Clients", () => {
     expect(PEOPLE_HUB_LINKS).toEqual([
-      { href: "/app/clients", label: "People" },
-      { href: "/app/properties", label: "Houses" },
+      { href: "/app/clients", label: "Customers" },
+      { href: "/app/properties", label: "Properties" },
     ]);
   });
 

@@ -19,19 +19,17 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : owner requests done 2026-11-01: TASK-231 (#748
-                      d4a4cf94, portal shows quote terms) and TASK-229 (#749
-                      d2ac0d71, room-by-room painting priced by engine rules
-                      only, no reconciliation line). Both deployed ~08:16 UTC,
-                      no migration; health ok, /login 200, Dowd portal 200.
-                      TASK-230 (#746) and B4 (TASK-193) done earlier.
-In-flight PR        : none
-Next step           : Track E (TASK-235 to TASK-240) once E0 is merged and
-                      G8 is Active; until then, next eligible step after B4.
+Last step           : E0 merged (#755, 2fe389a4); G8 Active (owner comment
+                      on #755, 2026-11-23 15:06 UTC).
+In-flight PR        : E1 TASK-235 PR 1 (staff screens + scan test)
+Next step           : E1 PR 2 (customer-facing pages) after PR 1 is
+                      Verified; then E2 TASK-238.
 Blocked on          : nothing
 Last known-good     : d2ac0d71 (deploy-good/d2ac0d71); previous d4a4cf94
-Notes               : Open PR #739 (quote editor design fixes, TASK-222
-                      follow-up) belongs to another session; not touched.
+Notes               : Main checkout holds another session's uncommitted
+                      drafts of TASK-235..240 (duplicates of #755); left
+                      untouched. Owner checks after deploy (non-blocking):
+                      none yet.
 ```
 
 ## Owner approvals
@@ -54,7 +52,7 @@ this one, as an approval.
 | G3 | Closing each stale "sent" estimate (TASK-206) | Per estimate, non-blocking | |
 | G4 | Any database restore or data repair on production | Ask every time | |
 | G6 | TASK-225 table-freeze exception (one nullable column for chosen add-ons) | Approved 2026-10-31 | Owner in session: "approve both, use craftsman factors, start TASK-227", answering (1) TASK-225's one new column and (2) TASK-228's factors. |
-| G8 | Track E: build TASK-235 to TASK-240 in the order and with the decisions in "Plan: Track E", merging and deploying under G0 | Pending | Needs an owner comment from `byesaw13` on the E0 PR, for example: `I approve Track E as described in docs/working/build-runbook.md`. |
+| G8 | Track E: build TASK-235 to TASK-240 in the order and with the decisions in "Plan: Track E", merging and deploying under G0 | **Active** 2026-11-23 | Owner comment on PR #755 at 2026-11-23 15:06 UTC, from `byesaw13`: `I approve Track E as described in docs/working/build-runbook.md` (issuecomment-7105048753). |
 | G7 | TASK-228 height factors: Craftsman ×1.23 (9–13 ft), ×1.46 (13–17 ft), ×1.69 (17–19 ft), ×1.92 (19–21 ft) | Approved 2026-10-31 | Same session answer as G6. |
 
 **Without G0 active** the agent works in "PRs only" mode: it builds, tests and
@@ -142,7 +140,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | D2 | TASK-226 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
 | D3 | TASK-225 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC, mig 213) | 2026-10-31 (health ok, /login 200, column present) |
 | D4 | TASK-227 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
-| E0 | Backlog TASK-235..240 + Track E | | | n/a | n/a |
+| E0 | Backlog TASK-235..240 + Track E | 2026-11-22 (#755, CI green) | 2026-11-23 (#755, 2fe389a4) | n/a | n/a |
 | E1 | TASK-235 | | | | |
 | E2 | TASK-238 | | | | |
 | E3 | TASK-236 | | | | |
@@ -687,6 +685,8 @@ Per step:
 
 ## Log
 
+- 2026-11-23 · E1 · In progress · TASK-235 PR 1: staff screens, API messages, menu and map say Customer, Property, Estimate, Invoice; scan test added
+- 2026-11-23 · E0 · Merged · #755 · squash 2fe389a4; G8 Active (owner comment on #755)
 
 - 2026-10-31 · B4 PR 1 · Verified · 8f158a7a deployed ~19:13 UTC, no migration; health ok, /login HTTP/2 200; known-good deploy-good/8f158a7a. Codex review fixed before merge: rates panel refetch loop on load error; saved hours-per-day now updates the card
 - 2026-10-31 · B4 PR 1 · Merged · #743 · squash 8f158a7a

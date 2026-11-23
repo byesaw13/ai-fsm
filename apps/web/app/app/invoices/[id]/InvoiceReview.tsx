@@ -4,7 +4,7 @@ export function InvoiceReview({ exceptions }: { exceptions: InvoiceException[] }
   if (exceptions.length === 0) {
     return (
       <p data-testid="invoice-review" style={{ margin: "0 0 var(--space-4)", color: "var(--fg-muted)" }}>
-        Nothing left to resolve before this bill goes out.
+        Nothing left to resolve before this invoice goes out.
       </p>
     );
   }

@@ -1,15 +1,18 @@
-/** Human nouns the shop sees. Backend tables keep `jobs`, `estimates`, `invoices`. */
+/**
+ * Words the shop and its customers see (owner decision 2026-11-22, DOMAIN_MODEL.md).
+ * Backend tables and routes keep their names (`clients`, `/app/clients`).
+ */
 export const UI = {
-  person: "Person",
-  people: "People",
-  house: "House",
-  houses: "Houses",
+  customer: "Customer",
+  customers: "Customers",
+  property: "Property",
+  properties: "Properties",
   job: "Job",
   jobs: "Jobs",
   today: "Today",
-  quote: "Quote",
-  quotes: "Quotes",
-  bill: "Bill",
-  bills: "Bills",
+  estimate: "Estimate",
+  estimates: "Estimates",
+  invoice: "Invoice",
+  invoices: "Invoices",
   desk: "Desk",
 } as const;

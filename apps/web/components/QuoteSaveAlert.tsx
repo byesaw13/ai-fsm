@@ -9,7 +9,7 @@ export function QuoteSaveAlert({ message }: { message: string }) {
   return (
     <div className="p7-card-danger" role="alert" data-testid="quote-save-alert">
       {reload ? (
-        <p style={{ margin: 0, fontWeight: 600 }}>This quote changed</p>
+        <p style={{ margin: 0, fontWeight: 600 }}>This estimate changed</p>
       ) : null}
       <p style={{ margin: reload ? "var(--space-1) 0 0" : 0 }} data-testid="edit-form-error">
         {message}

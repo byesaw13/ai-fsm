@@ -120,7 +120,7 @@ export function EstimateBanners({
             {estimate.expires_at ? ` on ${new Date(estimate.expires_at).toLocaleDateString()}` : ""}.
           </p>
           <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "#78350f" }}>
-            To re-engage this client, go to the job and create a new estimate.
+            To re-engage this customer, go to the job and create a new estimate.
           </p>
           {estimate.job_id && (
             <Link

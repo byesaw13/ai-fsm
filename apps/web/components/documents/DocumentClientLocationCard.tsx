@@ -215,13 +215,13 @@ export function DocumentClientLocationCard({
       if (!prop) return "Select a property";
       return formatPropertyOption(prop.address, prop.city, prop.state, prop.zip);
     }
-    return clientBillingAddress || "Client billing address (not on file)";
+    return clientBillingAddress || "Customer billing address (not on file)";
   }
 
   function buildPayload(): Record<string, unknown> {
     if (segment === "client") {
       if (!selectedClient || selectedClient.id === clientId) {
-        throw new Error("Choose a different client");
+        throw new Error("Choose a different customer");
       }
       return { client_id: selectedClient.id };
     }
@@ -249,7 +249,7 @@ export function DocumentClientLocationCard({
 
   function confirmBody(): string {
     if (segment === "client" && selectedClient) {
-      return `Change client from "${clientName ?? "—"}" to "${selectedClient.name}"? Linked project and property may be cleared unless you set them again.`;
+      return `Change customer from "${clientName ?? "—"}" to "${selectedClient.name}"? Linked project and property may be cleared unless you set them again.`;
     }
     return `Change service location from "${serviceLocation}" to "${previewLocation()}"?`;
   }
@@ -295,10 +295,10 @@ export function DocumentClientLocationCard({
   return (
     <>
       <Card>
-        <SectionHeader title="Client & Location" />
+        <SectionHeader title="Customer & Location" />
         <dl className="p7-detail-list" style={{ fontSize: "var(--text-sm)" }}>
           <div className="p7-detail-row">
-            <dt>Client</dt>
+            <dt>Customer</dt>
             <dd>
               {canEdit ? (
                 <button
@@ -349,7 +349,7 @@ export function DocumentClientLocationCard({
         </dl>
         {canEdit && (
           <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-            Tap client or service location to link or correct.
+            Tap customer or service location to link or correct.
           </p>
         )}
       </Card>
@@ -357,7 +357,7 @@ export function DocumentClientLocationCard({
       <Modal
         open={segment === "client"}
         onClose={closeEditor}
-        title="Link client"
+        title="Link customer"
         footer={
           <>
             <Button variant="secondary" onClick={closeEditor} disabled={pending}>
@@ -372,7 +372,7 @@ export function DocumentClientLocationCard({
         <div style={{ position: "relative" }}>
           <Input
             id="doc-client-search"
-            label="Client"
+            label="Customer"
             value={clientQuery}
             onChange={(e) => {
               setClientQuery(e.target.value);
@@ -454,8 +454,8 @@ export function DocumentClientLocationCard({
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
               {([
                 ["job", "Linked project (job)"],
-                ["property", "Client property"],
-                ["client_billing", "Client billing address"],
+                ["property", "Customer property"],
+                ["client_billing", "Customer billing address"],
               ] as const).map(([mode, label]) => (
                 <label key={mode} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                   <input
@@ -521,7 +521,7 @@ export function DocumentClientLocationCard({
             <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-secondary)", margin: 0 }}>
               {clientBillingAddress
                 ? `Uses billing address: ${clientBillingAddress}`
-                : "No billing address on file for this client. Add one on the client record or pick a property instead."}
+                : "No billing address on file for this customer. Add one on the customer record or pick a property instead."}
             </p>
           )}
 

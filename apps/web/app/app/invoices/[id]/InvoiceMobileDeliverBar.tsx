@@ -77,7 +77,7 @@ export function InvoiceMobileDeliverBar({
       }
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(portalUrl);
-        success("Client link copied");
+        success("Customer link copied");
         return;
       }
       error("Sharing not available on this device");
@@ -109,7 +109,7 @@ export function InvoiceMobileDeliverBar({
             color: "var(--fg)",
           }}
         >
-          Review the numbers, then deliver to the client
+          Review the numbers, then deliver to the customer
         </p>
       )}
       {showSend && (

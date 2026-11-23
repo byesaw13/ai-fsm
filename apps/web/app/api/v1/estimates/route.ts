@@ -184,7 +184,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         {
           error: {
             code: "NOT_FOUND",
-            message: "Client not found",
+            message: "Customer not found",
             traceId: session.traceId,
           },
         },

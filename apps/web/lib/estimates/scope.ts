@@ -241,7 +241,7 @@ function translateScopeRuleBased(notes: string): ScopeTranslation {
 
     if (totalSqFt > 0) {
       sq_ft = totalSqFt;
-      warningsList.push("Sq ft estimated from room count — verify exact measurements with client.");
+      warningsList.push("Sq ft estimated from room count — verify exact measurements with customer.");
     }
   }
 

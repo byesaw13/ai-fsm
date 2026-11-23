@@ -51,7 +51,7 @@ export function ClientActivityTimeline({ events }: { events: ActivityEvent[] }) 
   if (events.length === 0) {
     return (
       <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", padding: "var(--space-4) 0" }}>
-        No activity recorded for this client yet.
+        No activity recorded for this customer yet.
       </p>
     );
   }

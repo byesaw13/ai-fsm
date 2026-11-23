@@ -21,7 +21,7 @@ export function ClientTypeahead({
   value,
   onChange,
   disabled = false,
-  placeholder = "Search client...",
+  placeholder = "Search customer...",
   error,
 }: ClientTypeaheadProps) {
   const [query, setQuery] = useState("");

@@ -35,15 +35,15 @@ describe("quick actions", () => {
     expect(FIELD_QUICK_ACTIONS.some((a) => a.href === "/app/capture")).toBe(false);
   });
 
-  it("labels the clients destination People, not Clients", () => {
-    expect(OWNER_QUICK_ACTIONS.some((a) => a.href === "/app/clients" && a.label === "People")).toBe(
+  it("labels the clients destination Customers, not Clients", () => {
+    expect(OWNER_QUICK_ACTIONS.some((a) => a.href === "/app/clients" && a.label === "Customers")).toBe(
       true,
     );
     expect(OWNER_QUICK_ACTIONS.map((a) => a.label)).not.toContain("Clients");
   });
 
-  it("Today strip is Job, Receipt, Quote — nothing else", () => {
-    expect(FIELD_QUICK_ACTIONS.map((a) => a.label)).toEqual(["Job", "Receipt", "Quote"]);
+  it("Today strip is Job, Receipt, Estimate — nothing else", () => {
+    expect(FIELD_QUICK_ACTIONS.map((a) => a.label)).toEqual(["Job", "Receipt", "Estimate"]);
     expect(FIELD_QUICK_ACTIONS[0]).toMatchObject({ action: "quick-book" });
     expect(FIELD_QUICK_ACTIONS[1].href).toBe("/app/expenses/new");
     expect(FIELD_QUICK_ACTIONS[2].href).toMatch(/^\/app\/estimates/);

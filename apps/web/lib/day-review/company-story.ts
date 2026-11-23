@@ -67,7 +67,7 @@ const CLOCK_GAP_MINUTES = 20;
 /** Street number + first word, so "4 Ash St, Salem, NH" reads "4 Ash". */
 export function shortHouseLabel(raw: string | null | undefined): string {
   const text = (raw ?? "").trim();
-  if (!text) return "House";
+  if (!text) return "Property";
   const street = text.split(",")[0]?.trim() || text;
   const numbered = street.match(/^(\d+)\s+(\S+)/);
   if (numbered) return `${numbered[1]} ${numbered[2]}`;
@@ -169,10 +169,10 @@ export function assembleCompanyDayStoryInput(
 function housesLine(input: CompanyDayStoryInput): string {
   const houses =
     input.houseCount === 0
-      ? "No houses"
+      ? "No properties"
       : input.houseCount === 1
-        ? "1 house"
-        : `${input.houseCount} houses`;
+        ? "1 property"
+        : `${input.houseCount} properties`;
   const parts = [`${houses}. ${formatHours(input.jobMinutes)} on jobs`];
   if (input.miles != null) parts.push(`${Math.round(input.miles)} miles`);
   return `${parts.join(". ")}.`;
@@ -180,7 +180,7 @@ function housesLine(input: CompanyDayStoryInput): string {
 
 function billsLine(input: CompanyDayStoryInput): string {
   const holdCount = input.billsOnHold.length;
-  if (input.billsSent === 0 && holdCount === 0) return "Bills: none.";
+  if (input.billsSent === 0 && holdCount === 0) return "Invoices: none.";
   const parts: string[] = [];
   if (input.billsSent > 0) parts.push(`${input.billsSent} sent`);
   if (holdCount > 0) {
@@ -188,7 +188,7 @@ function billsLine(input: CompanyDayStoryInput): string {
     if (holdCount === 1) hold += ` (${holdLabel(input.billsOnHold[0])} — tap to send)`;
     parts.push(hold);
   }
-  return `Bills: ${parts.join(", ")}.`;
+  return `Invoices: ${parts.join(", ")}.`;
 }
 
 function comingBackItem(item: CompanyDayStoryReturn): string {
@@ -212,9 +212,9 @@ function leftoverBits(input: CompanyDayStoryInput): string[] {
     const r = receipts[0];
     const vendor = r.vendor.trim() || "Receipt";
     const money = r.amountCents != null ? ` ${formatMoney(r.amountCents)}` : "";
-    bits.push(`${vendor}${money} — which house?`);
+    bits.push(`${vendor}${money} — which property?`);
   } else if (receipts.length > 1) {
-    bits.push(`${receipts.length} receipts still need a house.`);
+    bits.push(`${receipts.length} receipts still need a property.`);
   }
   if (input.unansweredStops === 1) bits.push("1 stop still needs a reason.");
   else if (input.unansweredStops > 1) bits.push(`${input.unansweredStops} stops still need a reason.`);

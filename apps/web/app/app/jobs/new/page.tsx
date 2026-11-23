@@ -50,7 +50,7 @@ export default async function NewJobPage({ searchParams }: PageProps) {
       <Card>
         <SectionHeader title="Quick job" />
         <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginTop: "-8px", marginBottom: "var(--space-3)" }}>
-          Person, house, and today. Time and materials. No estimate.
+          Customer, property, and today. Time and materials. No estimate.
         </p>
         <QuickBookButton
           className="p7-btn p7-btn-primary"

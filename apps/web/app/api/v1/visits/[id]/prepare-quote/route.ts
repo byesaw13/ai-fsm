@@ -57,7 +57,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     if (existing) return NextResponse.json({ id: existing, resumed: true }, { status: 200 });
 
     const summary = await loadAssessmentSummary(session, visitId);
-    if (!summary) return errorResponse(session, 404, "NO_ASSESSMENT", "Save the assessment before preparing a quote");
+    if (!summary) return errorResponse(session, 404, "NO_ASSESSMENT", "Save the assessment before preparing an estimate");
 
     const context = await withEstimateContext(session, async (client) => {
       const { rows } = await client.query<{
@@ -100,7 +100,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     if (!scope) {
       const reason = describeAiFailure(failure);
       logger.warn("prepare-quote: AI preparation failed", { visitId, code: reason.code, error: (failure as Error | null)?.message });
-      return errorResponse(session, 503, reason.code, `${reason.message} No quote was created.`);
+      return errorResponse(session, 503, reason.code, `${reason.message} No estimate was created.`);
     }
 
     const { labor_rate_cents } = resolveLaborRateCents(context.property_state, context.settings);
@@ -136,6 +136,6 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     const err = error as Error & { code?: string };
     if (err.code === "NOT_FOUND") return errorResponse(session, 404, "NOT_FOUND", err.message);
     logger.error("POST /api/v1/visits/[id]/prepare-quote error", error, { traceId: session.traceId, visitId });
-    return errorResponse(session, 500, "INTERNAL_ERROR", "Failed to prepare the quote");
+    return errorResponse(session, 500, "INTERNAL_ERROR", "Failed to prepare the estimate");
   }
 });
