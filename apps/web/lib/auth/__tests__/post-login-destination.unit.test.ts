@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  homeEntryHref,
   readWorkspaceModeCookie,
+  shouldSteerToPreferredHome,
   resolvePostLoginHref,
 } from "../post-login-destination";
 
@@ -46,5 +48,29 @@ describe("readWorkspaceModeCookie", () => {
     expect(readWorkspaceModeCookie(null)).toBeNull();
     expect(readWorkspaceModeCookie("foo=bar")).toBeNull();
     expect(readWorkspaceModeCookie("dv_ws_mode=auto")).toBeNull();
+  });
+});
+
+describe("shouldSteerToPreferredHome (TASK-238)", () => {
+  it("steers when the app opens (first page of the session) on a home", () => {
+    expect(shouldSteerToPreferredHome({ pathname: "/app", firstInSession: true, homeEntry: false })).toBe(true);
+    expect(shouldSteerToPreferredHome({ pathname: "/app/my-work", firstInSession: true, homeEntry: false })).toBe(true);
+  });
+
+  it("steers when the logo is tapped (home entry)", () => {
+    expect(shouldSteerToPreferredHome({ pathname: "/app/my-work", firstInSession: false, homeEntry: true })).toBe(true);
+  });
+
+  it("never steers a menu tap on Desk or Today later in the session", () => {
+    expect(shouldSteerToPreferredHome({ pathname: "/app", firstInSession: false, homeEntry: false })).toBe(false);
+    expect(shouldSteerToPreferredHome({ pathname: "/app/my-work", firstInSession: false, homeEntry: false })).toBe(false);
+  });
+
+  it("never steers away from other pages", () => {
+    expect(shouldSteerToPreferredHome({ pathname: "/app/jobs", firstInSession: true, homeEntry: true })).toBe(false);
+  });
+
+  it("marks the logo link as a home entry", () => {
+    expect(homeEntryHref("/app/my-work")).toBe("/app/my-work?home=1");
   });
 });

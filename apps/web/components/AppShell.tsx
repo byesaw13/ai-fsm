@@ -12,6 +12,7 @@ import { CommandPalette } from "./CommandPalette";
 import { CAPTURE_HREF, CaptureLink } from "./CaptureLink";
 import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
 import { UI } from "@/lib/vocabulary";
+import { homeEntryHref } from "@/lib/auth/post-login-destination";
 import { LiveRefresh } from "./LiveRefresh";
 import {
   IconDashboard,
@@ -244,7 +245,9 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
 
   const isAdminOrOwner = role === "owner" || role === "admin";
   // Logo goes to each role's home: Today for field roles, Desk for pure admins.
-  const homeHref = role === "admin" ? "/app" : "/app/my-work";
+  const roleHome = role === "admin" ? "/app" : "/app/my-work";
+  // Owner logo is a deliberate "take me home": steer to the preferred home (TASK-238).
+  const homeHref = role === "owner" ? homeEntryHref(roleHome) : roleHome;
 
   const { summary: attention, refresh: refreshAttention } = useAttentionSummary(isAdminOrOwner);
 

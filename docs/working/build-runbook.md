@@ -19,18 +19,18 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : E0 merged (#755, 2fe389a4); G8 Active (owner comment
-                      on #755, 2026-11-23 15:06 UTC).
-In-flight PR        : #756 E1 TASK-235 (staff and customer screens in one
-                      PR; the customer-facing part was 9 strings, so the
-                      planned PR 2 was folded in)
-Next step           : E2 TASK-238 once E1 is Verified.
+Last step           : E1 TASK-235 Verified: #756 (8ba86816) deployed
+                      ~15:56 UTC, no migration; health ok, /login 200, a
+                      live portal estimate shows Estimate/Customer.
+In-flight PR        : E2 TASK-238 (homes never bounce)
+Next step           : E3 TASK-236 once E2 is Verified.
 Blocked on          : nothing
-Last known-good     : d2ac0d71 (deploy-good/d2ac0d71); previous d4a4cf94
+Last known-good     : 8ba86816 (deploy-good/18460468 was the one before;
+                      production had moved past d2ac0d71 to 18460468)
 Notes               : Main checkout holds another session's uncommitted
                       drafts of TASK-235..240 (duplicates of #755); left
                       untouched. Owner checks after deploy (non-blocking):
-                      none yet.
+                      none yet (TASK-235 has none).
 ```
 
 ## Owner approvals
@@ -142,7 +142,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | D3 | TASK-225 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC, mig 213) | 2026-10-31 (health ok, /login 200, column present) |
 | D4 | TASK-227 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
 | E0 | Backlog TASK-235..240 + Track E | 2026-11-22 (#755, CI green) | 2026-11-23 (#755, 2fe389a4) | n/a | n/a |
-| E1 | TASK-235 | | | | |
+| E1 | TASK-235 | 2026-11-23 (#756, CI green) | 2026-11-23 (#756, 8ba86816) | 2026-11-23 (~15:56 UTC) | 2026-11-23 (health ok, /login 200, staff pages 307 to /login, a live portal estimate link 200 shows Estimate/Customer and no Quote/Client) |
 | E2 | TASK-238 | | | | |
 | E3 | TASK-236 | | | | |
 | E4 | TASK-237 | | | | |
@@ -686,6 +686,10 @@ Per step:
 
 ## Log
 
+- 2026-11-23 · E2 · In progress · TASK-238: steer only on app open or logo; owner switch links; phone e2e added to the CI smoke
+- 2026-11-23 · E1 · Verified · health ok, /login 200, live portal estimate shows Estimate/Customer; known-good deploy-good/18460468 before it
+- 2026-11-23 · E1 · Deployed · 8ba86816 · ~15:56 UTC, no migration so no backup
+- 2026-11-23 · E1 · Merged · #756 · squash 8ba86816; customer-facing part folded in (9 strings)
 - 2026-11-23 · E1 · In progress · #756 · staff screens, API messages, menu, map, portal, print, PDF and SMS say Customer, Property, Estimate, Invoice; scan test added
 - 2026-11-23 · E0 · Merged · #755 · squash 2fe389a4; G8 Active (owner comment on #755)
 
