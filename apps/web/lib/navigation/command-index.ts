@@ -1,8 +1,7 @@
 import type { Role } from "@ai-fsm/domain";
 import {
-  FAB_QUICK_ACTIONS,
-  FIELD_QUICK_ACTIONS,
-  OWNER_QUICK_ACTIONS,
+  NEW_ACTIONS,
+  NEW_MORE_ACTIONS,
   type QuickAction,
 } from "./quick-actions";
 import { MONEY_HUB_LINKS, PEOPLE_HUB_LINKS, WORK_HUB_LINKS } from "./hubs";
@@ -25,6 +24,7 @@ const DESTINATIONS: CommandItem[] = [
   { id: "day-review", label: "Day Review", href: "/app/day-review", keywords: "end close evening", roles: OWNER_ADMIN },
   { id: "tracking", label: "Tracking", href: "/app/timeline", keywords: "timeline mileage gps vehicle", roles: OWNER_ADMIN },
   { id: "visits", label: "Visits", href: "/app/visits", keywords: "today schedule stop", roles: ALL },
+  { id: "quick-materials", label: "Quick materials", href: "/app/materials/quick", keywords: "supply house list materials", roles: OWNER_ADMIN },
   { id: "price-book", label: "Price book", href: "/app/price-book", keywords: "services rates", roles: OWNER_ADMIN },
   { id: "settings", label: "Settings", href: "/app/settings", keywords: "company team square", roles: OWNER_ADMIN },
   ...WORK_HUB_LINKS.map((l) => ({
@@ -50,6 +50,15 @@ const DESTINATIONS: CommandItem[] = [
   })),
 ];
 
+/** Old names people may still type for the New choices (TASK-236). */
+const NEW_KEYWORDS: Record<string, string> = {
+  "/app/intake/new": "new request lead intake call",
+  "/app/capture": "capture voice photo receipt note promise",
+  "/app/estimates/new": "new estimate quote",
+  "/app/jobs/new": "new job",
+  "/app/invoices/new": "new invoice bill",
+};
+
 function fromQuick(actions: QuickAction[], roles: Role[], prefix: string): CommandItem[] {
   return actions
     .filter((a) => !a.action)
@@ -57,7 +66,7 @@ function fromQuick(actions: QuickAction[], roles: Role[], prefix: string): Comma
       id: `${prefix}-${a.label}`,
       label: a.label,
       href: a.href,
-      keywords: a.label.toLowerCase(),
+      keywords: `${a.label.toLowerCase()} ${NEW_KEYWORDS[a.href] ?? ""}`.trim(),
       roles,
     }));
 }
@@ -76,9 +85,8 @@ function dedupe(items: CommandItem[]): CommandItem[] {
 
 export const COMMAND_INDEX: CommandItem[] = dedupe([
   ...DESTINATIONS,
-  ...fromQuick(OWNER_QUICK_ACTIONS, OWNER_ADMIN, "owner"),
-  ...fromQuick(FIELD_QUICK_ACTIONS, OWNER_ADMIN, "field"),
-  ...fromQuick(FAB_QUICK_ACTIONS, OWNER_ADMIN, "fab"),
+  ...fromQuick(NEW_ACTIONS, OWNER_ADMIN, "new"),
+  ...fromQuick(NEW_MORE_ACTIONS, OWNER_ADMIN, "new"),
 ]);
 
 export function filterCommands(query: string, role: Role, index: CommandItem[] = COMMAND_INDEX): CommandItem[] {

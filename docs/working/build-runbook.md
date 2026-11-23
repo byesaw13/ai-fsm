@@ -19,18 +19,17 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : E1 TASK-235 Verified: #756 (8ba86816) deployed
-                      ~15:56 UTC, no migration; health ok, /login 200, a
-                      live portal estimate shows Estimate/Customer.
-In-flight PR        : E2 TASK-238 (homes never bounce)
-Next step           : E3 TASK-236 once E2 is Verified.
+Last step           : E2 TASK-238 Verified: #757 (4365bb3a) deployed
+                      ~16:39 UTC, no migration; health ok, /login 200.
+In-flight PR        : E3 TASK-236 (one New button)
+Next step           : E4 TASK-237 once E3 is Verified.
 Blocked on          : nothing
-Last known-good     : 8ba86816 (deploy-good/18460468 was the one before;
-                      production had moved past d2ac0d71 to 18460468)
+Last known-good     : 4365bb3a (deploy-good/8ba86816 before it)
 Notes               : Main checkout holds another session's uncommitted
                       drafts of TASK-235..240 (duplicates of #755); left
                       untouched. Owner checks after deploy (non-blocking):
-                      none yet (TASK-235 has none).
+                      - TASK-238: on your phone, tap Switch to Desk; Desk
+                        stays open. Tap the logo; you land on Today.
 ```
 
 ## Owner approvals
@@ -143,7 +142,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | D4 | TASK-227 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
 | E0 | Backlog TASK-235..240 + Track E | 2026-11-22 (#755, CI green) | 2026-11-23 (#755, 2fe389a4) | n/a | n/a |
 | E1 | TASK-235 | 2026-11-23 (#756, CI green) | 2026-11-23 (#756, 8ba86816) | 2026-11-23 (~15:56 UTC) | 2026-11-23 (health ok, /login 200, staff pages 307 to /login, a live portal estimate link 200 shows Estimate/Customer and no Quote/Client) |
-| E2 | TASK-238 | | | | |
+| E2 | TASK-238 | 2026-11-23 (#757, CI green incl. phone/logo e2e) | 2026-11-23 (#757, 4365bb3a) | 2026-11-23 (~16:39 UTC) | 2026-11-23 (health ok, /login 200, /app and /app/my-work 307 to /login signed out; bounce and logo behavior covered by the CI e2e) |
 | E3 | TASK-236 | | | | |
 | E4 | TASK-237 | | | | |
 | E5 | TASK-239 | | | | |
@@ -686,6 +685,10 @@ Per step:
 
 ## Log
 
+- 2026-11-23 · E3 · In progress · TASK-236: one New button (phone + and sidebar), three choices plus More; Today strip uses the same list; quick-lead pop-up and FAB lists removed
+- 2026-11-23 · E2 · Verified · health ok, /login 200; known-good deploy-good/8ba86816 before it
+- 2026-11-23 · E2 · Deployed · 4365bb3a · ~16:39 UTC, no migration
+- 2026-11-23 · E2 · Merged · #757 · squash 4365bb3a; Codex finding (logo on a query-only change) fixed before merge
 - 2026-11-23 · E2 · In progress · TASK-238: steer only on app open or logo; owner switch links; phone e2e added to the CI smoke
 - 2026-11-23 · E1 · Verified · health ok, /login 200, live portal estimate shows Estimate/Customer; known-good deploy-good/18460468 before it
 - 2026-11-23 · E1 · Deployed · 8ba86816 · ~15:56 UTC, no migration so no backup

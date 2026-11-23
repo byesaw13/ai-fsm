@@ -6,8 +6,7 @@ import { Suspense, useEffect, useState, type ReactNode } from "react";
 import type { Route } from "next";
 import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
-import { QuickLeadModal } from "./QuickLeadModal";
-import { FloatingActionButton } from "./FloatingActionButton";
+import { NewButton } from "./NewButton";
 import { CommandPalette } from "./CommandPalette";
 import { CAPTURE_HREF, CaptureLink } from "./CaptureLink";
 import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
@@ -226,7 +225,6 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
   // office. So Field never shows the Desk home and vice-versa.
   const sections = getNavSections(role, pathname.startsWith("/app/my-work") ? "field" : "office");
   const bottomItems = getBottomNavItems(role);
-  const [showQuickLead, setShowQuickLead] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -294,32 +292,8 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
             <FindButton testId="command-palette-open" />
           </div>
 
-          {/* New Request button — owner/admin only */}
-          {isAdminOrOwner && (
-            <button
-              type="button"
-              onClick={() => setShowQuickLead(true)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                width: "100%",
-                padding: "8px 12px",
-                margin: "4px 0 8px",
-                borderRadius: 6,
-                border: "1px solid var(--accent, #0f172a)",
-                background: "var(--accent, #0f172a)",
-                color: "#fff",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-            >
-              <span style={{ fontSize: 16 }}>⚡</span>
-              New Request
-            </button>
-          )}
+          {/* The one New button (TASK-236) — owner/admin only */}
+          {isAdminOrOwner && <NewButton placement="sidebar" />}
 
           {/* Scrollable nav sections */}
           <nav className="p7-nav" aria-label="Primary navigation">
@@ -597,12 +571,11 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
           </>
         )}
       </div>
-      {showQuickLead && <QuickLeadModal onClose={() => setShowQuickLead(false)} />}
       {isAdminOrOwner &&
         !pathname.startsWith("/app/my-work") &&
         !pathname.startsWith("/app/my-day") &&
         !/^\/app\/visits\/[^/]+$/.test(pathname) &&
-        !pathname.startsWith("/app/capture") && <FloatingActionButton />}
+        !pathname.startsWith("/app/capture") && <NewButton placement="fab" />}
       <CommandPalette role={role} />
     </ToastProvider>
   );

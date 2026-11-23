@@ -1,64 +1,66 @@
 import { describe, it, expect } from "vitest";
 import {
-  OWNER_QUICK_ACTIONS,
-  FIELD_QUICK_ACTIONS,
-  FAB_QUICK_ACTIONS,
+  NEW_ACTIONS,
+  NEW_MORE_ACTIONS,
   fieldReceiptHref,
+  newActionHref,
 } from "../quick-actions";
 
-describe("quick actions", () => {
-  it("does not expose vehicle tracking as a field quick action (it lives in Home nav)", () => {
-    // Tracking is a Home-hub destination for owner/admin, not a one-tap field
-    // shortcut. Guard against it crowding the dashboard / My Day action strips.
-    for (const set of [OWNER_QUICK_ACTIONS, FIELD_QUICK_ACTIONS]) {
-      expect(set.some((a) => a.href === "/app/timeline")).toBe(false);
-    }
+describe("one New button (TASK-236)", () => {
+  it("offers exactly three plain choices", () => {
+    expect(NEW_ACTIONS.map((a) => a.label)).toEqual([
+      "Someone called",
+      "Quick job",
+      "Receipt, photo or note",
+    ]);
   });
 
-  it("every quick action has a well-formed internal href, label, and icon", () => {
-    for (const action of [...OWNER_QUICK_ACTIONS, ...FIELD_QUICK_ACTIONS]) {
+  it("someone called opens intake; quick job opens the quick-book form; receipt/photo/note opens Capture", () => {
+    expect(NEW_ACTIONS[0]).toMatchObject({ href: "/app/intake/new" });
+    expect(NEW_ACTIONS[1]).toMatchObject({ action: "quick-book" });
+    expect(NEW_ACTIONS[2]).toMatchObject({ href: "/app/capture" });
+  });
+
+  it("keeps the rarer starts under More, in shop words", () => {
+    expect(NEW_MORE_ACTIONS.map((a) => a.label)).toEqual([
+      "Receipt for a job",
+      "Material run",
+      "Log mileage",
+      "Invoice without a job",
+      "Full job form",
+      "Full estimate form",
+    ]);
+  });
+
+  it("does not offer the retired duplicate starts", () => {
+    const labels = [...NEW_ACTIONS, ...NEW_MORE_ACTIONS].map((a) => a.label);
+    for (const gone of ["Quick Estimate", "New Job", "New Request", "Capture", "Schedule"]) {
+      expect(labels).not.toContain(gone);
+    }
+    expect([...NEW_ACTIONS, ...NEW_MORE_ACTIONS].some((a) => a.href === "/app/estimates/quick")).toBe(false);
+  });
+
+  it("every action has an internal href, a label and an icon, and labels are unique", () => {
+    const all = [...NEW_ACTIONS, ...NEW_MORE_ACTIONS];
+    for (const action of all) {
       expect(action.href.startsWith("/app/")).toBe(true);
       expect(action.label.length).toBeGreaterThan(0);
       expect(action.icon.length).toBeGreaterThan(0);
     }
+    expect(new Set(all.map((a) => a.label)).size).toBe(all.length);
   });
 
-  it("labels are unique within each surface", () => {
-    for (const set of [OWNER_QUICK_ACTIONS, FIELD_QUICK_ACTIONS]) {
-      const labels = set.map((a) => a.label);
-      expect(new Set(labels).size).toBe(labels.length);
-    }
+  it("never offers vehicle tracking as a start", () => {
+    expect([...NEW_ACTIONS, ...NEW_MORE_ACTIONS].some((a) => a.href === "/app/timeline")).toBe(false);
   });
 
-  it("puts Capture first on the owner dashboard, not in the tech field strip", () => {
-    expect(OWNER_QUICK_ACTIONS[0]).toMatchObject({ label: "Capture", href: "/app/capture" });
-    expect(FIELD_QUICK_ACTIONS.some((a) => a.href === "/app/capture")).toBe(false);
-  });
-
-  it("labels the clients destination Customers, not Clients", () => {
-    expect(OWNER_QUICK_ACTIONS.some((a) => a.href === "/app/clients" && a.label === "Customers")).toBe(
-      true,
-    );
-    expect(OWNER_QUICK_ACTIONS.map((a) => a.label)).not.toContain("Clients");
-  });
-
-  it("Today strip is Job, Receipt, Estimate — nothing else", () => {
-    expect(FIELD_QUICK_ACTIONS.map((a) => a.label)).toEqual(["Job", "Receipt", "Estimate"]);
-    expect(FIELD_QUICK_ACTIONS[0]).toMatchObject({ action: "quick-book" });
-    expect(FIELD_QUICK_ACTIONS[1].href).toBe("/app/expenses/new");
-    expect(FIELD_QUICK_ACTIONS[2].href).toMatch(/^\/app\/estimates/);
-  });
-
-  it("exposes Quick job on the global FAB (TASK-119 launch point)", () => {
-    expect(FAB_QUICK_ACTIONS.some((a) => a.label === "Quick job" && a.action === "quick-book")).toBe(
-      true,
-    );
-  });
-
-  it("pins a Today receipt to the current job when we know the house", () => {
-    expect(fieldReceiptHref("fc42141c-870d-4af3-9933-b2e03d4950a0")).toBe(
+  it("pins a receipt to the open job when there is one", () => {
+    const receipt = NEW_MORE_ACTIONS[0];
+    expect(newActionHref(receipt, "fc42141c-870d-4af3-9933-b2e03d4950a0")).toBe(
       "/app/expenses/new?job=fc42141c-870d-4af3-9933-b2e03d4950a0",
     );
+    expect(newActionHref(receipt, null)).toBe("/app/expenses/new");
+    expect(newActionHref(NEW_ACTIONS[0], "abc")).toBe("/app/intake/new");
     expect(fieldReceiptHref(null)).toBe("/app/expenses/new");
   });
 });

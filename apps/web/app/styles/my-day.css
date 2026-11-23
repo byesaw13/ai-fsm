@@ -38,7 +38,8 @@
   width: 100%;
 }
 
-.my-day-quick-grid > a {
+.my-day-quick-grid > a,
+.my-day-quick-grid > button {
   min-height: 44px;
 }
 

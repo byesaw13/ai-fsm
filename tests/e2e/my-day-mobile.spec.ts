@@ -56,7 +56,7 @@ test.describe("My Day mobile", () => {
     await expect(more).toBeVisible();
     await more.locator("summary").click();
     await expect(page.getByTestId("field-quick-actions")).toBeVisible();
-    await expect(page.getByTestId("field-quick-actions").getByText("Estimate", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("field-quick-actions").getByText("Someone called", { exact: true })).toBeVisible();
   });
 
   test("one Now: start day or van pill, not activity chips", async ({ page }) => {
@@ -79,6 +79,6 @@ test.describe("My Day mobile", () => {
 
   test("FAB hidden on my day", async ({ page }) => {
     await page.goto(`${BASE}/app/my-work`);
-    await expect(page.locator(".p7-fab-wrap button[aria-label*='quick actions']")).not.toBeVisible();
+    await expect(page.getByTestId("new-button-fab")).not.toBeVisible();
   });
 });

@@ -28,6 +28,13 @@ describe("command index", () => {
     expect(filterCommands("xyzzy", "owner")).toEqual([]);
   });
 
+  it("finds the New choices by their old names (TASK-236)", () => {
+    expect(filterCommands("new request", "owner").some((c) => c.href === "/app/intake/new")).toBe(true);
+    expect(filterCommands("capture", "owner").some((c) => c.href === "/app/capture")).toBe(true);
+    expect(filterCommands("quote", "owner").some((c) => c.href === "/app/estimates/new")).toBe(true);
+    expect(filterCommands("quick materials", "owner").some((c) => c.href === "/app/materials/quick")).toBe(true);
+  });
+
   it("does not list duplicate label+href pairs", () => {
     const keys = COMMAND_INDEX.map((c) => `${c.label}|${c.href}`);
     expect(new Set(keys).size).toBe(keys.length);
