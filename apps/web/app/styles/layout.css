@@ -1987,3 +1987,35 @@ main { max-width: 980px; margin: 0 auto; padding: 24px; }
     bottom: calc(204px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Job page sections: Work / Money / History (TASK-239) */
+.p7-job-section {
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-card);
+}
+.p7-job-section__summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+}
+.p7-job-section__summary::-webkit-details-marker { display: none; }
+.p7-job-section__summary::before {
+  content: "▸";
+  color: var(--fg-muted);
+  transition: transform 0.15s;
+}
+.p7-job-section[open] > .p7-job-section__summary::before { transform: rotate(90deg); }
+.p7-job-section__title { font-weight: 800; font-size: var(--text-lg); }
+.p7-job-section__hint { color: var(--fg-muted); font-size: var(--text-sm); }
+.p7-job-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-3);
+}

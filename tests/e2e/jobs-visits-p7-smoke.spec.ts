@@ -30,6 +30,7 @@ test.describe("P7 jobs/visits smoke", () => {
     await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+/);
     await expect(page.locator('[data-testid="job-status"]')).toContainText("Draft");
 
+    await page.locator('[data-testid="job-section-work"]:visible > summary').click();
     await page.click('[data-testid="add-visit-btn"]');
     await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+\/visits\/new/);
 
