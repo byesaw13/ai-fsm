@@ -19,13 +19,12 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : E5 TASK-239 Verified: #761 (7cb13859) deployed
-                      ~19:17 UTC, no migration; health ok, /login 200.
-In-flight PR        : E6 TASK-240 (progress line)
-Next step           : Track E done once E6 is Verified; then the next
-                      eligible runbook step after B4.
+Last step           : Track E complete. E6 TASK-240 Verified: #762
+                      (a4a6aaa4) deployed ~19:56 UTC, no migration.
+In-flight PR        : none
+Next step           : next eligible runbook step after B4 (B5 TASK-194).
 Blocked on          : nothing
-Last known-good     : 7cb13859 (deploy-good/c2e76d6a before it)
+Last known-good     : a4a6aaa4 (deploy-good/7cb13859 before it)
 Notes               : Main checkout holds another session's uncommitted
                       drafts of TASK-235..240 (duplicates of #755); left
                       untouched. Owner checks after deploy (non-blocking):
@@ -154,7 +153,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | E3 | TASK-236 | 2026-11-23 (#758, CI green incl. New-button e2e) | 2026-11-23 (#758, 310eced7) | 2026-11-23 (~17:20 UTC) | 2026-11-23 (health ok, /login 200, /app/jobs, /app/intake/new, /app/capture 307 to /login signed out; menu covered by CI e2e) |
 | E4 | TASK-237 | 2026-11-23 (#759, CI green incl. menu e2e) | 2026-11-23 (#759, 9fcc6b20) | 2026-11-23 (~18:02 UTC) | 2026-11-23 (health ok, /login 200, hub pages 307 to /login signed out, no web errors; the Money page queries run read-only on production) |
 | E5 | TASK-239 | 2026-11-23 (#760, #761, CI green incl. phone and sections e2e) | 2026-11-23 (#760 c2e76d6a, #761 7cb13859) | 2026-11-23 (~18:54, ~19:17 UTC) | 2026-11-23 (health ok, /login 200, job page 307 signed out, no web errors) |
-| E6 | TASK-240 | | | | |
+| E6 | TASK-240 | 2026-11-23 (#762, CI green incl. progress-line e2e) | 2026-11-23 (#762, a4a6aaa4) | 2026-11-23 (~19:56 UTC) | 2026-11-23 (health ok, /login 200, customer page 307 signed out, no web errors; loader SQL run read-only on production) |
 | D5 | TASK-228 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC) | 2026-10-31 (health ok, /login 200) |
 
 ## Operating rules
@@ -693,6 +692,10 @@ Per step:
 
 ## Log
 
+- 2026-11-23 · Track E · Done · E1–E6 (TASK-235..240) merged, deployed and verified; owner checks listed in Current state
+- 2026-11-23 · E6 · Verified · health ok, /login 200, no web errors; known-good deploy-good/7cb13859 before it
+- 2026-11-23 · E6 · Deployed · a4a6aaa4 · ~19:56 UTC, no migration
+- 2026-11-23 · E6 · Merged · #762 · squash a4a6aaa4; Codex finding (draft invoice marked Working done) fixed before merge
 - 2026-11-23 · E6 · In progress · TASK-240: progress line on the job page (both layouts) and the customer page (top open job)
 - 2026-11-23 · E5 · Verified · PR 2 health ok, /login 200, no web errors; known-good deploy-good/c2e76d6a before it
 - 2026-11-23 · E5 PR 2 · Deployed · 7cb13859 · ~19:17 UTC, no migration

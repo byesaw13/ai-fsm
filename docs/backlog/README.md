@@ -222,7 +222,7 @@ closed in tests; owner-flow AC still open.
 | TASK-237 | [A shorter menu, and Money on one page](TASK-237-trim-the-menu.md) | 006 | Done |
 | TASK-238 | [Today and Desk never bounce you away](TASK-238-homes-never-bounce.md) | 006 | Done |
 | TASK-239 | [The job page leads with one next step](TASK-239-job-page-one-next-step.md) | 006 | Done |
-| TASK-240 | [A progress line on every job and customer](TASK-240-progress-line.md) | 006 | In progress |
+| TASK-240 | [A progress line on every job and customer](TASK-240-progress-line.md) | 006 | Done |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
