@@ -643,7 +643,10 @@ All steps:
 - Delete what the step replaces in the same PR (knip fails CI on unused files).
   Do not delete a page route.
 - Post-deploy check for every step: health ok, `/login` 200, and each changed
-  page returns 307 to `/login` when signed out.
+  staff page (`/app/...`) returns 307 to `/login` when signed out. Customer
+  pages are public: for each changed portal, `estimate/respond` or print page,
+  open one real token link from production data and check it returns 200 and
+  shows the new words.
 - The checks with a non-technical person (each task's "Owner check after
   deploy") are for the owner. When a step is Verified, list its check in
   "Current state" Notes and continue; they do not block the next step.
