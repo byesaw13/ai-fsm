@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import type { Route } from "next";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   HOME_ENTRY_PARAM,
   resolvePostLoginHref,
@@ -34,10 +34,12 @@ function takeFirstInSession(): boolean {
 export function WorkspaceAutoRoute() {
   const pathname = usePathname();
   const router = useRouter();
+  // The logo can change only the query (?home=1 while already on that home),
+  // so the effect has to follow the query too.
+  const homeEntry = useSearchParams().get(HOME_ENTRY_PARAM) === "1";
 
   useEffect(() => {
     const firstInSession = takeFirstInSession();
-    const homeEntry = new URLSearchParams(window.location.search).get(HOME_ENTRY_PARAM) === "1";
     if (!shouldSteerToPreferredHome({ pathname, firstInSession, homeEntry })) return;
 
     const target = resolvePostLoginHref("owner", {
@@ -46,7 +48,7 @@ export function WorkspaceAutoRoute() {
     });
     // Replace even when already there, so ?home=1 leaves the address bar.
     if (target !== pathname || homeEntry) router.replace(target as Route);
-  }, [pathname, router]);
+  }, [pathname, homeEntry, router]);
 
   return null;
 }

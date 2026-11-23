@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import type { Route } from "next";
 import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
@@ -421,7 +421,11 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
           {/* TASK-058: workspace mode is automatic by device (phone → Field,
               tablet/computer → Office) with an override in Settings — no on-screen
               toggle or daily popup. This renders nothing; it only steers entry. */}
-          {role === "owner" && <WorkspaceAutoRoute />}
+          {role === "owner" && (
+            <Suspense fallback={null}>
+              <WorkspaceAutoRoute />
+            </Suspense>
+          )}
           {children}
         </main>
 

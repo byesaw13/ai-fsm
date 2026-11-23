@@ -41,3 +41,19 @@ test.describe("Today and Desk never bounce (phone)", () => {
     await page.waitForURL((url) => url.pathname === "/app/my-work" && url.search === "");
   });
 });
+
+test.describe("the logo goes to the preferred home (computer)", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("from Today, the logo returns a computer owner to Desk", async ({ page }) => {
+    await page.goto(`${BASE}/login`);
+    await page.fill('[id="email"]', "owner@test.com");
+    await page.fill('[id="password"]', "password");
+    await page.click('[type="submit"]');
+    await page.waitForURL((url) => url.pathname === "/app");
+    await page.getByTestId("switch-to-today").click();
+    await page.waitForURL(/\/app\/my-work/);
+    await page.locator("a.p7-sidebar-brand").click();
+    await page.waitForURL((url) => url.pathname === "/app" && url.search === "");
+  });
+});
