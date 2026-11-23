@@ -176,7 +176,7 @@ closed in tests; owner-flow AC still open.
 | TASK-191 | [Person-hours on every estimate](TASK-191-hours-on-every-estimate.md) | 002 | Done |
 | TASK-192 | [Equipment line type](TASK-192-equipment-line-type.md) | 002 | Done |
 | TASK-193 | [Editable production rates with calibration](../archive/backlog-done/TASK-193-production-rates-settings.md) | 002 | Done |
-| TASK-194 | [Baseline panel, send rules and freeze at send](TASK-194-baseline-panel-send-rules.md) | 002 | In progress |
+| TASK-194 | [Baseline panel, send rules and freeze at send](TASK-194-baseline-panel-send-rules.md) | 002 | Done |
 | TASK-195 | [Rewrite the estimate review around the baseline](TASK-195-review-rewrite.md) | 002 | Proposed |
 | TASK-196 | [Convert to invoice copies only the right lines, and lines add up](../archive/backlog-done/TASK-196-invoice-convert-integrity.md) | 004 | Done |
 | TASK-197 | [AI line suggestions never set a price](TASK-197-item-suggester-price-cap.md) | 002 | Done |
