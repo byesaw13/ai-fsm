@@ -19,14 +19,15 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : Track E complete. E6 TASK-240 Verified: #762
-                      (a4a6aaa4) deployed ~19:56 UTC, no migration.
-In-flight PR        : B5 TASK-194 (baseline panel, send rules, freeze);
-                      branch task/194-baseline-panel; no migration
-                      (columns are migration 209).
-Next step           : B5 TASK-194 merge, deploy, verify.
+Last step           : B5 TASK-194 Verified: #764 (d1fdba88) deployed
+                      ~23:25 UTC 2026-11-23, no migration. Health ok,
+                      /login 200, send 401 unauth, no web errors; 17 sent
+                      estimates have no snapshot (show "Hours not
+                      recorded"), totals unchanged; prod has 0 drafts.
+In-flight PR        : none
+Next step           : B6 TASK-195 (review rewrite; needs B5, now Verified).
 Blocked on          : nothing
-Last known-good     : a4a6aaa4 (deploy-good/7cb13859 before it)
+Last known-good     : d1fdba88 (deploy-good/a4a6aaa4 before it)
 Notes               : Main checkout holds another session's uncommitted
                       drafts of TASK-235..240 (duplicates of #755); left
                       untouched. Owner checks after deploy (non-blocking):
@@ -124,7 +125,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | B2 | TASK-191 | 2026-10-27 (CI 40429996387, 40430001995, #726) | 2026-10-27 (#726, 20c7d5f8) | 2026-10-27 (~01:28 UTC) | 2026-10-27 (draft hours null, totals unchanged, 01:28 UTC) |
 | B3 | TASK-192 | 2026-10-27 (CI 40437008165, 40437011775, #728) | 2026-10-27 (#728, 2842780e) | 2026-10-27 (~02:32 UTC) | 2026-10-27 (equipment cost apart, 02:33 UTC) |
 | B4 | TASK-193 | PR 1 2026-10-31 (#743, CI green) | PR 1 2026-10-31 (#743, 8f158a7a) | PR 1 2026-10-31 (~19:13 UTC) | PR 1 2026-10-31 (health ok, /login 200, rates API 401 unauth); PR 2 2026-10-31 (#745, 6cbce4d3; deployed, verified) |
-| B5 | TASK-194 | | | | |
+| B5 | TASK-194 | 2026-11-23 (#764, CI green) | 2026-11-23 (#764, d1fdba88) | 2026-11-23 (~23:25 UTC) | 2026-11-23 (health ok, /login 200, sent estimates unchanged, no snapshots on old quotes) |
 | B6 | TASK-195 | | | | |
 | C1 | TASK-210 | | | | |
 | C2 | TASK-211 | | | | |
@@ -694,6 +695,9 @@ Per step:
 
 ## Log
 
+- 2026-11-23 · B5 · Verified · health ok, /login 200, send 401 unauth, no web errors, 17 old sent estimates without snapshot (Hours not recorded), totals unchanged
+- 2026-11-23 · B5 · Deployed · d1fdba88 · ~23:25 UTC, no migration; known-good deploy-good/a4a6aaa4
+- 2026-11-23 · B5 · Merged · #764 · squash d1fdba88; Codex findings fixed before merge (painting Materials/handling rows typed; panel saves carry the quote version); e2e locators scoped to #main-content
 - 2026-11-23 · B5 · In progress · TASK-194: computeHourlyBaseline (examples A–G), send rules (422 missing, cost-floor acknowledgment, frozen snapshot), panel, checklist, warning % in Settings
 - 2026-11-23 · Track E · Done · E1–E6 (TASK-235..240) merged, deployed and verified; owner checks listed in Current state
 - 2026-11-23 · E6 · Verified · health ok, /login 200, no web errors; known-good deploy-good/7cb13859 before it
