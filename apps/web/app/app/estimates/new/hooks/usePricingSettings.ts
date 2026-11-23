@@ -36,6 +36,7 @@ export function usePricingSettings(): {
             material_handling_pct: json.data.material_handling_pct,
             card_fee_pct: json.data.card_fee_pct,
             hours_per_day: json.data.hours_per_day ?? DEFAULT_PRICING_SETTINGS.hours_per_day,
+            baseline_warning_pct: json.data.baseline_warning_pct ?? DEFAULT_PRICING_SETTINGS.baseline_warning_pct,
           });
         }
       } catch {

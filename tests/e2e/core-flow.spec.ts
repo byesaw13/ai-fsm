@@ -9,6 +9,7 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
+import { makeEstimateSendable } from "./helpers/baseline";
 
 const BASE = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 const ADMIN_EMAIL = "admin@test.com";
@@ -198,6 +199,12 @@ test.describe("Required release smoke — admin core flow", () => {
     await login(page);
 
     await page.goto(`${BASE}/app/estimates/${estimateId}`);
+    // TASK-194: the draft lists what it needs and cannot be sent until that is done.
+    await expect(page.getByTestId("baseline-panel")).toBeVisible();
+    await expect(page.getByTestId("before-send-checklist")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Mark as Sent", exact: true })).toBeDisabled();
+    await makeEstimateSendable(page, estimateId);
+    await expect(page.getByTestId("baseline-effective-rate")).toContainText("/h vs");
     await page.getByRole("button", { name: "Mark as Sent", exact: true }).click();
     await expect(page.locator('#main-content [data-testid="estimate-status"]')).toContainText("Sent");
 

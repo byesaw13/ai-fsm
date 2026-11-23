@@ -21,6 +21,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { estimateIdFromUrl, makeEstimateSendable } from "./helpers/baseline";
 
 const BASE = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 const ADMIN_EMAIL = "admin@test.com";
@@ -77,6 +78,7 @@ test.describe("Invoice conversion smoke — admin role", () => {
     await expect(
       page.locator('[data-testid="estimate-transition-panel"]')
     ).toBeVisible();
+    await makeEstimateSendable(page, estimateIdFromUrl(page.url()));
     await page.click('[data-testid="transition-btn-sent"]');
     await expect(page.locator('[data-testid="estimate-status"]')).toContainText(
       "Sent"
@@ -128,6 +130,7 @@ test.describe("Invoice conversion smoke — admin role", () => {
     const estimateUrl = page.url();
 
     // Transition to sent
+    await makeEstimateSendable(page, estimateIdFromUrl(page.url()));
     await page.click('[data-testid="transition-btn-sent"]');
     await expect(page.locator('[data-testid="estimate-status"]')).toContainText(
       "Sent"
@@ -167,6 +170,7 @@ test.describe("Invoice conversion smoke — admin role", () => {
     await completeEstimateWizard(page, "Transition test", "1", "200.00");
     await page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/);
 
+    await makeEstimateSendable(page, estimateIdFromUrl(page.url()));
     await page.click('[data-testid="transition-btn-sent"]');
     await expect(page.locator('[data-testid="estimate-status"]')).toContainText("Sent");
     await page.click('[data-testid="transition-btn-approved"]');
@@ -189,6 +193,7 @@ test.describe("Invoice conversion smoke — admin role", () => {
     await completeEstimateWizard(page, "List visibility test", "1", "200.00");
     await page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/);
 
+    await makeEstimateSendable(page, estimateIdFromUrl(page.url()));
     await page.click('[data-testid="transition-btn-sent"]');
     await expect(page.locator('[data-testid="estimate-status"]')).toContainText("Sent");
     await page.click('[data-testid="transition-btn-approved"]');

@@ -9,29 +9,41 @@ interface Props {
   clientEmail: string | null;
   sentAt: string | null;
   emailConfigured: boolean;
+  /** True while the "Before you can send" list has items (TASK-194). */
+  blocked?: boolean;
 }
 
-export function SendEstimateButton({ estimateId, clientEmail, sentAt, emailConfigured }: Props) {
+export function SendEstimateButton({ estimateId, clientEmail, sentAt, emailConfigured, blocked = false }: Props) {
   const [pending, setPending] = useState<"send" | "mark" | null>(null);
+  const [ackNeeded, setAckNeeded] = useState<{ mode: "send" | "mark"; message: string } | null>(null);
   const { success, error } = useToast();
   const router = useRouter();
 
   const canEmail = emailConfigured && !!clientEmail;
 
-  async function handleAction(mode: "send" | "mark") {
+  async function handleAction(mode: "send" | "mark", acknowledgeCostFloor = false) {
     setPending(mode);
     try {
       const res = await fetch(`/api/v1/estimates/${estimateId}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(mode === "mark" ? { markOnly: true } : {}),
+        body: JSON.stringify({
+          ...(mode === "mark" ? { markOnly: true } : {}),
+          ...(acknowledgeCostFloor ? { acknowledgeCostFloor: true } : {}),
+        }),
       });
       const json = await res.json() as {
         sent?: boolean;
         sentTo?: string | null;
         emailSkipped?: boolean;
-        error?: { message?: string };
+        error?: { code?: string; message?: string };
       };
+      if (json.error?.code === "COST_FLOOR_ACK_REQUIRED") {
+        setAckNeeded({ mode, message: json.error.message ?? "This price is below your cost floor." });
+        return;
+      }
+      if (json.error?.code === "BASELINE_INCOMPLETE") router.refresh();
+      setAckNeeded(null);
       if (res.ok && json.sent) {
         if (json.emailSkipped || mode === "mark" || !json.sentTo) {
           success(sentAt ? "Estimate marked as resent" : "Estimate marked as sent");
@@ -55,7 +67,7 @@ export function SendEstimateButton({ estimateId, clientEmail, sentAt, emailConfi
         <button
           type="button"
           onClick={() => handleAction("send")}
-          disabled={!!pending}
+          disabled={!!pending || blocked}
           data-testid="transition-btn-sent"
           style={{
             display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
@@ -71,7 +83,7 @@ export function SendEstimateButton({ estimateId, clientEmail, sentAt, emailConfi
       <button
         type="button"
         onClick={() => handleAction("mark")}
-        disabled={!!pending}
+        disabled={!!pending || blocked}
         // Primary action when email is unavailable — e2e + staff offline path
         data-testid={canEmail ? "transition-btn-mark-sent" : "transition-btn-sent"}
         style={{
@@ -92,7 +104,33 @@ export function SendEstimateButton({ estimateId, clientEmail, sentAt, emailConfi
             : "Mark as Sent"}
       </button>
 
+      {ackNeeded && (
+        <div data-testid="cost-floor-ack" style={{ border: "1px solid var(--color-danger)", borderRadius: 6, padding: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+          <p style={{ margin: "0 0 var(--space-2)" }}>{ackNeeded.message}</p>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => handleAction(ackNeeded.mode, true)}
+              disabled={!!pending}
+              data-testid="cost-floor-ack-send"
+              style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "var(--color-danger)", color: "#fff", fontWeight: 600, cursor: "pointer" }}
+            >
+              I know, send it anyway
+            </button>
+            <button
+              type="button"
+              onClick={() => setAckNeeded(null)}
+              disabled={!!pending}
+              style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--fg)", cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+        {blocked ? "Finish the list above to send. " : ""}
         {canEmail
           ? sentAt
             ? `Last sent ${new Date(sentAt).toLocaleDateString()} — ${clientEmail}. Or mark sent without re-emailing.`

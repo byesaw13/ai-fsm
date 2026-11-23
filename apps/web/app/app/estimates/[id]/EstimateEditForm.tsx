@@ -366,6 +366,12 @@ function StandardEstimateEditForm({
     });
   }
 
+  function updateLineCost(index: number, cents: number | null) {
+    setLineItems((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, unit_cost_cents: cents } : row))
+    );
+  }
+
   function removeLineItem(index: number) {
     setLineItems((prev) => prev.filter((_, i) => i !== index));
   }
@@ -818,6 +824,7 @@ function StandardEstimateEditForm({
                 onAdd={addLineItem}
                 onRemove={removeLineItem}
                 onDuplicate={duplicateLineItem}
+                onCostChange={updateLineCost}
               />
             </>
           )}

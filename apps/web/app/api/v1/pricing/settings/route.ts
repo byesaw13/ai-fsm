@@ -22,6 +22,7 @@ const patchSchema = z
     material_handling_pct: z.number().int().min(0).max(100).optional(),
     card_fee_pct: z.number().min(0).max(10).optional(),
     hours_per_day: z.number().gt(0).max(24).optional(),
+    baseline_warning_pct: z.number().min(0).max(100).optional(),
   })
   .refine(
     (d) => {
@@ -131,6 +132,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
       material_handling_pct: data.material_handling_pct ?? current.material_handling_pct,
       card_fee_pct: data.card_fee_pct ?? current.card_fee_pct,
       hours_per_day: data.hours_per_day ?? current.hours_per_day,
+      baseline_warning_pct: data.baseline_warning_pct ?? current.baseline_warning_pct,
     };
 
     if (next.labor_billing_cents_per_hour < next.labor_cost_cents_per_hour) {
@@ -159,6 +161,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
          material_handling_pct = $9,
          card_fee_pct = $10,
          hours_per_day = $11,
+         baseline_warning_pct = $12,
          updated_at = NOW()
        WHERE account_id = $1
        RETURNING *`,
@@ -174,6 +177,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
         next.material_handling_pct,
         next.card_fee_pct,
         next.hours_per_day,
+        next.baseline_warning_pct,
       ]
     );
 

@@ -42,6 +42,7 @@ export function PricingSettingsForm({ onSaved }: { onSaved?: (settings: Business
             material_handling_pct: json.data.material_handling_pct,
             card_fee_pct: json.data.card_fee_pct,
             hours_per_day: json.data.hours_per_day,
+            baseline_warning_pct: json.data.baseline_warning_pct,
           });
         }
       } catch {
@@ -312,6 +313,27 @@ export function PricingSettingsForm({ onSaved }: { onSaved?: (settings: Business
             />
             <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
               Turns per-day production rates into hours. At 8, 400 sq ft a day is 50 sq ft an hour.
+            </span>
+          </label>
+          <label style={{ display: "grid", gap: 4, fontSize: "var(--text-sm)" }}>
+            <span>Strong warning below baseline (%)</span>
+            <Input
+              id="baseline-warning-pct"
+              type="number"
+              step="1"
+              min="0"
+              max="100"
+              value={String(settings.baseline_warning_pct)}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  baseline_warning_pct: Math.min(100, Math.max(0, Number(e.target.value) || 0)),
+                })
+              }
+              data-testid="baseline-warning-pct"
+            />
+            <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+              Any price below the hourly baseline gets a warning. From this far below, the warning is stronger. Neither stops sending.
             </span>
           </label>
         </div>

@@ -9,6 +9,7 @@ import { computeConditionTier } from "./guardrails";
 import { defaultMaterialPrice, splitInternalCosts } from "./cost-split";
 import { explicitMaterialDepositCents } from "./itemized-preserve";
 import { lineHourColumns, storedHour, storedHourSource, type HourSource } from "./stored-hours";
+import { baselineFingerprint, clearCostConfirmationIfChanged } from "./baseline";
 
 export interface LineItemInput {
   description: string;
@@ -66,6 +67,9 @@ export interface PatchEstimateInput {
   labor_hours_high?: number | null;
   labor_hours_source?: HourSource | null;
   direct_costs_confirmed?: boolean;
+  /** Non-line direct costs (mileage cost, tolls, disposal, permits). Null = not entered. */
+  other_direct_cost_cents?: number | null;
+  handling_in_baseline?: boolean;
   trip_count?: string;
   requires_drying_or_curing?: boolean;
   difficult_access?: boolean;
@@ -222,6 +226,8 @@ export async function updateEstimateById(
       "minimum_service_override_reason", "minimum_service_override_note",
       "deposit_required", "deposit_type", "deposit_percentage", "deposit_fixed_cents",
       "deposit_due_trigger", "terms_scope_accepted", "terms_payment_accepted", "terms_change_order_accepted",
+      "labor_hours_low", "labor_hours_high", "labor_hours_source",
+      "direct_costs_confirmed", "other_direct_cost_cents", "handling_in_baseline",
     ] as const;
     for (const key of disallowedKeys) {
       if (patch[key] !== undefined) {
@@ -253,6 +259,7 @@ export async function updateEstimateById(
   }
 
   // Draft state: full update
+  const baselineBefore = await baselineFingerprint(client, id);
   const setClauses: string[] = [];
   const params: unknown[] = [];
   let idx = 1;
@@ -273,8 +280,13 @@ export async function updateEstimateById(
     setClauses.push(`labor_hours_source = $${idx++}`);
     params.push(storedHourSource(patch.labor_hours_source));
   }
-  if (patch.direct_costs_confirmed === true) {
-    setClauses.push(`direct_costs_confirmed_at = now()`);
+  if (patch.other_direct_cost_cents !== undefined) {
+    setClauses.push(`other_direct_cost_cents = $${idx++}`);
+    params.push(patch.other_direct_cost_cents);
+  }
+  if (patch.handling_in_baseline !== undefined) {
+    setClauses.push(`handling_in_baseline = $${idx++}`);
+    params.push(patch.handling_in_baseline);
   }
   if (patch.internal_notes !== undefined) { setClauses.push(`internal_notes = $${idx++}`); params.push(patch.internal_notes); }
   if (patch.expires_at !== undefined) { setClauses.push(`expires_at = $${idx++}`); params.push(patch.expires_at); }
@@ -561,6 +573,18 @@ export async function updateEstimateById(
     await client.query(
       `UPDATE estimates SET ${setClauses.join(", ")} WHERE id = $${idx}`,
       params
+    );
+  }
+
+  // A change to anything the baseline reads clears the cost confirmation and the
+  // cost-floor acknowledgment (TASK-194). Confirming in the same save then applies.
+  await clearCostConfirmationIfChanged(client, id, baselineBefore);
+  if (patch.direct_costs_confirmed !== undefined) {
+    await client.query(
+      patch.direct_costs_confirmed
+        ? `UPDATE estimates SET direct_costs_confirmed_at = now() WHERE id = $1`
+        : `UPDATE estimates SET direct_costs_confirmed_at = NULL, cost_floor_ack_at = NULL, cost_floor_ack_by = NULL WHERE id = $1`,
+      [id],
     );
   }
 

@@ -124,6 +124,8 @@ const patchEstimateSchema = z.object({
   labor_hours_high: z.number().nonnegative().nullable().optional(),
   labor_hours_source: z.enum(HOUR_SOURCES).nullable().optional(),
   direct_costs_confirmed: z.boolean().optional(),
+  other_direct_cost_cents: z.number().int().nonnegative().nullable().optional(),
+  handling_in_baseline: z.boolean().optional(),
   trip_count: estimateTripCountSchema.optional(),
   requires_drying_or_curing: z.boolean().optional(),
   difficult_access: z.boolean().optional(),

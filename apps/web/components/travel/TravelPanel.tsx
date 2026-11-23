@@ -255,7 +255,7 @@ export function TravelPanel({
     : null;
 
   return (
-    <Card data-testid="travel-panel" style={{ marginBottom: "var(--space-4)" }}>
+    <Card id="travel-panel" data-testid="travel-panel" style={{ marginBottom: "var(--space-4)" }}>
       <SectionHeader title="Travel & Mileage" as="h2" />
 
       {snapshot && !display && (

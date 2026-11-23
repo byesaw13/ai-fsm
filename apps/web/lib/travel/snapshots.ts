@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg";
 import { travelTimeHours } from "@/lib/estimates/stored-hours";
+import { baselineFingerprint, clearCostConfirmationIfChanged } from "@/lib/estimates/baseline";
 import {
   buildTravelInvoiceLineDrafts,
   type TravelCalculationResult,
@@ -228,6 +229,7 @@ export async function applyTravelToEstimate(
   );
   const presentationMode = modeRow.rows[0]?.presentation_mode ?? "standard";
   const isMultiOption = presentationMode === "multi_option";
+  const baselineBefore = await baselineFingerprint(client, estimateId);
 
   // Remove prior travel surcharge line items (we manage a single travel line)
   await client.query(
@@ -308,6 +310,7 @@ export async function applyTravelToEstimate(
 
   // Recalculate estimate totals from line items + surcharge fields (no-op for multi_option)
   await recalculateEstimateTotals(client, estimateId, opts.accountId);
+  await clearCostConfirmationIfChanged(client, estimateId, baselineBefore);
 }
 
 async function recalculateEstimateTotals(

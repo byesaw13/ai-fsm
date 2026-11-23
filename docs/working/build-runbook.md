@@ -21,8 +21,10 @@ docs-only commit when there is no PR).
 ```
 Last step           : Track E complete. E6 TASK-240 Verified: #762
                       (a4a6aaa4) deployed ~19:56 UTC, no migration.
-In-flight PR        : none
-Next step           : next eligible runbook step after B4 (B5 TASK-194).
+In-flight PR        : B5 TASK-194 (baseline panel, send rules, freeze);
+                      branch task/194-baseline-panel; no migration
+                      (columns are migration 209).
+Next step           : B5 TASK-194 merge, deploy, verify.
 Blocked on          : nothing
 Last known-good     : a4a6aaa4 (deploy-good/7cb13859 before it)
 Notes               : Main checkout holds another session's uncommitted
@@ -692,6 +694,7 @@ Per step:
 
 ## Log
 
+- 2026-11-23 · B5 · In progress · TASK-194: computeHourlyBaseline (examples A–G), send rules (422 missing, cost-floor acknowledgment, frozen snapshot), panel, checklist, warning % in Settings
 - 2026-11-23 · Track E · Done · E1–E6 (TASK-235..240) merged, deployed and verified; owner checks listed in Current state
 - 2026-11-23 · E6 · Verified · health ok, /login 200, no web errors; known-good deploy-good/7cb13859 before it
 - 2026-11-23 · E6 · Deployed · a4a6aaa4 · ~19:56 UTC, no migration
