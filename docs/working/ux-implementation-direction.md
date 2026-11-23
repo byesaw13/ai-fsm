@@ -2175,3 +2175,30 @@ For each report card:
 ## Later audits
 
 Append the next unaudited screen below this line. Use only the delta format from section 27: Already aligned, Conflict, Missing, Unknown / verify. Do not restate sections 1–25.
+
+## 31. Simplicity audit — navigation, entry points, vocabulary (2026-11-22)
+
+Whole-app pass for a non-technical user. Tasks: TASK-235 to TASK-240.
+
+**Already aligned**
+
+- Locked shop nouns in `lib/vocabulary.ts`; navigation uses them and is tested.
+- Role-aware nav: tech sees Today only.
+- Work Orders and Visits are already out of the hub nouns (`lib/navigation/hubs.ts`).
+- `ProjectWhatNext.tsx` already computes a job's next step.
+
+**Conflict**
+
+- Screen text uses Client, Customer, Property, Estimate and Invoice (about 620 labels) where the nav says Person, House, Quote and Bill (about 70). Only 4 files use `lib/vocabulary.ts`. Owner decision 2026-11-22: move to Customer, Property, Estimate, Invoice everywhere (DOMAIN_MODEL). TASK-235.
+- Three different shortcut lists in `lib/navigation/quick-actions.ts` (Desk 8, + sheet 8, Today 3); a job has four ways to start. Rule 1, Rule 2. TASK-236.
+- `WorkspaceAutoRoute` replaces a deliberate tap on Desk (phone) or Today (computer) with the device home. TASK-238.
+- Job detail: about 22 panels and 36 buttons and links with equal weight. Rule 1, Rule 8, Rule 9. TASK-239.
+
+**Missing**
+
+- One Money page (owed / spent / mileage); the phone Money tab opens Bills only. TASK-237.
+- A visible flow position on job and customer pages. TASK-240.
+
+**Unknown / verify**
+
+- Click-through with a non-technical user was not done; counts come from code. Each task's test plan includes a hands-on check.

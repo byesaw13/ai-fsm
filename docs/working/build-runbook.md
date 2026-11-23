@@ -26,7 +26,8 @@ Last step           : owner requests done 2026-11-01: TASK-231 (#748
                       no migration; health ok, /login 200, Dowd portal 200.
                       TASK-230 (#746) and B4 (TASK-193) done earlier.
 In-flight PR        : none
-Next step           : next eligible runbook step after B4.
+Next step           : Track E (TASK-235 to TASK-240) once E0 is merged and
+                      G8 is Active; until then, next eligible step after B4.
 Blocked on          : nothing
 Last known-good     : d2ac0d71 (deploy-good/d2ac0d71); previous d4a4cf94
 Notes               : Open PR #739 (quote editor design fixes, TASK-222
@@ -53,6 +54,7 @@ this one, as an approval.
 | G3 | Closing each stale "sent" estimate (TASK-206) | Per estimate, non-blocking | |
 | G4 | Any database restore or data repair on production | Ask every time | |
 | G6 | TASK-225 table-freeze exception (one nullable column for chosen add-ons) | Approved 2026-10-31 | Owner in session: "approve both, use craftsman factors, start TASK-227", answering (1) TASK-225's one new column and (2) TASK-228's factors. |
+| G8 | Track E: build TASK-235 to TASK-240 in the order and with the decisions in "Plan: Track E", merging and deploying under G0 | Pending | Needs an owner comment from `byesaw13` on the E0 PR, for example: `I approve Track E as described in docs/working/build-runbook.md`. |
 | G7 | TASK-228 height factors: Craftsman ×1.23 (9–13 ft), ×1.46 (13–17 ft), ×1.69 (17–19 ft), ×1.92 (19–21 ft) | Approved 2026-10-31 | Same session answer as G6. |
 
 **Without G0 active** the agent works in "PRs only" mode: it builds, tests and
@@ -73,6 +75,10 @@ Approved product decisions (do not change them):
 | Massachusetts adjustment documented only, not changed | `docs/working/hourly-baseline.md` |
 | Estimating assistant design (D1 to D11, E1 to E10, correction passes) | `docs/working/estimating-assistant-phase3.md`, G0b |
 | AI line suggestions never set a price: price book default, else price book minimum, else no price and "Price needed" | Owner in session 2026-10-26 (TASK-197) |
+| Screens say Customer, Property, Estimate, Invoice; routes, tables and API names do not change | Owner 2026-11-22, `docs/canonical/DOMAIN_MODEL.md` (TASK-235) |
+| Desk and Today both stay; a deliberate tap on either is never redirected | TASK-238 (TASK-143 keeps Desk) |
+| Track E deletes no route; old links keep working | TASK-235 to TASK-237 |
+| Money lives at `/app/invoices` (summary cards, then the list); no new route | TASK-237, ROADMAP scope freeze |
 | Per-day production rates convert to hours with an hours-per-day setting, default 8, editable in Settings and shown next to each conversion | Owner in session 2026-10-26 (TASK-193) |
 
 Engineering proposals (the implementing agent may refine these; it states the
@@ -136,6 +142,13 @@ docs-only commit after the event. Planned tests are not passing tests.
 | D2 | TASK-226 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
 | D3 | TASK-225 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC, mig 213) | 2026-10-31 (health ok, /login 200, column present) |
 | D4 | TASK-227 | 2026-10-31 (#740, CI green) | 2026-10-31 (#740, 0e1b9921) | 2026-10-31 (~16:05 UTC) | 2026-10-31 (health ok, /login 200, Dowd portal) |
+| E0 | Backlog TASK-235..240 + Track E | | | n/a | n/a |
+| E1 | TASK-235 | | | | |
+| E2 | TASK-238 | | | | |
+| E3 | TASK-236 | | | | |
+| E4 | TASK-237 | | | | |
+| E5 | TASK-239 | | | | |
+| E6 | TASK-240 | | | | |
 | D5 | TASK-228 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC) | 2026-10-31 (health ok, /login 200) |
 
 ## Operating rules
@@ -349,6 +362,22 @@ it if needed." Track D runs ahead of the remaining B, C and F steps.
   approved, G6).
 - **D4** TASK-227 Pool paint across rooms that share a color.
 - **D5** TASK-228 Tall-wall height factors (factors approved, G7).
+
+### Track E: simpler screens for a non-technical user (plan: "Plan: Track E")
+
+Proposed 2026-11-22 after the simplicity audit (UX direction section 31). The
+owner asked for these to be built together with little interruption. Track E
+starts only when G8 is Active, then runs ahead of the remaining B, C and F
+steps. Steps run one at a time in this order, because E1 to E4 all edit the
+menu, the shortcut lists and their tests:
+
+- **E0** Backlog TASK-235 to TASK-240 and this track (docs only).
+- **E1** TASK-235 One word for each thing (two PRs).
+- **E2** TASK-238 Today and Desk never bounce you away (needs E1).
+- **E3** TASK-236 One New button (needs E1).
+- **E4** TASK-237 Shorter menu, Money on one page (needs E1, E3).
+- **E5** TASK-239 Job page leads with one next step (needs E1; two PRs).
+- **E6** TASK-240 Progress line (needs E5).
 
 Not in this runbook: TASK-183 (deferred until Good/Better/Best is used) and
 the Phase 4 items in `docs/canonical/ROADMAP.md`.
@@ -599,7 +628,62 @@ the production follow-up. Record progress in "Current state" and "Log".
 See the task files. Owner questions answered 2026-10-31 (G6, G7). Order the
 owner chose: D4 next, then D3 and D5.
 
+## Plan: Track E
+
+Breadcrumbs for whoever continues. The task files hold scope and acceptance
+criteria; this section holds the rest.
+
+All steps:
+
+- UI only: no migration and no data script, so no backup step at deploy.
+- Before editing a screen, read its section in
+  `docs/working/ux-implementation-direction.md` plus sections 22, 23, 25 and 31.
+- Labels come from `UI.*` in `apps/web/lib/vocabulary.ts` once E1 PR 1 has merged.
+- E2E tests added here also run at a phone viewport.
+- Delete what the step replaces in the same PR (knip fails CI on unused files).
+  Do not delete a page route.
+- Post-deploy check for every step: health ok, `/login` 200, and each changed
+  page returns 307 to `/login` when signed out.
+- The checks with a non-technical person (each task's "Owner check after
+  deploy") are for the owner. When a step is Verified, list its check in
+  "Current state" Notes and continue; they do not block the next step.
+- Copy and layout choices inside a task's scope (status sentences, allow-list
+  entries, which panel goes in which section) are engineering choices: make
+  them and list them in the PR under "Choices made". Anything else follows the
+  usual stop conditions.
+
+Per step:
+
+- **E1 · TASK-235.** Start with `apps/web/lib/vocabulary.ts` and its test, then
+  `components/AppShell.tsx`, `lib/navigation/hubs.ts`,
+  `lib/navigation/quick-actions.ts`, `components/CommandPalette.tsx`. Then
+  sweep screen text and label props, e.g.
+  `rg -n '>[^<{]*\b(Client|People|Person|House|Quote|Bill)s?\b' apps/web/app apps/web/components`.
+  PR 1: staff screens plus the scan test (`app/app`, `components`). PR 2: the
+  portal, `estimate/respond`, print pages, `lib/pdf`, email and SMS templates,
+  with the scan widened to them. E2E smoke specs that look for old labels
+  change in the same PR.
+- **E2 · TASK-238.** `components/WorkspaceAutoRoute.tsx` and the post-login
+  destination helper. Tell login and logo entries apart from menu taps; pick a
+  mechanism and say why in the PR.
+- **E3 · TASK-236.** `lib/navigation/quick-actions.ts` exports one primary list
+  and one "More" list; `FloatingActionButton.tsx`, the Desk tiles
+  (`app/app/OwnerDashboard.tsx` / `DashboardWidgets.tsx`) and the Today strip
+  render them. "Someone called" opens the intake flow (`app/app/intake/new`).
+- **E4 · TASK-237.** `buildHubSections` and the More sheet in `AppShell.tsx`;
+  hub chips in `hubs.ts`; the Money summary on `app/app/invoices/page.tsx`
+  (open invoices total, this month's expenses, this month's miles). Test that
+  every old destination is reachable within two taps.
+- **E5 · TASK-239.** `app/app/jobs/[id]/page.tsx` and `ProjectWhatNext.tsx`.
+  PR 1: a pure function `jobNextStep(job) → { sentence, action }` with a unit
+  test for every job state, rendered as the top block. PR 2: move panels into
+  Work / Money / History and remove the ones they replace; the PR lists every
+  action that existed before and where it lives now.
+- **E6 · TASK-240.** A pure step-derivation function with unit tests and one
+  small component, in the job header from E5 and on `app/app/clients/[id]`.
+
 ## Log
+
 
 - 2026-10-31 · B4 PR 1 · Verified · 8f158a7a deployed ~19:13 UTC, no migration; health ok, /login HTTP/2 200; known-good deploy-good/8f158a7a. Codex review fixed before merge: rates panel refetch loop on load error; saved hours-per-day now updates the card
 - 2026-10-31 · B4 PR 1 · Merged · #743 · squash 8f158a7a

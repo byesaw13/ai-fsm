@@ -19,15 +19,17 @@ These objects form the core product vocabulary. New documentation and product wo
 
 ### UI labels vs backend terms
 
-| Backend | UI label (owner/staff) |
+Owner decision 2026-11-22: staff and customer screens use **Customer, Property, Estimate, Invoice**. This replaces Person, House, Quote, Bill (September 2026). Those words reached the menu but only about 70 screen labels, against about 620 for these. These also match the database, the API and Square. Until TASK-235 ships, the menu still shows the September words.
+
+| Backend | UI label (owner/staff and customer) |
 |---|---|
-| `clients` | **Person** / People |
-| `properties` | **House** |
+| `clients` | **Customer** / Customers |
+| `properties` | **Property** / Properties |
 | `jobs` | **Job** |
 | `work_orders` | (internal — not a nav noun) |
 | `visits` | **Visit** / Day |
-| `estimates` | **Quote** |
-| `invoices` | **Bill** |
+| `estimates` | **Estimate** |
+| `invoices` | **Invoice** |
 
 Backend tables, routes, and status enums keep their stable names (`job`, `jobs`, `/app/jobs`). Presentation maps `job` → **Job** everywhere in primary navigation and owner-facing copy. The field home is **Today** (`/app/my-work`). The office home is **Desk** (`/app`).
 

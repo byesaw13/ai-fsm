@@ -103,7 +103,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-235**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-241**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -217,6 +217,12 @@ closed in tests; owner-flow AC still open.
 | TASK-232 | [Saving a quote in the edit form keeps its job and property](TASK-232-edit-form-keeps-job-and-property.md) | 002 | Proposed |
 | TASK-233 | [A percentage deposit survives a quote save](TASK-233-percentage-deposit-survives-save.md) | 002 | Proposed |
 | TASK-234 | [Revise and resend a sent quote](TASK-234-revise-and-resend.md) | 002 | Proposed |
+| TASK-235 | [Customer, Property, Estimate, Invoice on every screen](TASK-235-screens-speak-shop-words.md) | 006 | Proposed |
+| TASK-236 | [One "New" button with three plain choices](TASK-236-one-new-button.md) | 006 | Proposed |
+| TASK-237 | [A shorter menu, and Money on one page](TASK-237-trim-the-menu.md) | 006 | Proposed |
+| TASK-238 | [Today and Desk never bounce you away](TASK-238-homes-never-bounce.md) | 006 | Proposed |
+| TASK-239 | [The job page leads with one next step](TASK-239-job-page-one-next-step.md) | 006 | Proposed |
+| TASK-240 | [A progress line on every job and customer](TASK-240-progress-line.md) | 006 | Proposed |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
