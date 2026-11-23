@@ -217,7 +217,7 @@ function ensureSpace(ctx: Ctx, needed: number): void {
 }
 
 interface RenderInput {
-  docType: "Invoice" | "Quote";
+  docType: "Invoice" | "Estimate";
   ref: string;
   /**
    * Internal workflow status (draft/sent/partial/etc). Not shown on the
@@ -336,7 +336,7 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   }
 
   const rightX = PAGE_W - MARGIN;
-  // Title case to match HTML print ("Invoice" / "Quote")
+  // Title case to match HTML print ("Invoice" / "Estimate")
   rightText(input.docType, rightX, ctx.y, 22, bold, INK);
   rightText(input.ref, rightX, ctx.y - 18, 10, font, MUTED);
   rightText(`Document standard: ${DOCUMENT_STANDARD_VERSION}`, rightX, ctx.y - 32, 8, font, MUTED);
