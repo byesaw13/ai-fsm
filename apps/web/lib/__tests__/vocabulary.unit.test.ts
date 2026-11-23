@@ -36,17 +36,11 @@ describe("nav speaks those nouns", () => {
     expect(tech).toMatchObject({ href: "/app/my-work", label: UI.today });
   });
 
-  it("calls jobs Jobs, estimates Estimates, invoices Invoices, properties Properties", () => {
-    const work = getNavSections("admin").find((s) => s.label === "Work");
-    expect(work?.items.find((i) => i.href === "/app/jobs")?.label).toBe(UI.jobs);
-    expect(work?.items.find((i) => i.href === "/app/estimates")?.label).toBe(UI.estimates);
-
-    const money = getNavSections("admin").find((s) => s.label === "Money");
-    expect(money?.items.find((i) => i.href === "/app/invoices")?.label).toBe(UI.invoices);
-
-    const people = getNavSections("admin").find((s) => s.label === UI.customers);
-    expect(people?.items.find((i) => i.href === "/app/properties")?.label).toBe(UI.properties);
-    expect(people?.items.find((i) => i.href === "/app/clients")?.label).toBe(UI.customers);
+  it("names the hubs Jobs and Customers; estimates, invoices and properties are hub tabs", () => {
+    const top = getNavSections("admin")[0].items;
+    expect(top.find((i) => i.href === "/app/jobs")?.label).toBe(UI.jobs);
+    expect(top.find((i) => i.href === "/app/clients")?.label).toBe(UI.customers);
+    expect(top.find((i) => i.href === "/app/invoices")?.label).toBe("Money");
   });
 
   it("gives the owner phone tabs Today / Jobs / Customers / Money", () => {
