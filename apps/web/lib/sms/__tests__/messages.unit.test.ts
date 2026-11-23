@@ -22,7 +22,7 @@ describe("serviceSmsPhone", () => {
 
 describe("service text copy", () => {
   it("keeps each text to one or two sentences and includes STOP", () => {
-    expect(quoteReadyText("AB12CD34", "https://example.com/q")).toMatch(/quote AB12CD34 is ready/);
+    expect(quoteReadyText("AB12CD34", "https://example.com/q")).toMatch(/estimate AB12CD34 is ready/);
     expect(quoteReadyText("AB12CD34", "https://example.com/q")).toMatch(/STOP/);
     expect(invoiceReadyText({ number: "1042", amountDueCents: 15000, url: "https://example.com/i", paid: false })).toMatch(
       /\$150\.00/

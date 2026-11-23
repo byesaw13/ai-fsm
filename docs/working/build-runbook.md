@@ -21,9 +21,10 @@ docs-only commit when there is no PR).
 ```
 Last step           : E0 merged (#755, 2fe389a4); G8 Active (owner comment
                       on #755, 2026-11-23 15:06 UTC).
-In-flight PR        : E1 TASK-235 PR 1 (staff screens + scan test)
-Next step           : E1 PR 2 (customer-facing pages) after PR 1 is
-                      Verified; then E2 TASK-238.
+In-flight PR        : #756 E1 TASK-235 (staff and customer screens in one
+                      PR; the customer-facing part was 9 strings, so the
+                      planned PR 2 was folded in)
+Next step           : E2 TASK-238 once E1 is Verified.
 Blocked on          : nothing
 Last known-good     : d2ac0d71 (deploy-good/d2ac0d71); previous d4a4cf94
 Notes               : Main checkout holds another session's uncommitted
@@ -685,7 +686,7 @@ Per step:
 
 ## Log
 
-- 2026-11-23 · E1 · In progress · TASK-235 PR 1: staff screens, API messages, menu and map say Customer, Property, Estimate, Invoice; scan test added
+- 2026-11-23 · E1 · In progress · #756 · staff screens, API messages, menu, map, portal, print, PDF and SMS say Customer, Property, Estimate, Invoice; scan test added
 - 2026-11-23 · E0 · Merged · #755 · squash 2fe389a4; G8 Active (owner comment on #755)
 
 - 2026-10-31 · B4 PR 1 · Verified · 8f158a7a deployed ~19:13 UTC, no migration; health ok, /login HTTP/2 200; known-good deploy-good/8f158a7a. Codex review fixed before merge: rates panel refetch loop on load error; saved hours-per-day now updates the card

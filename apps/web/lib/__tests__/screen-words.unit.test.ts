@@ -4,9 +4,9 @@
  *
  * Scans the text people read — JSX text and string values — in staff screens,
  * components, helpers and API messages, and fails on the retired words.
- * Code names, routes, imports, test ids, log lines and AI prompts are skipped.
- * Customer-facing pages (portal, print, PDF, email, SMS) join the scan in
- * TASK-235 PR 2.
+ * Covers staff screens and what customers see (portal, estimate response,
+ * booking, intake, print pages, PDF, email, SMS). Code names, routes, imports,
+ * test ids, log lines and AI prompts are skipped.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -14,14 +14,19 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const WEB = path.resolve(__dirname, "../..");
-const ROOTS = ["app/app", "app/api", "components", "lib"];
-
-/** Not scanned yet: customer-facing (PR 2) and AI prompts (not screen text). */
-const SKIP_FILES: RegExp[] = [
-  /\/print\//,
-  /^lib\/(pdf|email|sms|portal)\//,
-  /^lib\/estimates\/(ai-draft|item-suggester|interview-agent)\.ts$/,
+const ROOTS = [
+  "app/app",
+  "app/api",
+  "app/portal",
+  "app/estimate",
+  "app/booking",
+  "app/intake",
+  "components",
+  "lib",
 ];
+
+/** AI prompts are instructions to the model, not screen text. */
+const SKIP_FILES: RegExp[] = [/^lib\/estimates\/(ai-draft|item-suggester|interview-agent)\.ts$/];
 
 const RETIRED = /\b(Clients?|clients?|People|Persons?|Houses?|Quotes?|quotes?|Bills?)\b/;
 
@@ -32,6 +37,7 @@ const ALLOWED: RegExp[] = [
   /Person-hours/i, // the unit
   /People pay what they still remember/, // plain English, not the noun
   /Client concierge/, // realtor-sponsored purpose: the realtor's client
+  /^Bill To$/, // the standard billing-address heading on invoices and printed estimates
 ];
 
 function files(dir: string): string[] {
@@ -98,7 +104,7 @@ function retiredWordsIn(file: string): string[] {
 }
 
 describe("screens speak Customer, Property, Estimate, Invoice", () => {
-  it("no staff screen, component, helper or API message uses a retired word", () => {
+  it("no staff or customer screen, helper or message uses a retired word", () => {
     const hits = ROOTS.flatMap((root) => files(path.join(WEB, root)))
       .filter((file) => !SKIP_FILES.some((skip) => skip.test(path.relative(WEB, file))))
       .flatMap(retiredWordsIn);

@@ -854,12 +854,12 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
   const site = (d.branding?.website?.trim() || DEFAULT_BRAND_URL).replace(/^https?:\/\//, "");
   const terms =
     d.branding?.estimateTerms?.trim() ||
-    "This quote is provided in good faith and may be adjusted if scope or conditions change.";
+    "This estimate is provided in good faith and may be adjusted if scope or conditions change.";
   const footer = `Questions? Reach us at ${site}. Thank you for considering us.`;
 
   return renderDocument({
     optionGroups: multiOption ? d.options : undefined,
-    docType: "Quote",
+    docType: "Estimate",
     ref: d.estimateRef,
     status: d.status,
     clientName: d.clientName,

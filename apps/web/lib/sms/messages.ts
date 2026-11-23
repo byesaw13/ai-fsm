@@ -27,7 +27,7 @@ export function firstWord(full: string | null | undefined): string | null {
 }
 
 export function quoteReadyText(ref: string, url: string): string {
-  return withStop(`Dovetails: your quote ${ref} is ready. ${url}`);
+  return withStop(`Dovetails: your estimate ${ref} is ready. ${url}`);
 }
 
 export function invoiceReadyText(opts: {

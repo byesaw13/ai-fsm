@@ -223,7 +223,7 @@ export default async function EstimatePrintPage({
             logoSrc={branding.logoPath ? `/api/v1/account/logo?t=${encodeURIComponent(account?.settings?.logo_filename ?? "")}` : null}
           />
           <div style={{ textAlign: "right" }}>
-            <h1>Quote</h1>
+            <h1>Estimate</h1>
             <p className="meta-label">{estimateNumber}</p>
             <p className="meta-label no-print">{documentFilename}</p>
             <p className="meta-label">Document standard: {DOCUMENT_STANDARD_VERSION}</p>
@@ -346,7 +346,7 @@ export default async function EstimatePrintPage({
               <p>{legacyTerms.sections.exclusions}</p>
             </div>
             <div>
-              <h3>Client Responsibilities</h3>
+              <h3>Customer Responsibilities</h3>
               <p>{legacyTerms.sections.client_responsibilities}</p>
             </div>
           </div>
@@ -474,7 +474,7 @@ export default async function EstimatePrintPage({
 
         {/* Estimate terms (Settings → Estimate terms; falls back to domain default) */}
         <div className="section-block">
-          <h2>Quote Terms</h2>
+          <h2>Estimate Terms</h2>
           <p className="terms">{estimateTermsBody}</p>
         </div>
 
@@ -503,7 +503,7 @@ export default async function EstimatePrintPage({
           </div>
           <div>
             <div style={{ borderTop: "1px solid #111", paddingTop: 6, minWidth: 220 }}>
-              <p style={{ fontSize: 12, color: "#666" }}>Client acceptance &amp; date</p>
+              <p style={{ fontSize: 12, color: "#666" }}>Customer acceptance &amp; date</p>
             </div>
           </div>
         </div>
