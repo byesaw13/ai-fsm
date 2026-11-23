@@ -98,9 +98,10 @@ test.describe("Required release smoke — admin core flow", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
     await page.goto(`${BASE}/app/jobs/${jobId}`);
-    const phone = page.getByTestId("job-phone-layout");
-    await expect(phone.getByTestId("project-what-next-message")).toBeVisible();
-    await expect(phone.getByTestId("project-what-next-primary")).toBeVisible();
+    // Only the visible copy counts (a streamed page can briefly hold a hidden one).
+    const phone = page.locator('[data-testid="job-phone-layout"]:visible');
+    await expect(phone.locator('[data-testid="project-what-next-message"]:visible')).toHaveCount(1);
+    await expect(phone.locator('[data-testid="project-what-next-primary"]:visible')).toHaveCount(1);
     // Exactly one primary-styled action on the first screen.
     const primariesOnFirstScreen = await phone
       .locator(".p7-btn-primary, .mobile-work-item-primary")
