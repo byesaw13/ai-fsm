@@ -57,7 +57,9 @@ export function jobProgressSteps(i: JobProgressInput): ProgressStep[] {
     );
   }
   raw.push(
-    { key: "working", label: "Working", done: WORK_DONE.has(i.jobStatus) || !!i.invoiceId },
+    // A draft invoice can be prepared early from an approved estimate; only an
+    // invoice that went out says the work is done.
+    { key: "working", label: "Working", done: WORK_DONE.has(i.jobStatus) || INVOICE_OUT.has(i.invoiceStatus ?? "") },
     {
       key: "invoiced",
       label: "Invoiced",

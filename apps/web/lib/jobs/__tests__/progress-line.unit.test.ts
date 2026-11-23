@@ -62,6 +62,12 @@ describe("job progress line (TASK-240)", () => {
     );
   });
 
+  it("a draft invoice prepared early keeps Working current on an open job", () => {
+    expect(
+      view({ jobStatus: "in_progress", estimateId: "e1", estimateSent: true, approvedEstimateId: "e1", invoiceId: "i1", invoiceStatus: "draft" }),
+    ).toBe("Call:done Estimate:done Approved:done Working:current Invoiced:todo Paid:todo");
+  });
+
   it("a quick job with no estimate skips Estimate and Approved", () => {
     expect(view({ jobStatus: "in_progress" })).toBe("Call:done Working:current Invoiced:todo Paid:todo");
     expect(view({ jobStatus: "completed", invoiceId: "i1", invoiceStatus: "partial" })).toBe(
