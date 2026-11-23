@@ -425,6 +425,8 @@ function StandardEstimateEditForm({
                     description: "Materials",
                     quantity: 1,
                     unit_price_cents: parseCents(materialCostDollars),
+                    unit_cost_cents: parseCents(materialCostDollars),
+                    line_item_type: "materials" as const,
                     sort_order: 1,
                   },
                 ]
@@ -435,6 +437,7 @@ function StandardEstimateEditForm({
                     description: "Material handling fee (15%)",
                     quantity: 1,
                     unit_price_cents: paintingResult.material_handling_cents,
+                    line_item_type: "handling_fee" as const,
                     sort_order: 2,
                   },
                 ]

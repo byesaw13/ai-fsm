@@ -687,10 +687,17 @@ export function useEstimateForm({
               ...paintingLaborHourFields(),
             },
             ...(paintingResult.material_cents > 0
-              ? [{ description: "Materials", quantity: 1, unit_price_cents: paintingResult.material_cents, sort_order: 1 }]
+              ? [{
+                  description: "Materials",
+                  quantity: 1,
+                  unit_price_cents: paintingResult.material_cents,
+                  ...(parseCents(materialCostDollars) > 0 ? { unit_cost_cents: parseCents(materialCostDollars) } : {}),
+                  line_item_type: "materials" as const,
+                  sort_order: 1,
+                }]
               : []),
             ...(paintingResult.material_handling_cents > 0
-              ? [{ description: "Material handling fee (15%)", quantity: 1, unit_price_cents: paintingResult.material_handling_cents, sort_order: 2, visible_to_customer: true }]
+              ? [{ description: "Material handling fee (15%)", quantity: 1, unit_price_cents: paintingResult.material_handling_cents, line_item_type: "handling_fee" as const, sort_order: 2, visible_to_customer: true }]
               : []),
           ],
           internal_notes: `Internal labor: ${formatCents(paintingResult.internal_labor_cost_cents)} | Gross margin: ${paintingResult.gross_margin_pct}% (${formatCents(paintingResult.gross_margin_cents)})`,

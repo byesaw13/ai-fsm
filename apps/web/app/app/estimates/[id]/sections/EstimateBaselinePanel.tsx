@@ -74,7 +74,7 @@ function LiveBaseline(props: Extract<BaselinePanelProps, { mode: "live" | "froze
   const { result, mode } = props;
   const editable = mode === "live";
   const router = useRouter();
-  const { setUpdatedAt } = useQuoteVersion();
+  const { updatedAt, setUpdatedAt } = useQuoteVersion();
   const [otherDirect, setOtherDirect] = useState(
     props.otherDirectCents == null ? "" : String(props.otherDirectCents / 100),
   );
@@ -91,7 +91,8 @@ function LiveBaseline(props: Extract<BaselinePanelProps, { mode: "live" | "froze
       const res = await fetch(`/api/v1/estimates/${props.estimateId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        // The loaded version, so a save from a stale tab is refused (STALE_QUOTE) and asks for a reload.
+        body: JSON.stringify(updatedAt ? { ...body, updated_at: updatedAt } : body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
