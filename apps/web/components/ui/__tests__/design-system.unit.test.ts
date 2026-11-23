@@ -133,171 +133,100 @@ describe("getButtonClass", () => {
 // AppShell — getNavSections, getBottomNavItems, isNavActive
 // ---------------------------------------------------------------------------
 
-import { getNavSections, getBottomNavItems, isNavActive } from "../../AppShell";
+import { getNavSections, getBottomNavItems, isNavActive, navAttentionCount } from "../../AppShell";
+import { MONEY_HUB_LINKS, PEOPLE_HUB_LINKS, WORK_HUB_LINKS } from "@/lib/navigation/hubs";
 
-function flattenSections(sections: ReturnType<typeof getNavSections>) {
-  return sections.flatMap((s) => s.items);
-}
+describe("getNavSections (five places, TASK-237)", () => {
+  // Every destination the 14-item sidebar had before TASK-237.
+  const OLD_SIDEBAR = [
+    "/app",
+    "/app/my-work",
+    "/app/capture",
+    "/app/day-review",
+    "/app/timeline",
+    "/app/requests",
+    "/app/estimates",
+    "/app/jobs",
+    "/app/schedule",
+    "/app/clients",
+    "/app/properties",
+    "/app/invoices",
+    "/app/reports",
+    "/app/settings",
+    "/app/map",
+  ];
+  // Tabs shown at the top of each hub page (lib/navigation/hubs.ts).
+  const HUB_TABS: Record<string, string[]> = {
+    "/app/jobs": WORK_HUB_LINKS.map((l) => l.href),
+    "/app/clients": PEOPLE_HUB_LINKS.map((l) => l.href),
+    "/app/invoices": MONEY_HUB_LINKS.map((l) => l.href),
+  };
 
-describe("getNavSections (nested hubs)", () => {
-  const HUB_LABELS = ["Home", "Work", "Customers", "Money"];
+  function topLevel(role: "owner" | "admin", view?: "field" | "office") {
+    const sections = getNavSections(role, view);
+    return sections.flatMap((s) => (s.collapsible ? [{ href: "#more", label: s.label }] : s.items));
+  }
 
-  it("returns labeled hub sections for admin role", () => {
-    const sections = getNavSections("admin");
-    const labels = sections.map((s) => s.label).filter(Boolean);
-    expect(labels).toEqual(HUB_LABELS);
-    // Settings sits in a trailing unlabeled section
-    expect(sections[sections.length - 1].label).toBe("");
-    expect(sections[sections.length - 1].items.some((i) => i.href === "/app/settings")).toBe(true);
+  it("shows the home, Jobs, Customers, Money and More — five entries", () => {
+    expect(topLevel("owner", "field").map((i) => i.label)).toEqual(["Today", "Jobs", "Customers", "Money", "More"]);
+    expect(topLevel("owner", "office").map((i) => i.label)).toEqual(["Desk", "Jobs", "Customers", "Money", "More"]);
+    expect(topLevel("admin").map((i) => i.label)).toEqual(["Desk", "Jobs", "Customers", "Money", "More"]);
   });
 
-  it("Owner nav has the active home + all shared business destinations", () => {
-    // The home swaps with the workspace (Today in Field, Desk in Office);
-    // the shared destinations are present in both. (TASK-058 follow-up)
-    const shared = [
-      "/app/requests",
-      "/app/clients",
-      "/app/properties",
-      "/app/estimates",
-      "/app/jobs",
-      "/app/schedule",
-      "/app/invoices",
-      "/app/reports",
-      "/app/settings",
-    ];
-    for (const view of ["field", "office"] as const) {
-      const hrefs = flattenSections(getNavSections("owner", view)).map((i) => i.href);
-      for (const href of shared) expect(hrefs).toContain(href);
-      expect(hrefs).toContain(view === "field" ? "/app/my-work" : "/app");
-      expect(hrefs).toContain("/app/timeline");
-      expect(hrefs).not.toContain("/app/mileage");
-      expect(hrefs).toContain("/app/capture");
-      expect(hrefs).toContain("/app/map");
-      expect(hrefs).toHaveLength(14);
-    }
+  it("puts Capture, Day Review, Tracking, Reports, Map and Settings under More", () => {
+    const more = getNavSections("owner", "office").find((s) => s.collapsible);
+    expect(more?.items.map((i) => i.label)).toEqual(["Capture", "Day Review", "Tracking", "Reports", "Map", "Settings"]);
   });
 
-  it("Admin nav drops Today (pure admins don't do field work) — 12 items", () => {
-    const hrefs = flattenSections(getNavSections("admin")).map((i) => i.href);
-    expect(hrefs).not.toContain("/app/my-work"); // EPIC-006 P5
-    expect(hrefs).toContain("/app");
-    expect(hrefs).toContain("/app/settings");
-    expect(hrefs).toContain("/app/timeline");
-    expect(hrefs).toContain("/app/capture");
+  it("gives admins Action Queue under More and no Map", () => {
+    const more = getNavSections("admin").find((s) => s.collapsible);
+    const hrefs = more?.items.map((i) => i.href) ?? [];
+    expect(hrefs).toContain("/app/action-queue");
     expect(hrefs).not.toContain("/app/map");
-    expect(hrefs).toHaveLength(13);
   });
 
-  it("Layer 2+ tools are not in main nav", () => {
-    const items = flattenSections(getNavSections("admin"));
-    const hrefs = items.map((i) => i.href);
-    expect(hrefs).not.toContain("/app/price-book");
-    expect(hrefs).not.toContain("/app/maintenance-plans");
-    expect(hrefs).not.toContain("/app/field");
-    expect(hrefs).not.toContain("/portal/login");
-    expect(hrefs).not.toContain("/app/automations");
-    expect(hrefs).not.toContain("/app/inbox");
-    expect(hrefs).not.toContain("/app/booking-requests");
-  });
-
-  it("owner nav is hub sections totaling 12 items with a single home per workspace", () => {
-    for (const view of ["field", "office"] as const) {
-      const sections = getNavSections("owner", view);
-      expect(sections.map((s) => s.label).filter(Boolean)).toEqual(HUB_LABELS);
-      const hrefs = flattenSections(sections).map((i) => i.href);
-      expect(hrefs).toHaveLength(14);
-      expect(hrefs).toContain("/app/map");
-      expect(hrefs).toContain("/app/timeline");
-      expect(hrefs).toContain("/app/capture");
-      if (view === "field") {
-        expect(hrefs).toContain("/app/my-work");
-        expect(hrefs).not.toContain("/app"); // no Desk home in Field
-      } else {
-        expect(hrefs).toContain("/app");
-        expect(hrefs).not.toContain("/app/my-work"); // no Today home in Office
+  it("keeps every old sidebar destination within two taps", () => {
+    for (const role of ["owner", "admin"] as const) {
+      for (const view of ["field", "office"] as const) {
+        const sections = getNavSections(role, view);
+        const oneTap = sections.flatMap((s) => s.items.map((i) => i.href));
+        const twoTaps = new Set([...oneTap, ...oneTap.flatMap((h) => HUB_TABS[h] ?? [])]);
+        for (const href of OLD_SIDEBAR) {
+          if (role === "admin" && (href === "/app/my-work" || href === "/app/map")) continue;
+          if (role === "owner" && href === (view === "field" ? "/app" : "/app/my-work")) continue;
+          expect(twoTaps.has(href), `${role}/${view}: ${href}`).toBe(true);
+        }
       }
     }
   });
 
-  it("returns Today for tech role — no Day Review or Visits tab", () => {
-    const sections = getNavSections("tech");
-    const items = flattenSections(sections);
-    expect(items).toHaveLength(1);
-    const hrefs = items.map((i) => i.href);
-    expect(hrefs).toEqual(["/app/my-work"]);
-    expect(items.map((i) => i.label)).toEqual(["Today"]);
-    expect(hrefs).not.toContain("/app/visits");
-    expect(hrefs).not.toContain("/app/field");
-    expect(hrefs).not.toContain("/app/settings");
-    expect(hrefs).not.toContain("/app/jobs");
-    expect(hrefs).not.toContain("/app/estimates");
-    expect(hrefs).not.toContain("/app/invoices");
-    expect(hrefs).not.toContain("/app/automations");
-    expect(hrefs).not.toContain("/app/capture");
-    expect(hrefs).not.toContain("/app/map");
-  });
-
-  it("leads with Today for owner/tech, Desk for pure admin", () => {
-    for (const role of ["tech", "owner"] as const) {
-      const items = flattenSections(getNavSections(role));
-      expect(items[0].href).toBe("/app/my-work");
-      expect(items[0].label).toBe("Today");
-    }
-
-    const adminFirst = flattenSections(getNavSections("admin"))[0];
-    expect(adminFirst.href).toBe("/app");
-    expect(adminFirst.label).toBe("Desk");
-  });
-
   it("owner sidebar shows the active workspace's home, not both", () => {
-    // Field surface: Today leads, Desk is not in the sidebar (reach it from
-    // Settings → Workspace). Office surface: the reverse.
-    const field = flattenSections(getNavSections("owner", "field")).map((i) => i.href);
+    const field = topLevel("owner", "field").map((i) => i.href);
     expect(field[0]).toBe("/app/my-work");
     expect(field).not.toContain("/app");
-
-    const office = flattenSections(getNavSections("owner", "office")).map((i) => i.href);
+    const office = topLevel("owner", "office").map((i) => i.href);
     expect(office[0]).toBe("/app");
     expect(office).not.toContain("/app/my-work");
+  });
 
-    // Shared business destinations stay in both.
-    for (const href of ["/app/jobs", "/app/invoices", "/app/reports", "/app/settings"]) {
-      expect(field).toContain(href);
-      expect(office).toContain(href);
+  it("returns Today only for tech", () => {
+    const items = getNavSections("tech").flatMap((s) => s.items);
+    expect(items.map((i) => i.href)).toEqual(["/app/my-work"]);
+    expect(items.map((i) => i.label)).toEqual(["Today"]);
+  });
+
+  it("keeps Layer 2+ tools out of the menu", () => {
+    const hrefs = getNavSections("admin").flatMap((s) => s.items.map((i) => i.href));
+    for (const gone of ["/app/price-book", "/app/automations", "/app/work-orders", "/app/visits"]) {
+      expect(hrefs).not.toContain(gone);
     }
   });
 
-  it("Home hub lists Tracking next to Day Review for owner/admin", () => {
-    const adminHome = getNavSections("admin").find((s) => s.label === "Home");
-    expect(adminHome?.items.map((i) => i.label)).toEqual([
-      "Desk",
-      "Capture",
-      "Day Review",
-      "Tracking",
-    ]);
-    expect(adminHome?.items.map((i) => i.href)).toContain("/app/timeline");
-
-    const ownerHome = getNavSections("owner", "office").find((s) => s.label === "Home");
-    expect(ownerHome?.items.some((i) => i.href === "/app/timeline" && i.label === "Tracking")).toBe(
-      true,
-    );
-
-    const tech = flattenSections(getNavSections("tech")).map((i) => i.href);
-    expect(tech).not.toContain("/app/timeline");
-  });
-
-  it("Work hub lists requests through schedule in order — Work Orders dropped (TASK-125)", () => {
-    const work = getNavSections("admin").find((s) => s.label === "Work");
-    expect(work?.items.map((i) => i.href)).toEqual([
-      "/app/requests",
-      "/app/estimates",
-      "/app/jobs",
-      "/app/schedule",
-    ]);
-    // Work Orders are reached inside a Job, not from the top nav.
-    expect(work?.items.map((i) => i.href)).not.toContain("/app/work-orders");
-    expect(work?.items.find((i) => i.href === "/app/jobs")?.label).toBe("Jobs");
-    expect(work?.items.find((i) => i.href === "/app/estimates")?.label).toBe("Estimates");
+  it("puts a needs-attention count on Jobs (requests + estimates) and Money (invoices)", () => {
+    const a = { requestsCount: 2, estimatesCount: 3, invoicesCount: 4 };
+    expect(navAttentionCount("/app/jobs", a)).toBe(5);
+    expect(navAttentionCount("/app/invoices", a)).toBe(4);
+    expect(navAttentionCount("/app/clients", a)).toBe(0);
   });
 });
 

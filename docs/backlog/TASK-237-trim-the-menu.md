@@ -1,7 +1,7 @@
 # TASK-237: A shorter menu, and Money on one page
 
 Status:
-Proposed
+In progress
 
 Epic:
 EPIC-006 Role-Based Workspaces

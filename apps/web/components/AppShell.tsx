@@ -15,17 +15,14 @@ import { homeEntryHref } from "@/lib/auth/post-login-destination";
 import { LiveRefresh } from "./LiveRefresh";
 import {
   IconDashboard,
-  IconEstimates,
   IconInbox,
   IconSettings,
   IconMap,
   IconMyDay,
-  IconProperties,
   IconJobs,
   IconClients,
   IconInvoices,
   IconReports,
-  IconSchedule,
   IconDayReview,
   IconField,
   IconCapture,
@@ -67,6 +64,8 @@ interface NavItem {
 interface NavSection {
   label: string;
   items: NavItem[];
+  /** Sidebar shows the label as a toggle; items stay closed until opened (TASK-237). */
+  collapsible?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,29 +81,41 @@ const NAV_MY_DAY:     NavItem = { href: "/app/my-work",      label: UI.today,   
 const NAV_CAPTURE:    NavItem = { href: "/app/capture",      label: "Capture",    Icon: IconCapture };
 const NAV_DAY_REVIEW: NavItem = { href: "/app/day-review",   label: "Day Review", Icon: IconDayReview };
 const NAV_TRACKING:   NavItem = { href: "/app/timeline",     label: "Tracking",   Icon: IconField };
-const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests",   Icon: IconInbox };
-const NAV_CLIENTS:    NavItem = { href: "/app/clients",      label: UI.customers, Icon: IconClients,   adminOnly: true };
-const NAV_PROPS:      NavItem = { href: "/app/properties",   label: UI.properties, Icon: IconProperties, adminOnly: true };
-const NAV_ESTIMATES:  NavItem = { href: "/app/estimates",    label: UI.estimates, Icon: IconEstimates, adminOnly: true };
-const NAV_JOBS:       NavItem = { href: "/app/jobs",         label: UI.jobs,      Icon: IconJobs,       adminOnly: true };
-// Work orders are reached inside a Job, not from the top nav.
-const NAV_SCHEDULE:   NavItem = { href: "/app/schedule",     label: "Schedule",   Icon: IconSchedule,  adminOnly: true };
-const NAV_INVOICES:   NavItem = { href: "/app/invoices",     label: UI.invoices,  Icon: IconInvoices,  adminOnly: true };
 const NAV_REPORTS:    NavItem = { href: "/app/reports",      label: "Reports",    Icon: IconReports,   adminOnly: true };
 const NAV_SETTINGS:   NavItem = { href: "/app/settings",     label: "Settings",   Icon: IconSettings,  adminOnly: true };
 const NAV_MAP:        NavItem = { href: "/app/map",          label: "Map",        Icon: IconMap };
 
-/** Nested hub IA — Home / Work / Customers / Money (+ Settings). Home item is injected per role/view. */
-function buildHubSections(home: NavItem): NavSection[] {
+const NAV_ACTION_QUEUE: NavItem = { href: "/app/action-queue", label: "Action Queue", Icon: IconInbox, adminOnly: true };
+
+/** The three hubs — the same items in the sidebar and the phone tabs (TASK-237). */
+const HUB_JOBS: NavItem = {
+  href: "/app/jobs",
+  label: UI.jobs,
+  Icon: IconJobs,
+  activePrefixes: ["/app/jobs", "/app/requests", "/app/estimates", "/app/work-orders", "/app/schedule", "/app/visits"],
+};
+const HUB_CUSTOMERS: NavItem = {
+  href: "/app/clients",
+  label: UI.customers,
+  Icon: IconClients,
+  activePrefixes: ["/app/clients", "/app/properties"],
+};
+const HUB_MONEY: NavItem = {
+  href: "/app/invoices",
+  label: "Money",
+  Icon: IconInvoices,
+  activePrefixes: ["/app/invoices", "/app/expenses", "/app/materials", "/app/mileage"],
+};
+
+/**
+ * Five places to go (TASK-237): the home, Jobs, Customers, Money, and More.
+ * Requests, Estimates and Schedule are tabs inside Jobs; Properties inside
+ * Customers; expenses and mileage inside Money.
+ */
+function buildHubSections(home: NavItem, more: NavItem[]): NavSection[] {
   return [
-    { label: "Home", items: [home, NAV_CAPTURE, NAV_DAY_REVIEW, NAV_TRACKING] },
-    {
-      label: "Work",
-      items: [NAV_REQUESTS, NAV_ESTIMATES, NAV_JOBS, NAV_SCHEDULE],
-    },
-    { label: UI.customers, items: [NAV_CLIENTS, NAV_PROPS] },
-    { label: "Money", items: [NAV_INVOICES, NAV_REPORTS] },
-    { label: "", items: [NAV_SETTINGS] },
+    { label: "", items: [home, HUB_JOBS, HUB_CUSTOMERS, HUB_MONEY] },
+    { label: "More", collapsible: true, items: more },
   ];
 }
 
@@ -122,21 +133,22 @@ export function getNavSections(role: Role, view: "office" | "field" = "field"): 
 
   // EPIC-006 Phase 5: pure admins never see the field home.
   if (role === "admin") {
-    return buildHubSections(NAV_TODAY);
+    return buildHubSections(NAV_TODAY, [
+      NAV_CAPTURE, NAV_DAY_REVIEW, NAV_TRACKING, NAV_REPORTS, NAV_ACTION_QUEUE, NAV_SETTINGS,
+    ]);
   }
 
   // Owner: sidebar reflects the ACTIVE workspace so the two homes never sit
   // side-by-side (TASK-058 follow-up). Shared business destinations stay in both.
   const home = view === "office" ? NAV_TODAY : NAV_MY_DAY;
-  const sections = buildHubSections(home);
-  const last = sections.length - 1;
-  sections[last] = { ...sections[last], items: [...sections[last].items, NAV_MAP] };
-  return sections;
+  return buildHubSections(home, [
+    NAV_CAPTURE, NAV_DAY_REVIEW, NAV_TRACKING, NAV_REPORTS, NAV_MAP, NAV_SETTINGS,
+  ]);
 }
 
 /**
- * Mobile bottom tab shortcuts. Owner: Today / Jobs / People / Money;
- * Admin: Desk / Jobs / People / Money. AppShell adds More as the 5th slot.
+ * Mobile bottom tab shortcuts. Owner: Today / Jobs / Customers / Money;
+ * Admin: Desk / Jobs / Customers / Money. AppShell adds More as the 5th slot.
  * Tech: Today. Visit kitchen is on Now (More), not a tab.
  */
 export function getBottomNavItems(role: Role): NavItem[] {
@@ -160,33 +172,7 @@ export function getBottomNavItems(role: Role): NavItem[] {
           activePrefixes: ["/app/day-review", "/app/timeline", "/app/capture"],
         };
 
-  const work: NavItem = {
-    href: "/app/jobs",
-    label: UI.jobs,
-    Icon: IconJobs,
-    activePrefixes: [
-      "/app/jobs",
-      "/app/requests",
-      "/app/estimates",
-      "/app/work-orders",
-      "/app/schedule",
-      "/app/visits",
-    ],
-  };
-  const people: NavItem = {
-    href: "/app/clients",
-    label: UI.customers,
-    Icon: IconClients,
-    activePrefixes: ["/app/clients", "/app/properties"],
-  };
-  const money: NavItem = {
-    href: "/app/invoices",
-    label: "Money",
-    Icon: IconInvoices,
-    activePrefixes: ["/app/invoices", "/app/reports", "/app/expenses", "/app/materials", "/app/mileage"],
-  };
-
-  return [home, work, people, money];
+  return [home, HUB_JOBS, HUB_CUSTOMERS, HUB_MONEY];
 }
 
 /** Returns true if href (and optional hub prefixes) match the current pathname */
@@ -212,6 +198,21 @@ export function isNavActive(
 // AppShell
 // ---------------------------------------------------------------------------
 
+/** A collapsible section stays open while one of its pages is showing. */
+function sectionHasActive(section: NavSection, pathname: string): boolean {
+  return section.items.some((i) => isNavActive(pathname, i.href, i.activePrefixes));
+}
+
+/** Needs-attention badge for a hub: Jobs carries requests + estimates, Money carries invoices. */
+export function navAttentionCount(
+  href: string,
+  a: { requestsCount: number; estimatesCount: number; invoicesCount: number },
+): number {
+  if (href === HUB_JOBS.href) return a.requestsCount + a.estimatesCount;
+  if (href === HUB_MONEY.href) return a.invoicesCount;
+  return 0;
+}
+
 interface AppShellProps {
   role: Role;
   userName?: string;
@@ -227,6 +228,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
   const bottomItems = getBottomNavItems(role);
   const [showMore, setShowMore] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     const val = localStorage.getItem("p7-sidebar-collapsed");
@@ -299,24 +301,28 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
           <nav className="p7-nav" aria-label="Primary navigation">
             {sections.map((section, sectionIdx) => (
               <div key={sectionIdx}>
-                {section.label && <div className="p7-nav-section">{section.label}</div>}
-                {section.items.map((item) => {
+                {section.collapsible ? (
+                  <button
+                    type="button"
+                    className="p7-nav-item"
+                    data-testid="nav-more-toggle"
+                    aria-expanded={moreOpen || sectionHasActive(section, pathname)}
+                    onClick={() => setMoreOpen((v) => !v)}
+                    title={section.label}
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
+                  >
+                    <span className="p7-nav-icon" aria-hidden="true">⋯</span>
+                    <span className="p7-nav-label">{section.label}</span>
+                  </button>
+                ) : (
+                  section.label && <div className="p7-nav-section">{section.label}</div>
+                )}
+                {(!section.collapsible || moreOpen || sectionHasActive(section, pathname)) &&
+                  section.items.map((item) => {
                   const active = isNavActive(pathname, item.href, item.activePrefixes);
-                  const count =
-                    item.href === NAV_REQUESTS.href
-                      ? attention.requestsCount
-                      : item.href === NAV_INVOICES.href
-                        ? attention.invoicesCount
-                        : item.href === NAV_ESTIMATES.href
-                          ? attention.estimatesCount
-                          : 0;
-                  const href =
-                    count > 0 &&
-                    (item.href === NAV_REQUESTS.href ||
-                      item.href === NAV_INVOICES.href ||
-                      item.href === NAV_ESTIMATES.href)
-                      ? (`${item.href}?attention=1` as Route)
-                      : (item.href as Route);
+                  const count = navAttentionCount(item.href, attention);
+                  // Hubs open whole: the Money totals need every invoice (TASK-237).
+                  const href = item.href as Route;
                   const navClass = `p7-nav-item ${active ? "p7-nav-active" : ""}`;
                   const navInner = (
                     <>
@@ -469,21 +475,8 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                     <div className="p7-more-grid">
                       {section.items.map((item) => {
                         const active = isNavActive(pathname, item.href, item.activePrefixes);
-                        const count =
-                          item.href === NAV_REQUESTS.href
-                            ? attention.requestsCount
-                            : item.href === NAV_INVOICES.href
-                              ? attention.invoicesCount
-                              : item.href === NAV_ESTIMATES.href
-                                ? attention.estimatesCount
-                                : 0;
-                        const href =
-                          count > 0 &&
-                          (item.href === NAV_REQUESTS.href ||
-                            item.href === NAV_INVOICES.href ||
-                            item.href === NAV_ESTIMATES.href)
-                            ? (`${item.href}?attention=1` as Route)
-                            : (item.href as Route);
+                        const count = navAttentionCount(item.href, attention);
+                        const href = item.href as Route;
                         const moreClass = `p7-more-item ${active ? "p7-nav-active" : ""}`;
                         const moreInner = (
                           <>

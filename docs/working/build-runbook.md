@@ -19,17 +19,19 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : E2 TASK-238 Verified: #757 (4365bb3a) deployed
-                      ~16:39 UTC, no migration; health ok, /login 200.
-In-flight PR        : E3 TASK-236 (one New button)
-Next step           : E4 TASK-237 once E3 is Verified.
+Last step           : E3 TASK-236 Verified: #758 (310eced7) deployed
+                      ~17:20 UTC, no migration; health ok, /login 200.
+In-flight PR        : E4 TASK-237 (shorter menu, Money on one page)
+Next step           : E5 TASK-239 once E4 is Verified.
 Blocked on          : nothing
-Last known-good     : 4365bb3a (deploy-good/8ba86816 before it)
+Last known-good     : 310eced7 (deploy-good/4365bb3a before it)
 Notes               : Main checkout holds another session's uncommitted
                       drafts of TASK-235..240 (duplicates of #755); left
                       untouched. Owner checks after deploy (non-blocking):
                       - TASK-238: on your phone, tap Switch to Desk; Desk
                         stays open. Tap the logo; you land on Today.
+                      - TASK-236: hand someone "a customer called about a
+                        leaky faucet"; they pick Someone called unaided.
 ```
 
 ## Owner approvals
@@ -143,7 +145,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | E0 | Backlog TASK-235..240 + Track E | 2026-11-22 (#755, CI green) | 2026-11-23 (#755, 2fe389a4) | n/a | n/a |
 | E1 | TASK-235 | 2026-11-23 (#756, CI green) | 2026-11-23 (#756, 8ba86816) | 2026-11-23 (~15:56 UTC) | 2026-11-23 (health ok, /login 200, staff pages 307 to /login, a live portal estimate link 200 shows Estimate/Customer and no Quote/Client) |
 | E2 | TASK-238 | 2026-11-23 (#757, CI green incl. phone/logo e2e) | 2026-11-23 (#757, 4365bb3a) | 2026-11-23 (~16:39 UTC) | 2026-11-23 (health ok, /login 200, /app and /app/my-work 307 to /login signed out; bounce and logo behavior covered by the CI e2e) |
-| E3 | TASK-236 | | | | |
+| E3 | TASK-236 | 2026-11-23 (#758, CI green incl. New-button e2e) | 2026-11-23 (#758, 310eced7) | 2026-11-23 (~17:20 UTC) | 2026-11-23 (health ok, /login 200, /app/jobs, /app/intake/new, /app/capture 307 to /login signed out; menu covered by CI e2e) |
 | E4 | TASK-237 | | | | |
 | E5 | TASK-239 | | | | |
 | E6 | TASK-240 | | | | |
@@ -685,6 +687,10 @@ Per step:
 
 ## Log
 
+- 2026-11-23 · E4 · In progress · TASK-237: sidebar is home, Jobs, Customers, Money, More; Money page leads with owed / spent / mileage
+- 2026-11-23 · E3 · Verified · health ok, /login 200; known-good deploy-good/4365bb3a before it
+- 2026-11-23 · E3 · Deployed · 310eced7 · ~17:20 UTC, no migration
+- 2026-11-23 · E3 · Merged · #758 · squash 310eced7; Codex finding (+ button covered More on phones) fixed before merge
 - 2026-11-23 · E3 · In progress · TASK-236: one New button (phone + and sidebar), three choices plus More; Today strip uses the same list; quick-lead pop-up and FAB lists removed
 - 2026-11-23 · E2 · Verified · health ok, /login 200; known-good deploy-good/8ba86816 before it
 - 2026-11-23 · E2 · Deployed · 4365bb3a · ~16:39 UTC, no migration

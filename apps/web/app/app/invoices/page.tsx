@@ -21,6 +21,8 @@ import type { MetricCardData } from "@/components/ui";
 import { formatInvoiceViewLabel, isInvoiceUnread } from "@/lib/invoices/client-view";
 import { amountDueCents } from "@/lib/invoices/payments";
 import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
+import { moneyCards } from "@/lib/money-page/money-cards";
+import { loadMoneyMonth } from "@/lib/money-page/load-money-month";
 import { invoiceAttentionPredicate } from "@/lib/attention/counts";
 import { formatSponsoredInvoiceLabel } from "@/lib/invoices/sponsored";
 
@@ -175,7 +177,6 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
     0,
   );
 
-  const totalPaid = grouped.paid.reduce((sum, i) => sum + i.paid_cents, 0);
   const priorityInvoice = grouped.overdue[0] ?? grouped.partial[0] ?? grouped.sent[0] ?? null;
   // Use the effective status so a due-on-completion invoice never drives an
   // "overdue" call-to-action.
@@ -188,31 +189,20 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
         : "Follow up on sent invoice"
     : null;
 
-  const metrics: MetricCardData[] = [
-    {
-      label: "Outstanding",
-      value: formatDollars(totalOutstanding),
-      sub: `${grouped.sent.length + grouped.partial.length + grouped.overdue.length} unpaid`,
-    },
-    {
-      label: "Overdue",
-      value: formatDollars(totalOverdue),
-      sub: `${grouped.overdue.length} invoices`,
-      variant: totalOverdue > 0 ? "alert" : "default",
-    },
-    {
-      label: "Collected",
-      value: formatDollars(totalPaid),
-      sub: `${grouped.paid.length} paid`,
-      variant: totalPaid > 0 ? "success" : "default",
-    },
-  ];
+  // TASK-237: Money leads with owed / spent / mileage, then the invoice list.
+  const unpaidCount = grouped.sent.length + grouped.partial.length + grouped.overdue.length;
+  const metrics: MetricCardData[] = moneyCards({
+    owedCents: totalOutstanding,
+    owedCount: unpaidCount,
+    overdueCents: totalOverdue,
+    ...(await loadMoneyMonth(session)),
+  });
 
   return (
     <PageContainer>
       <PageHeader
-        title="Invoices"
-        subtitle={`${invoices.length} total`}
+        title="Money"
+        subtitle={`${invoices.length} ${invoices.length === 1 ? "invoice" : "invoices"}`}
         actions={
           canCreate ? (
             <LinkButton
@@ -247,7 +237,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
         </p>
       )}
 
-      {invoices.length > 0 && <MetricGrid metrics={metrics} />}
+      {!attentionMode && <MetricGrid metrics={metrics} />}
 
       {priorityInvoice && (
         <div data-testid="billing-queue-card">
