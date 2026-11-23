@@ -130,6 +130,24 @@ test.describe("Required release smoke — admin core flow", () => {
     await expect(desk.locator('[data-testid="job-tasks-card"]:visible')).toBeVisible();
   });
 
+  test("3d. The job and its customer show where the job stands (TASK-240)", async ({ page }) => {
+    expect(jobId).toBeTruthy();
+    await login(page);
+    await page.goto(`${BASE}/app/jobs/${jobId}`);
+    const line = page.locator('[data-testid="job-progress-line"]:visible');
+    await expect(line).toHaveCount(1);
+    // A new draft job is past the call and waiting on an estimate.
+    await expect(line.locator('[aria-current="step"]')).toContainText("Estimate");
+    await expect(line.locator('[data-state="done"]')).toContainText(["Call"]);
+
+    // The customer page shows the same line for their open job.
+    const customerHref = await page.locator('a[href^="/app/clients/"]:visible').first().getAttribute("href");
+    expect(customerHref).toBeTruthy();
+    await page.goto(`${BASE}${customerHref}`);
+    const customerLine = page.locator('[data-testid="client-progress-line"]:visible');
+    await expect(customerLine.locator('[aria-current="step"]')).toContainText("Estimate");
+  });
+
   test("4. Admin can schedule a visit for the job", async ({ page }) => {
     expect(jobId).toBeTruthy();
     await login(page);
