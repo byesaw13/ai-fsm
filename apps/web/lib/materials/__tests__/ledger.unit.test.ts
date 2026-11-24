@@ -71,7 +71,7 @@ describe("variantCacheFrom", () => {
     expect(cache.lastPurchasedAt).toBe("2026-02-01");
   });
 
-  it("voided, pending, dismissed and AI-allowance rows are ignored", () => {
+  it("voided, pending, dismissed and AI-allowance rows are ignored when real evidence exists", () => {
     const cache = variantCacheFrom([
       obs({ unitPriceCents: 1000 }),
       obs({ unitPriceCents: 5000, status: "pending", observedOn: "2026-09-01" }),
@@ -82,8 +82,14 @@ describe("variantCacheFrom", () => {
     expect(cache.purchaseCount).toBe(1);
   });
 
-  it("no evidence leaves nothing to write", () => {
-    expect(variantCacheFrom([]).unitCostCents).toBeNull();
+  it("no evidence left clears the purchase metrics", () => {
+    const cache = variantCacheFrom([obs({ unitPriceCents: 900, status: "superseded" })]);
+    expect(cache).toMatchObject({ unitCostCents: null, avgPaidCents: null, purchaseCount: 0, lastPurchasedAt: null });
+  });
+
+  it("with only an AI allowance, the allowance is the price shown and nothing is a purchase", () => {
+    const cache = variantCacheFrom([obs({ kind: "ai_allowance", unitPriceCents: 1299 })]);
+    expect(cache).toMatchObject({ unitCostCents: 1299, purchaseCount: 0, lastPurchasedAt: null });
   });
 });
 

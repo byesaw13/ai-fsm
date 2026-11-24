@@ -91,10 +91,11 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
 
     // Keys from the whole file: identical rows on one day stay distinct, and the same
     // file imported again adds no observations (TASK-210; TASK-211 replaces this import).
+    // The date is part of every key, and identical rows are numbered within their date.
     const fileKeys = observationFingerprints(
       parsed.lines.map((l) => ({
-        sku: l.sku,
-        name: `${l.purchasedAt ?? ""}|${l.name}`,
+        sku: l.sku ? `${l.purchasedAt ?? "nodate"}|${l.sku}` : null,
+        name: `${l.purchasedAt ?? "nodate"}|${l.name}`,
         unitPriceCents: l.unit_cost_cents,
         quantity: l.quantity ?? 1,
       })),

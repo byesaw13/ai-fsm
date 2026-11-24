@@ -47,7 +47,7 @@ export interface CacheObservation {
 }
 
 export interface VariantCache {
-  /** Latest price: newest regular (non-sale) evidence, else newest sale evidence. Null = no evidence. */
+  /** Latest price: newest regular (non-sale) evidence, else sale evidence, else an AI allowance. Null = nothing at all. */
   unitCostCents: number | null;
   /** Mean of real, regular purchases. Summaries never count. */
   avgPaidCents: number | null;
@@ -90,7 +90,9 @@ export function variantCacheFrom(observations: CacheObservation[]): VariantCache
             ? -1
             : b.createdAt.localeCompare(a.createdAt),
     )[0];
-  const latest = newest(priced.filter((o) => !o.isSale)) ?? newest(priced);
+  // With no price evidence at all, an AI allowance is the only figure left to show.
+  const allowance = newest(real.filter((o) => o.kind === "ai_allowance"));
+  const latest = newest(priced.filter((o) => !o.isSale)) ?? newest(priced) ?? allowance;
 
   const purchaseDates = [
     ...real.filter((o) => PURCHASE_KINDS.includes(o.kind)),
@@ -159,13 +161,14 @@ export async function recomputeVariantCache(client: PoolClient, accountId: strin
       [accountId, cache.supersededSummaryIds],
     );
   }
-  if (cache.unitCostCents === null) return;
+  // No evidence left (e.g. a corrected receipt removed the only line): the catalog
+  // must not keep reporting a purchase the ledger no longer has.
   await client.query(
     `UPDATE materials_price_book
      SET unit_cost_cents = $3, avg_paid_cents = $4, purchase_count = $5,
          last_purchased_at = $6::date, updated_at = now()
      WHERE id = $2 AND account_id = $1`,
-    [accountId, variantId, cache.unitCostCents, cache.avgPaidCents, cache.purchaseCount, cache.lastPurchasedAt],
+    [accountId, variantId, cache.unitCostCents ?? 0, cache.avgPaidCents, cache.purchaseCount, cache.lastPurchasedAt],
   );
 }
 
@@ -308,6 +311,16 @@ export async function findOrCreateVariant(
     return { id: adopted.rows[0].id, storeFamily: family, created: false };
   }
   const variantName = taken.rows[0] ? `${name} (${STORE_LABEL[family]}${sku ? ` ${sku}` : ""})`.slice(0, 255) : name;
+  if (variantName !== name) {
+    // This store's variant may already exist under its store-suffixed name.
+    const suffixed = await client.query<{ id: string }>(
+      `SELECT id FROM materials_price_book
+       WHERE account_id = $1 AND store_family = $2 AND lower(name) = lower($3) AND unit = $4
+       LIMIT 1`,
+      [accountId, family, variantName, unit],
+    );
+    if (suffixed.rows[0]) return { id: suffixed.rows[0].id, storeFamily: family, created: false };
+  }
   const category = item.category && VALID_CATEGORIES.has(item.category) ? item.category : "other";
 
   const inserted = await client.query<{ id: string }>(

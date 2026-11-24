@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Pool, type PoolClient } from "pg";
-import { findOrCreateVariant, recordObservations, type NewObservation } from "../ledger";
+import { findOrCreateVariant, recordObservations, replaceSourceObservations, type NewObservation } from "../ledger";
 import { backfillPriceObservations } from "../backfill";
 
 const RUN = !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
@@ -82,6 +82,22 @@ describe.skipIf(!RUN)("price observation ledger", () => {
     expect(again!.id).toBe(hd!.id);
   });
 
+  it("a store-suffixed variant without a SKU is reused on the next purchase", async () => {
+    const first = await tx((c) => findOrCreateVariant(c, accountId, { name: `${tag} Tape`, supplier: "Home Depot" }));
+    const lowes1 = await tx((c) => findOrCreateVariant(c, accountId, { name: `${tag} Tape`, supplier: "Lowe's" }));
+    const lowes2 = await tx((c) => findOrCreateVariant(c, accountId, { name: `${tag} Tape`, supplier: "Lowe's" }));
+    expect(lowes1!.id).not.toBe(first!.id);
+    expect(lowes2!.id).toBe(lowes1!.id);
+  });
+
+  it("a receipt correction that removes the only line clears the purchase", async () => {
+    const v = await tx((c) => findOrCreateVariant(c, accountId, { name: `${tag} Hinge`, sku: `${tag}-H`, supplier: "Home Depot" }));
+    await tx((c) => replaceSourceObservations(c, accountId, `${tag}:receipt`, [obs(v!.id, { sourceRef: `${tag}:receipt`, dedupeKey: `${tag}:hinge` })]));
+    expect((await variantRow(v!.id)).purchase_count).toBe(1);
+    await tx((c) => replaceSourceObservations(c, accountId, `${tag}:receipt`, []));
+    expect(await variantRow(v!.id)).toEqual({ unit_cost_cents: 0, avg_paid_cents: null, purchase_count: 0, last_purchased_at: null });
+  });
+
   it("concurrent recordObservations on one variant leave a consistent cache", async () => {
     const v = await tx((c) => findOrCreateVariant(c, accountId, { name: `${tag} Roller`, sku: `${tag}-R`, supplier: "Home Depot" }));
     const batch = (prices: number[]) =>
@@ -93,7 +109,7 @@ describe.skipIf(!RUN)("price observation ledger", () => {
   });
 
   it("a duplicate key adds nothing", async () => {
-    const v = await tx((c) => findOrCreateVariant(c, accountId, { name: `${tag} Tape`, sku: `${tag}-T`, supplier: "Home Depot" }));
+    const v = await tx((c) => findOrCreateVariant(c, accountId, { name: `${tag} Duct tape`, sku: `${tag}-T`, supplier: "Home Depot" }));
     const one = obs(v!.id, { dedupeKey: `${tag}:fixed` });
     const first = await tx((c) => recordObservations(c, accountId, [one]));
     const second = await tx((c) => recordObservations(c, accountId, [one]));
