@@ -1,7 +1,7 @@
 # TASK-195: Rewrite the estimate review around the baseline
 
 Status:
-In progress
+Done (2026-11-24, #766, deployed and verified)
 
 Epic:
 EPIC-002 Estimating & Assessments
