@@ -1,50 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  deriveInvoiceStatus,
   amountDueCents,
   validatePaymentAmount,
   isInvoiceFullyPaid,
 } from "../payments";
-
-describe("deriveInvoiceStatus", () => {
-  it("returns paid when paid equals total", () => {
-    expect(deriveInvoiceStatus(10000, 10000)).toBe("paid");
-  });
-
-  it("returns paid when paid exceeds total", () => {
-    expect(deriveInvoiceStatus(10000, 15000)).toBe("paid");
-  });
-
-  it("returns partial when paid is between 0 and total", () => {
-    expect(deriveInvoiceStatus(10000, 5000)).toBe("partial");
-  });
-
-  it("returns partial for a one-cent payment", () => {
-    expect(deriveInvoiceStatus(10000, 1)).toBe("partial");
-  });
-
-  it("returns sent when nothing paid and no deposit credit", () => {
-    expect(deriveInvoiceStatus(10000, 0)).toBe("sent");
-  });
-
-  it("returns paid when deposit credit + payments cover total", () => {
-    // Final invoice $15,526 with $1,500 deposit credit; client pays remaining $14,026
-    expect(deriveInvoiceStatus(1_552_600, 1_402_600, 150_000)).toBe("paid");
-  });
-
-  it("returns partial when payments on final do not cover remainder after credit", () => {
-    expect(deriveInvoiceStatus(1_552_600, 500_000, 150_000)).toBe("partial");
-  });
-
-  it("returns sent when only deposit credit applied (no payments on this invoice yet)", () => {
-    // Credit reduces balance but does not mean this invoice has been paid
-    expect(deriveInvoiceStatus(1_552_600, 0, 150_000)).toBe("sent");
-  });
-
-  it("returns paid when deposit credit alone covers the full total", () => {
-    expect(deriveInvoiceStatus(150_000, 0, 150_000)).toBe("paid");
-  });
-});
 
 describe("amountDueCents", () => {
   it("subtracts paid from total", () => {

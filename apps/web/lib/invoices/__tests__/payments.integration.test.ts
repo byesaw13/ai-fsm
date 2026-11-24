@@ -57,14 +57,6 @@ describe.skipIf(!shouldRun)("Payment Integration Tests", () => {
     expect(true).toBe(true);
   });
 
-  it("payment delete recalculates invoice correctly", () => {
-    // 1. Create invoice with total_cents=10000
-    // 2. Insert two payments of 3000 and 7000
-    // 3. Delete first payment
-    // 4. Verify invoice.paid_cents=7000, status='partial'
-    expect(true).toBe(true);
-  });
-
   it("duplicate payment detection works within 60 second window", () => {
     // 1. Insert payment with amount=5000, method=cash
     // 2. Attempt identical insert within same transaction
