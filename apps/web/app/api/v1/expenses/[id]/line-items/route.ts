@@ -105,6 +105,8 @@ export const PUT = withRole(["owner", "admin"], async (request, session) => {
                 accountId: session.accountId,
                 supplier: exp.vendor_name,
                 purchasedAt: exp.expense_date?.slice(0, 10) ?? null,
+                source: { kind: "receipt", expenseId },
+                enteredBy: session.userId,
               },
               saved.map((li) => ({
                 name: li.name,

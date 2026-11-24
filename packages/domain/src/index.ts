@@ -28,6 +28,7 @@ export * from "./construction-profiles";
 export * from "./production-takeoff";
 export * from "./production-rates";
 export * from "./painting-rate-hours";
+export * from "./price-evidence";
 export * from "./hourly-baseline";
 export * from "./work-order";
 export * from "./completion-criteria";

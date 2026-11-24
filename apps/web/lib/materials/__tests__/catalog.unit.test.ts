@@ -1,206 +1,66 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { PoolClient } from "pg";
-import {
-  computeRunningAverage,
-  learnMaterialsFromLineItems,
-  shouldUpdateLastPaid,
-  upsertMaterialFromPurchase,
-} from "../catalog";
 
-describe("computeRunningAverage", () => {
-  it("first purchase sets avg to cost and count 1", () => {
-    expect(computeRunningAverage(null, 0, 500)).toEqual({
-      avg_paid_cents: 500,
-      purchase_count: 1,
-    });
-  });
+const findOrCreateVariant = vi.fn();
+const recordObservations = vi.fn(async () => ({ inserted: 1, duplicates: 0 }));
+const replaceSourceObservations = vi.fn(async () => ({ inserted: 1, duplicates: 0, superseded: 0 }));
 
-  it("second purchase averages last and new", () => {
-    expect(computeRunningAverage(400, 1, 600)).toEqual({
-      avg_paid_cents: 500,
-      purchase_count: 2,
-    });
-  });
+vi.mock("../ledger", async (orig) => ({
+  ...(await orig<typeof import("../ledger")>()),
+  findOrCreateVariant: (...a: unknown[]) => findOrCreateVariant(...a),
+  recordObservations: (...a: unknown[]) => recordObservations(...(a as [])),
+  replaceSourceObservations: (...a: unknown[]) => replaceSourceObservations(...(a as [])),
+}));
 
-  it("rounds fractional averages", () => {
-    // (100*2 + 101) / 3 = 100.333… → 100
-    expect(computeRunningAverage(100, 2, 101)).toEqual({
-      avg_paid_cents: 100,
-      purchase_count: 3,
-    });
-  });
+import { learnMaterialsFromLineItems } from "../catalog";
+
+const client = {} as PoolClient;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  findOrCreateVariant.mockImplementation(async (_c, _a, item: { sku?: string | null; name: string }) => ({
+    id: `v-${item.sku ?? item.name}`,
+    storeFamily: "home_depot",
+    created: false,
+  }));
 });
 
-function makeClient(handlers: Array<(sql: string, params: unknown[]) => { rows: unknown[] }>): PoolClient {
-  let i = 0;
-  return {
-    query: vi.fn().mockImplementation((sql: string, params: unknown[] = []) => {
-      const handler = handlers[i++];
-      if (!handler) return Promise.resolve({ rows: [], rowCount: 0 });
-      return Promise.resolve(handler(sql, params));
-    }),
-  } as unknown as PoolClient;
-}
-
-describe("shouldUpdateLastPaid", () => {
-  it("updates when incoming has no date or existing has none", () => {
-    expect(shouldUpdateLastPaid("2026-01-01", null)).toBe(true);
-    expect(shouldUpdateLastPaid(null, "2026-01-01")).toBe(true);
-  });
-
-  it("updates only when incoming is at least as recent", () => {
-    expect(shouldUpdateLastPaid("2026-06-01", "2026-07-01")).toBe(true);
-    expect(shouldUpdateLastPaid("2026-07-01", "2026-07-01")).toBe(true);
-    expect(shouldUpdateLastPaid("2026-07-01", "2026-06-01")).toBe(false);
-  });
-});
-
-describe("upsertMaterialFromPurchase", () => {
-  it("matches by SKU before name and updates avg", async () => {
-    const client = makeClient([
-      // by SKU hit
-      () => ({
-        rows: [
-          {
-            id: "m1",
-            account_id: "a1",
-            name: "Old Name",
-            brand: null,
-            category: "hardware",
-            unit: "each",
-            unit_cost_cents: 400,
-            supplier: "Home Depot",
-            sku: "1006765300",
-            last_purchased_at: "2026-01-01",
-            notes: null,
-            is_active: true,
-            avg_paid_cents: 400,
-            purchase_count: 1,
-          },
-        ],
-      }),
-      // UPDATE
-      (_sql, params) => ({
-        rows: [
-          {
-            id: "m1",
-            account_id: "a1",
-            name: "DW Access Door",
-            brand: null,
-            category: "hardware",
-            unit: "each",
-            unit_cost_cents: params[1],
-            supplier: "Home Depot",
-            sku: "1006765300",
-            last_purchased_at: "2026-07-01",
-            notes: null,
-            is_active: true,
-            avg_paid_cents: params[2],
-            purchase_count: params[3],
-          },
-        ],
-      }),
-    ]);
-
-    const row = await upsertMaterialFromPurchase(
+describe("learnMaterialsFromLineItems (TASK-210)", () => {
+  it("a receipt replaces its own observations, keyed to the receipt", async () => {
+    const { learned } = await learnMaterialsFromLineItems(
       client,
-      { accountId: "a1", supplier: "Home Depot", purchasedAt: "2026-07-01" },
-      { name: "DW Access Door", unit_cost_cents: 600, sku: "1006765300" },
-    );
-
-    expect(row?.unit_cost_cents).toBe(600);
-    expect(row?.avg_paid_cents).toBe(500);
-    expect(row?.purchase_count).toBe(2);
-    expect((client.query as ReturnType<typeof vi.fn>).mock.calls[0][0]).toContain("lower(btrim(sku))");
-  });
-
-  it("falls back to name+unit when no SKU", async () => {
-    const client = makeClient([
-      // no SKU path — name lookup only (sku null skips SKU query)
-      () => ({ rows: [] }),
-      // INSERT
-      () => ({
-        rows: [
-          {
-            id: "m2",
-            account_id: "a1",
-            name: "2x4",
-            brand: null,
-            category: "lumber",
-            unit: "each",
-            unit_cost_cents: 399,
-            supplier: null,
-            sku: null,
-            last_purchased_at: null,
-            notes: null,
-            is_active: true,
-            avg_paid_cents: 399,
-            purchase_count: 1,
-          },
-        ],
-      }),
-    ]);
-
-    const row = await upsertMaterialFromPurchase(
-      client,
-      { accountId: "a1", category: "lumber" },
-      { name: "2x4", unit_cost_cents: 399 },
-    );
-
-    expect(row?.name).toBe("2x4");
-    expect(row?.purchase_count).toBe(1);
-    // First query is name match (no SKU)
-    const firstSql = (client.query as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
-    expect(firstSql).toContain("lower(btrim(name))");
-  });
-
-  it("skips zero cost and blank name", async () => {
-    const client = makeClient([]);
-    expect(
-      await upsertMaterialFromPurchase(client, { accountId: "a1" }, { name: "", unit_cost_cents: 100 }),
-    ).toBeNull();
-    expect(
-      await upsertMaterialFromPurchase(client, { accountId: "a1" }, { name: "x", unit_cost_cents: 0 }),
-    ).toBeNull();
-    expect(client.query).not.toHaveBeenCalled();
-  });
-});
-
-describe("learnMaterialsFromLineItems", () => {
-  it("counts learned lines", async () => {
-    const client = makeClient([
-      () => ({ rows: [] }),
-      () => ({
-        rows: [
-          {
-            id: "m1",
-            account_id: "a1",
-            name: "Nail",
-            brand: null,
-            category: "other",
-            unit: "each",
-            unit_cost_cents: 100,
-            supplier: null,
-            sku: null,
-            last_purchased_at: null,
-            notes: null,
-            is_active: true,
-            avg_paid_cents: 100,
-            purchase_count: 1,
-          },
-        ],
-      }),
-      // second line skipped (zero cost) — no queries
-    ]);
-
-    const result = await learnMaterialsFromLineItems(
-      client,
-      { accountId: "a1" },
+      { accountId: "a1", supplier: "The Home Depot", purchasedAt: "2026-07-01", source: { kind: "receipt", expenseId: "e1" } },
       [
-        { name: "Nail", unit_cost_cents: 100 },
-        { name: "Bad", unit_cost_cents: 0 },
+        { name: "Screws", unit_cost_cents: 500, sku: "123", quantity: 1 },
+        { name: "Screws", unit_cost_cents: 500, sku: "123", quantity: 1 },
+        { name: "", unit_cost_cents: 100 },
+        { name: "Free", unit_cost_cents: 0 },
       ],
     );
-    expect(result.learned).toBe(1);
+    expect(learned).toBe(2);
+    const [, , sourceRef, rows] = replaceSourceObservations.mock.calls[0] as unknown as [
+      unknown, string, string, { kind: string; dedupeKey: string; observedOn: string }[],
+    ];
+    expect(sourceRef).toBe("expense:e1");
+    expect(rows.map((r) => r.kind)).toEqual(["receipt", "receipt"]);
+    expect(rows[0].dedupeKey).toMatch(/^receipt:e1:/);
+    expect(rows[0].dedupeKey).not.toBe(rows[1].dedupeKey);
+    expect(rows[0].observedOn).toBe("2026-07-01");
+    expect(recordObservations).not.toHaveBeenCalled();
+  });
+
+  it("a receipt with no priced lines clears its observations", async () => {
+    await learnMaterialsFromLineItems(client, { accountId: "a1", source: { kind: "receipt", expenseId: "e2" } }, []);
+    expect(replaceSourceObservations).toHaveBeenCalledWith(client, "a1", "expense:e2", []);
+  });
+
+  it("a CSV row is a supplier_csv observation, sale kept as sale, explicit key honored", async () => {
+    await learnMaterialsFromLineItems(
+      client,
+      { accountId: "a1", supplier: "Lowe's", purchasedAt: "2026-05-02", source: { kind: "supplier_csv", ref: "imp" } },
+      [{ name: "Tape", unit_cost_cents: 300, is_sale: true, dedupe_key: "csv:k1" }],
+    );
+    const [, , rows] = recordObservations.mock.calls[0] as unknown as [unknown, string, { kind: string; isSale: boolean; dedupeKey: string }[]];
+    expect(rows[0]).toMatchObject({ kind: "supplier_csv", isSale: true, dedupeKey: "csv:k1" });
   });
 });

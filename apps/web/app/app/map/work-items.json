@@ -36,7 +36,7 @@
   { "id": "TASK-205", "title": "Materials list never times out", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "A big materials list finishes instead of showing 'Network error'." },
   { "id": "TASK-206", "title": "Quote cleanup and stale sent quotes", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Small quote errors fixed, and old quotes still marked sent get closed out with your OK." },
   { "id": "TASK-209", "title": "Estimating assistant (Phase 3 slice)", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Prices on quotes say where they came from and how much to trust them; paint quantities come from your measurements." },
-  { "id": "TASK-210", "title": "Price history you can trust", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Every price you paid is kept with its source and date, not overwritten." },
+  { "id": "TASK-210", "title": "Price history you can trust", "branch": "quote", "status": "progress", "phase": "Phase 3", "fit": "Every price you paid is kept with its source and date, not overwritten." },
   { "id": "TASK-211", "title": "Purchase imports without double counting", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Import two years of Home Depot history without booking expenses or counting a purchase twice." },
   { "id": "TASK-212", "title": "Package sizes", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "The app knows a 1-gallon can from a 5-gallon bucket, and asks when it doesn't." },
   { "id": "TASK-213", "title": "Price confidence with reasons", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Each material price says High, Medium, Low or Unverified, and why." },

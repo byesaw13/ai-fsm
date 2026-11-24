@@ -163,6 +163,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
                 accountId: session.accountId,
                 supplier: row.vendor_name,
                 purchasedAt: row.expense_date?.slice(0, 10) ?? null,
+                source: { kind: "receipt", expenseId },
+                enteredBy: session.userId,
               },
               saved.map((li) => ({
                 name: li.name,
