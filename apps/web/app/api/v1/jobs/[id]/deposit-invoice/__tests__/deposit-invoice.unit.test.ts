@@ -28,6 +28,9 @@ vi.mock("@/lib/invoices/db", () => ({
 
 vi.mock("@/lib/db/audit", () => ({ appendAuditLog: vi.fn() }));
 
+const { findOpenInvoice, createInvoice } = vi.hoisted(() => ({ findOpenInvoice: vi.fn(), createInvoice: vi.fn() }));
+vi.mock("@/lib/invoices/create-invoice", () => ({ findOpenInvoice, createInvoice }));
+
 import { POST } from "../route";
 
 const JOB = "00000000-0000-0000-0000-0000000000aa";
@@ -36,6 +39,8 @@ const post = () => new NextRequest(URL, { method: "POST", headers: { "content-ty
 
 beforeEach(() => {
   mockClientQuery.mockReset();
+  findOpenInvoice.mockReset().mockResolvedValue(null);
+  createInvoice.mockReset().mockResolvedValue({ id: "NEWDEP", invoice_number: "INV-0007", status: "draft", created: true });
 });
 
 describe("POST deposit-invoice", () => {
@@ -47,7 +52,7 @@ describe("POST deposit-invoice", () => {
 
   it("400 NO_ESTIMATE when no approved estimate is linked", async () => {
     mockClientQuery.mockResolvedValueOnce({
-      rows: [{ client_id: "C1", property_id: null, estimate_id: null, total_cents: null, deposit_cents: null, existing_deposit_id: null, final_invoice_id: null }],
+      rows: [{ client_id: "C1", property_id: null, estimate_id: null, total_cents: null, deposit_cents: null }],
       rowCount: 1,
     });
     const res = await POST(post());
@@ -57,45 +62,41 @@ describe("POST deposit-invoice", () => {
 
   it("is idempotent — returns the existing deposit invoice without inserting", async () => {
     mockClientQuery.mockResolvedValueOnce({
-      rows: [{ client_id: "C1", property_id: null, estimate_id: "E1", total_cents: 100000, deposit_cents: 0, existing_deposit_id: "DEP1", final_invoice_id: null }],
+      rows: [{ client_id: "C1", property_id: null, estimate_id: "E1", total_cents: 100000, deposit_cents: 0 }],
       rowCount: 1,
     });
+    findOpenInvoice.mockResolvedValueOnce({ id: "DEP1", invoice_number: "INV-0001", status: "draft" });
     const res = await POST(post());
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ invoice_id: "DEP1", created: false });
-    expect(mockClientQuery).toHaveBeenCalledTimes(1); // no accounts/insert queries
+    expect(mockClientQuery).toHaveBeenCalledTimes(1); // no accounts/billed queries
+    expect(createInvoice).not.toHaveBeenCalled();
   });
 
   it("creates a draft deposit at the company standard % of the total", async () => {
     mockClientQuery
       .mockResolvedValueOnce({
-        rows: [{ client_id: "C1", property_id: "P1", estimate_id: "E1", total_cents: 100000, deposit_cents: 0, existing_deposit_id: null, final_invoice_id: null }],
+        rows: [{ client_id: "C1", property_id: "P1", estimate_id: "E1", total_cents: 100000, deposit_cents: 0 }],
         rowCount: 1,
       }) // jobRow
       .mockResolvedValueOnce({ rows: [{ settings: { deposit_percent: 30 } }], rowCount: 1 }) // accounts
-      .mockResolvedValueOnce({ rows: [{ sum_cents: "0" }], rowCount: 1 }) // already billed
-      .mockResolvedValueOnce({ rows: [{ id: "NEWDEP" }], rowCount: 1 }); // insert
+      .mockResolvedValueOnce({ rows: [{ sum_cents: "0" }], rowCount: 1 }); // already billed
     const res = await POST(post());
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body).toMatchObject({ invoice_id: "NEWDEP", amount_cents: 30000, created: true });
-    // The insert carries invoice_kind='deposit' and the computed amount as total.
-    const insertCall = mockClientQuery.mock.calls.find((c) => String(c[0]).includes("INSERT INTO invoices"));
-    expect(insertCall).toBeTruthy();
-    expect(String(insertCall![0])).toContain("'deposit'");
-    expect(insertCall![1]).toContain(30000);
+    expect(createInvoice.mock.calls[0][1]).toMatchObject({ invoice_kind: "deposit", total_cents: 30000, job_id: JOB });
   });
 
   it("uses the estimate's configured deposit over the company %", async () => {
     mockClientQuery
       .mockResolvedValueOnce({
-        rows: [{ client_id: "C1", property_id: null, estimate_id: "E1", total_cents: 100000, deposit_cents: 25000, existing_deposit_id: null, final_invoice_id: null }],
+        rows: [{ client_id: "C1", property_id: null, estimate_id: "E1", total_cents: 100000, deposit_cents: 25000 }],
         rowCount: 1,
       })
       .mockResolvedValueOnce({ rows: [{ settings: { deposit_percent: 30 } }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [{ sum_cents: "0" }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [{ id: "NEWDEP" }], rowCount: 1 });
+      .mockResolvedValueOnce({ rows: [{ sum_cents: "0" }], rowCount: 1 });
     const res = await POST(post());
     expect((await res.json()).amount_cents).toBe(25000);
   });
@@ -103,21 +104,21 @@ describe("POST deposit-invoice", () => {
   it("clamps the deposit to remaining balance after progress invoices", async () => {
     mockClientQuery
       .mockResolvedValueOnce({
-        rows: [{ client_id: "C1", property_id: null, estimate_id: "E1", total_cents: 100000, deposit_cents: 0, existing_deposit_id: null, final_invoice_id: null }],
+        rows: [{ client_id: "C1", property_id: null, estimate_id: "E1", total_cents: 100000, deposit_cents: 0 }],
         rowCount: 1,
       })
       .mockResolvedValueOnce({ rows: [{ settings: { deposit_percent: 30 } }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [{ sum_cents: "80000" }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [{ id: "NEWDEP" }], rowCount: 1 });
+      .mockResolvedValueOnce({ rows: [{ sum_cents: "80000" }], rowCount: 1 });
     const res = await POST(post());
     expect((await res.json()).amount_cents).toBe(20000);
   });
 
   it("400 FINAL_EXISTS when a final invoice already exists", async () => {
     mockClientQuery.mockResolvedValueOnce({
-      rows: [{ client_id: "C1", property_id: null, estimate_id: "E1", total_cents: 100000, deposit_cents: 0, existing_deposit_id: null, final_invoice_id: "FIN1" }],
+      rows: [{ client_id: "C1", property_id: null, estimate_id: "E1", total_cents: 100000, deposit_cents: 0 }],
       rowCount: 1,
     });
+    findOpenInvoice.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "FIN1", invoice_number: "INV-0002", status: "draft" });
     const res = await POST(post());
     expect(res.status).toBe(400);
     expect((await res.json()).error.code).toBe("FINAL_EXISTS");

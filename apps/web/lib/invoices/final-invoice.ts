@@ -19,7 +19,8 @@
 
 import { addOnLines, invoiceMoneyFor } from "@/lib/estimates/approved-lines";
 import type { PoolClient } from "pg";
-import { generateInvoiceNumber, loadCreditedInvoicesForEstimate } from "@/lib/invoices/db";
+import { loadCreditedInvoicesForEstimate } from "@/lib/invoices/db";
+import { createInvoice, findOpenInvoice } from "@/lib/invoices/create-invoice";
 import { reconcileFinalInvoice } from "@/lib/invoices/billing";
 import { appendAuditLog } from "@/lib/db/audit";
 import {
@@ -76,18 +77,9 @@ export async function createDraftFinalInvoiceForJob(
   const { client, jobId, accountId, userId, visitId, traceId, closeoutRollup, laborDescription } =
     params;
 
-  // ── Guard: skip if a final invoice already exists for this job ──────────
-  // We gate on job_id (not estimate_id) so the check catches invoices created
-  // by any path (visit completion, job completion, manual convert).
-  const existingCheck = await client.query<{ id: string }>(
-    `SELECT id FROM invoices
-     WHERE job_id = $1 AND account_id = $2
-       AND invoice_kind IN ('final', 'standard')
-       AND status NOT IN ('cancelled')
-     LIMIT 1`,
-    [jobId, accountId]
-  );
-  if ((existingCheck.rowCount ?? 0) > 0) {
+  // ── Guard: skip if an open final or standard invoice exists for this job ──
+  // (any path: visit completion, job completion, Convert, manual).
+  if (await findOpenInvoice(client, { kind: "final", accountId, jobId })) {
     return null;
   }
 
@@ -437,38 +429,25 @@ export async function createDraftFinalInvoiceForJob(
   }
   const dueDate = dueDateUponCompletion(completionAt);
 
-  const invoiceNumber = await generateInvoiceNumber(client, accountId);
-
-  const invoiceRes = await client.query<{ id: string }>(
-    `INSERT INTO invoices
-       (account_id, client_id, job_id, estimate_id, property_id,
-        status, invoice_kind, invoice_number,
-        subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-        notes, due_date, created_by, travel_snapshot_id, travel_billing_mode)
-     VALUES ($1, $2, $3, $4, $5,
-             'draft', 'final', $6,
-             $7, $8, $9, 0, $10,
-             $11, $12, $13, $14, $15)
-     RETURNING id`,
-    [
-      accountId,
-      job.client_id,
-      jobId,
-      job.estimate_id ?? null,
-      job.property_id,
-      invoiceNumber,
-      subtotal,
-      taxCents,
-      totalCents,
-      depositCreditCents,
-      finalNotes,
-      dueDate,
-      userId,
-      job.travel_snapshot_id,
-      job.travel_snapshot_id ? "estimated" : null,
-    ]
-  );
-  const invoiceId = invoiceRes.rows[0].id;
+  const created = await createInvoice(client, {
+    account_id: accountId,
+    client_id: job.client_id,
+    job_id: jobId,
+    estimate_id: job.estimate_id ?? null,
+    property_id: job.property_id,
+    invoice_kind: "final",
+    subtotal_cents: subtotal,
+    tax_cents: taxCents,
+    total_cents: totalCents,
+    deposit_cents: depositCreditCents,
+    notes: finalNotes,
+    due_date: dueDate,
+    created_by: userId,
+    travel_snapshot_id: job.travel_snapshot_id,
+    travel_billing_mode: job.travel_snapshot_id ? "estimated" : null,
+  });
+  if (!created.created) return null;
+  const { id: invoiceId, invoice_number: invoiceNumber } = created;
 
   if (closeoutRollup) {
     await client.query(

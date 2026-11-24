@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
-import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
+import { withInvoiceContext } from "@/lib/invoices/db";
+import { createInvoice, findOpenInvoice } from "@/lib/invoices/create-invoice";
 import { gatedDepositCents } from "@/lib/invoices/deposit";
 import { resolveDepositPolicy } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
@@ -33,19 +34,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         estimate_id: string | null;
         total_cents: number | null;
         deposit_cents: number | null;
-        existing_deposit_id: string | null;
-        final_invoice_id: string | null;
       }>(
         `SELECT j.client_id, j.property_id, e.id AS estimate_id,
-                e.total_cents, e.deposit_cents,
-                (SELECT id FROM invoices
-                  WHERE estimate_id = e.id AND account_id = j.account_id
-                    AND invoice_kind = 'deposit' AND status <> 'void'
-                  ORDER BY created_at DESC LIMIT 1) AS existing_deposit_id,
-                (SELECT id FROM invoices
-                  WHERE estimate_id = e.id AND account_id = j.account_id
-                    AND invoice_kind = 'final' AND status <> 'void'
-                  LIMIT 1) AS final_invoice_id
+                e.total_cents, e.deposit_cents
          FROM jobs j
          LEFT JOIN LATERAL (
            SELECT id, total_cents, deposit_cents FROM estimates
@@ -67,14 +58,18 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
-      // Idempotent: at most one deposit invoice per estimate.
-      if (job.existing_deposit_id) {
-        return { invoice_id: job.existing_deposit_id, created: false };
+      const existingDeposit = await findOpenInvoice(client, {
+        kind: "deposit", accountId: session.accountId, estimateId: job.estimate_id,
+      });
+      if (existingDeposit) {
+        return { invoice_id: existingDeposit.id, created: false };
       }
 
       // A final invoice snapshots its deposit credit at creation, so a deposit
       // created afterward would go uncredited and overcollect — reject that.
-      if (job.final_invoice_id) {
+      if (await findOpenInvoice(client, {
+        kind: "final", accountId: session.accountId, jobId, estimateId: job.estimate_id,
+      })) {
         throw Object.assign(
           new Error("A final invoice already exists — collect the deposit before the final invoice."),
           { code: "FINAL_EXISTS" },
@@ -118,35 +113,22 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
-      const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
-
-      // Deposit invoice: reviewable DRAFT. Its own total IS the deposit;
-      // deposit_cents = 0 on the row (the credit is applied on the FINAL invoice
-      // via loadCreditedInvoicesForEstimate). Matches lib/estimates/approve.ts.
-      const inserted = await client.query<{ id: string }>(
-        `INSERT INTO invoices
-           (account_id, client_id, job_id, estimate_id, property_id,
-            status, invoice_kind, invoice_number,
-            subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-            notes, created_by)
-         VALUES ($1, $2, $3, $4, $5,
-                 'draft', 'deposit', $6,
-                 $7, 0, $7, 0, 0,
-                 $8, $9)
-         RETURNING id`,
-        [
-          session.accountId,
-          job.client_id,
-          jobId,
-          job.estimate_id,
-          job.property_id,
-          invoiceNumber,
-          amountCents,
-          "Deposit",
-          session.userId,
-        ],
-      );
-      const invoiceId = inserted.rows[0].id;
+      // Deposit invoice: reviewable DRAFT. Its own total IS the deposit; the
+      // credit is applied on the FINAL invoice (loadCreditedInvoicesForEstimate).
+      const created = await createInvoice(client, {
+        account_id: session.accountId,
+        client_id: job.client_id!,
+        job_id: jobId,
+        estimate_id: job.estimate_id,
+        property_id: job.property_id,
+        invoice_kind: "deposit",
+        subtotal_cents: amountCents,
+        tax_cents: 0,
+        total_cents: amountCents,
+        notes: "Deposit",
+        created_by: session.userId,
+      });
+      const { id: invoiceId, invoice_number: invoiceNumber } = created;
 
       await appendAuditLog(client, {
         account_id: session.accountId,

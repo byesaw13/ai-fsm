@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
-import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
+import { withInvoiceContext } from "@/lib/invoices/db";
+import { createInvoice, findOpenInvoice } from "@/lib/invoices/create-invoice";
 import { clampProgressAmountCents, thirdOfTotalCents } from "@/lib/invoices/progress";
 import { logger } from "@/lib/logger";
 
@@ -51,13 +52,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         property_id: string | null;
         estimate_id: string | null;
         total_cents: number | null;
-        final_invoice_id: string | null;
       }>(
-        `SELECT j.client_id, j.property_id, e.id AS estimate_id, e.total_cents,
-                (SELECT id FROM invoices
-                  WHERE estimate_id = e.id AND account_id = j.account_id
-                    AND invoice_kind = 'final' AND status <> 'void'
-                  LIMIT 1) AS final_invoice_id
+        `SELECT j.client_id, j.property_id, e.id AS estimate_id, e.total_cents
          FROM jobs j
          LEFT JOIN LATERAL (
            SELECT id, total_cents FROM estimates
@@ -79,7 +75,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
-      if (job.final_invoice_id) {
+      if (await findOpenInvoice(client, {
+        kind: "final", accountId: session.accountId, jobId, estimateId: job.estimate_id,
+      })) {
         throw Object.assign(
           new Error("A final invoice already exists — progress invoices must be created before the final."),
           { code: "FINAL_EXISTS" },
@@ -112,34 +110,21 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
-      const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
-
       // Progress invoice: reviewable DRAFT, its own total IS the amount billed
-      // now. deposit_cents = 0 here; the credit is applied on the FINAL invoice.
-      const inserted = await client.query<{ id: string }>(
-        `INSERT INTO invoices
-           (account_id, client_id, job_id, estimate_id, property_id,
-            status, invoice_kind, invoice_number,
-            subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-            notes, created_by)
-         VALUES ($1, $2, $3, $4, $5,
-                 'draft', 'progress', $6,
-                 $7, 0, $7, 0, 0,
-                 $8, $9)
-         RETURNING id`,
-        [
-          session.accountId,
-          job.client_id,
-          jobId,
-          job.estimate_id,
-          job.property_id,
-          invoiceNumber,
-          amountCents,
-          "Progress payment",
-          session.userId,
-        ],
-      );
-      const invoiceId = inserted.rows[0].id;
+      // now. The credit is applied on the FINAL invoice.
+      const { id: invoiceId, invoice_number: invoiceNumber } = await createInvoice(client, {
+        account_id: session.accountId,
+        client_id: job.client_id!,
+        job_id: jobId,
+        estimate_id: job.estimate_id,
+        property_id: job.property_id,
+        invoice_kind: "progress",
+        subtotal_cents: amountCents,
+        tax_cents: 0,
+        total_cents: amountCents,
+        notes: "Progress payment",
+        created_by: session.userId,
+      });
 
       await appendAuditLog(client, {
         account_id: session.accountId,

@@ -53,10 +53,13 @@ describe("calculateDepositPolicy", () => {
 describe("createApprovalArtifacts deposit policy", () => {
   function fakeClient(estimate: { deposit_required: boolean; deposit_cents: number }) {
     const queries: string[] = [];
+    const params: unknown[][] = [];
     return {
       queries,
-      async query(sql: string) {
+      params,
+      async query(sql: string, values: unknown[] = []) {
         queries.push(sql);
+        params.push(values);
         if (sql.includes("FROM estimates")) {
           return { rows: [{ client_id: "client-1", job_id: "job-1", property_id: null, notes: "Scope", ...estimate }], rowCount: 1 };
         }
@@ -78,7 +81,8 @@ describe("createApprovalArtifacts deposit policy", () => {
     const client = fakeClient({ deposit_required: true, deposit_cents: 30000 });
     const result = await createApprovalArtifacts(client as never, { estimateId: "est-1", accountId: "acct-1", userId: "user-1" });
     expect(result.depositInvoiceId).toBe("invoice-1");
-    expect(client.queries.find((q) => q.includes("INSERT INTO invoices"))).toContain("'draft', 'deposit'");
+    const i = client.queries.findIndex((q) => q.includes("INSERT INTO invoices"));
+    expect(client.params[i]).toEqual(expect.arrayContaining(["draft", "deposit"]));
   });
 });
 

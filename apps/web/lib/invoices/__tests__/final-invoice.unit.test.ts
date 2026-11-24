@@ -22,6 +22,19 @@ vi.mock("@/lib/invoices/db", () => ({
     ),
 }));
 
+// Each consumes the one ordinal client.query slot the old inline query used.
+const { createInvoice } = vi.hoisted(() => ({
+  createInvoice: vi.fn(async (client: { query: () => Promise<{ rows: { id: string }[] }> }) => {
+    const id = (await client.query()).rows[0]?.id;
+    return { id, invoice_number: "INV-0042", status: "draft", created: true };
+  }),
+}));
+vi.mock("@/lib/invoices/create-invoice", () => ({
+  findOpenInvoice: async (client: { query: () => Promise<{ rows: unknown[] }> }) =>
+    (await client.query()).rows[0] ?? null,
+  createInvoice,
+}));
+
 vi.mock("@/lib/db/audit", () => ({
   appendAuditLog: vi.fn().mockResolvedValue(undefined),
 }));
@@ -188,13 +201,9 @@ describe("createDraftFinalInvoiceForJob", () => {
     expect(result?.lineItemCount).toBe(2);
 
     // Verify the invoice INSERT was called with the deposit credit
-    const insertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
-      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO invoices")
-    );
-    expect(insertCall).toBeDefined();
     // deposit_cents arg ($10) should be 15000 (the live deposit credit)
-    const args = insertCall![1] as unknown[];
-    const depositCentsArg = args[9]; // $10 is index 9
+    const args = createInvoice.mock.calls[0][1];
+    const depositCentsArg = args.deposit_cents; 
     expect(depositCentsArg).toBe(15000);
   });
 
@@ -221,9 +230,8 @@ describe("createDraftFinalInvoiceForJob", () => {
     const result = await createDraftFinalInvoiceForJob({ client, jobId: "job-1", accountId: "acct-1", userId: "user-1" });
     expect(result?.lineItemCount).toBe(2);
     const calls = (client.query as ReturnType<typeof vi.fn>).mock.calls as unknown[][];
-    const insert = calls.find((c) => typeof c[0] === "string" && (c[0] as string).includes("INSERT INTO invoices"))!;
-    const args = insert[1] as unknown[];
-    expect([args[6], args[7], args[8]]).toEqual([120_000, 6_000, 126_000]);
+    const args = createInvoice.mock.calls[0][1];
+    expect([args.subtotal_cents, args.tax_cents, args.total_cents]).toEqual([120_000, 6_000, 126_000]);
     const lineArgs = calls.filter((c) => typeof c[0] === "string" && (c[0] as string).includes("INSERT INTO invoice_line_items")).map((c) => (c[1] as unknown[]).slice(1, 4));
     expect(lineArgs).toContainEqual(["Foyer stairwell (added option)", 1, 20_000]);
   });
@@ -349,12 +357,9 @@ describe("createDraftFinalInvoiceForJob", () => {
     expect(result?.invoiceId).toBe("labor-inv-id");
     expect(result?.lineItemCount).toBe(1);
 
-    const insertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
-      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO invoices")
-    );
-    const args = insertCall![1] as unknown[];
-    expect(args[6]).toBe(25875);
-    expect(args[8]).toBe(25875);
+    const args = createInvoice.mock.calls[0][1];
+    expect(args.subtotal_cents).toBe(25875);
+    expect(args.total_cents).toBe(25875);
 
     const lineInsertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
       (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO invoice_line_items")
@@ -423,11 +428,8 @@ describe("createDraftFinalInvoiceForJob", () => {
     expect(result?.invoiceId).toBe("inv-id");
 
     // Only DEP-002 (5000) should be credited — DEP-001 is voided
-    const insertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
-      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO invoices")
-    );
-    const args = insertCall![1] as unknown[];
-    expect(args[9]).toBe(5000); // deposit_cents = only the live deposit
+    const args = createInvoice.mock.calls[0][1];
+    expect(args.deposit_cents).toBe(5000); // deposit_cents = only the live deposit
   });
 
   it("T&M: bills tracked hours at estimate labor rate, not estimate budget lines", async () => {
@@ -556,13 +558,10 @@ describe("createDraftFinalInvoiceForJob", () => {
     expect(appendEquipmentFromJobExpenses).toHaveBeenCalled();
 
     // Actuals include lift — not the $10,350 estimate
-    const insertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
-      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO invoices")
-    );
-    const args = insertCall![1] as unknown[];
-    expect(args[6]).toBe(actualTotal); // subtotal
-    expect(args[8]).toBe(actualTotal); // total
-    expect(args[9]).toBe(50000); // deposit credit
+    const args = createInvoice.mock.calls[0][1];
+    expect(args.subtotal_cents).toBe(actualTotal); // subtotal
+    expect(args.total_cents).toBe(actualTotal); // total
+    expect(args.deposit_cents).toBe(50000); // deposit credit
 
     // Labor line uses tracked hours at estimate rate, not budget quantity 90
     const laborInsert = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(

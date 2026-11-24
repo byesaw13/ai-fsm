@@ -19,14 +19,16 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : I0 merged (#775, 2b47f648): TASK-246..255 and
-                      Track I. G9 Active. C2 TASK-211 Verified before it
-                      (#770, #771; last deploy 0b58b702).
-In-flight PR        : I1 TASK-246 (payment delete through the trigger,
-                      migration 217)
-Next step           : I1 TASK-246 merge, backup, deploy, verify; then I2.
+Last step           : I1 TASK-246 Verified (#776, c365fa9a, migration 217;
+                      backup ai_fsm_20261124T221733Z.dump verified). Deployed
+                      ~22:24 UTC together with #774 (TASK-241, merged by
+                      another session, not yet deployed). Health ok, /login
+                      200, payment DELETE 401 unauth, trigger fires on
+                      DELETE, 53 invoices with payments still match.
+In-flight PR        : I2 TASK-247 (one invoice writer, migration 218)
+Next step           : I2 TASK-247 merge, backup, deploy, verify; then I3.
 Blocked on          : nothing
-Last known-good     : 0b58b702 (deploy-good/e83864f7 before it)
+Last known-good     : c365fa9a (deploy-good/0b58b702 before it)
 Notes               : The stale TASK-235..240 drafts in the main checkout
                       were discarded at the owner's request 2026-11-24.
                       C3 TASK-212 resumes after Track I. Owner checks after deploy (non-blocking):
@@ -158,7 +160,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | E5 | TASK-239 | 2026-11-23 (#760, #761, CI green incl. phone and sections e2e) | 2026-11-23 (#760 c2e76d6a, #761 7cb13859) | 2026-11-23 (~18:54, ~19:17 UTC) | 2026-11-23 (health ok, /login 200, job page 307 signed out, no web errors) |
 | E6 | TASK-240 | 2026-11-23 (#762, CI green incl. progress-line e2e) | 2026-11-23 (#762, a4a6aaa4) | 2026-11-23 (~19:56 UTC) | 2026-11-23 (health ok, /login 200, customer page 307 signed out, no web errors; loader SQL run read-only on production) |
 | I0 | Backlog TASK-246..255 + Track I | 2026-11-24 (#775, CI green) | 2026-11-24 (#775, 2b47f648) | n/a | n/a |
-| I1 | TASK-246 | | | | |
+| I1 | TASK-246 | 2026-11-24 (#776, CI green) | 2026-11-24 (#776, c365fa9a) | 2026-11-24 (~22:24 UTC, migration 217) | 2026-11-24 (health ok, /login 200, DELETE 401 unauth, trigger on DELETE, paid totals unchanged) |
 | I2 | TASK-247 | | | | |
 | I3 | TASK-251 | | | | |
 | I4 | TASK-249 | | | | |
@@ -778,6 +780,10 @@ Per step:
 
 ## Log
 
+- 2026-11-24 · I2 · In progress · TASK-247: lib/invoices/create-invoice.ts (findOpenInvoice, createInvoice) used by all six invoice writers; migration 218 unique indexes (one open final/standard per job, one open final and one open deposit per estimate, void ignored); manual invoice on a job that has one → 409 INVOICE_EXISTS. Prod read-only: no existing duplicates
+- 2026-11-24 · I1 · Verified · health ok, /login 200, payment DELETE 401 unauth, trg_payment_sync_invoice fires on DELETE, 0 of 53 invoices with payments drift. TASK-246 Done
+- 2026-11-24 · I1 · Deployed · c365fa9a · ~22:24 UTC, migration 217; backup ai_fsm_20261124T221733Z.dump verified; known-good deploy-good/0b58b702. Also shipped #774 (TASK-241), which another session merged at 21:58 and had not deployed. The deploy script recreated postgres-1 (image refresh); data intact
+- 2026-11-24 · I1 · Merged · #776 · squash c365fa9a; no Codex findings. Found while building: deleting the last payment on a partial invoice 500'd (partial → sent rejected)
 - 2026-11-24 · C1 · Verified · health ok, no web errors; backfill re-run inserts 0 / changes 0; no variant counts more purchases than its real active rows
 - 2026-11-24 · C1 · Backfill · run pl-2026-11-24-prod applied after dry run (1,314 summaries, 260 receipts; averages for ~1,095 Pro Xtra-only items now blank until the C7 re-import); cleanup: DELETE FROM price_observations WHERE note = 'backfill:pl-2026-11-24-prod' + restore from price-cache-before-pl-2026-11-24-prod.json
 - 2026-11-24 · C2 · PR 1 · #770 merged (e83864f7), deployed with migration 215 after backup ai_fsm_20261124T034408Z.dump; Codex P1 (overlapping imports) and two P2s fixed before merge; verified

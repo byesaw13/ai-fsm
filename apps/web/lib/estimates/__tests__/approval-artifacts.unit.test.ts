@@ -92,8 +92,7 @@ describe("createApprovalArtifacts", () => {
     const insertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
       (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO invoices"),
     );
-    const args = insertCall![1] as unknown[];
-    expect(args[2]).toBe("job-1");
+    expect(insertCall![1] as unknown[]).toContain("job-1");
   });
 
   it("is idempotent — skips deposit creation if one already exists", async () => {

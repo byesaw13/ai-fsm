@@ -1,7 +1,7 @@
 # TASK-246: Deleting a payment updates the invoice through the database trigger
 
 Status:
-In Progress
+Done
 
 Epic:
 EPIC-004 Billing & Profitability
@@ -25,10 +25,10 @@ Out of scope:
 - Payment editing UI. Refund handling.
 
 Acceptance Criteria:
-- [ ] Deleting one of two payments leaves the invoice `partial` with the right `paid_cents`.
-- [ ] Deleting the only payment leaves the invoice `sent`, `paid_cents` 0, `paid_at` null.
-- [ ] A reopened (draft) invoice stays `draft` after a payment delete.
-- [ ] The route contains no `UPDATE invoices SET paid_cents`.
+- [x] Deleting one of two payments leaves the invoice `partial` with the right `paid_cents`.
+- [x] Deleting the only payment leaves the invoice `sent`, `paid_cents` 0, `paid_at` null.
+- [x] A reopened (draft) invoice stays `draft` after a payment delete.
+- [x] The route contains no `UPDATE invoices SET paid_cents`.
 
 Test Plan:
 - Integration: the three cases above against the real trigger.
