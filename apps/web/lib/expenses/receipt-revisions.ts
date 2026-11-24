@@ -5,8 +5,8 @@
  * Every parse or line edit of a receipt is a revision: a snapshot of its lines,
  * signed adjustments, tax and reconciliation. Receipt price observations are keyed
  * by revision, so the current revision's prices are active and earlier ones are
- * superseded; restoring an earlier revision makes it current again and brings its
- * prices back. The expense row is locked first, so concurrent re-parses of one
+ * superseded; restoring an earlier revision saves it again as the newest revision,
+ * which brings its lines and prices back. The expense row is locked first, so concurrent re-parses of one
  * receipt run one after the other and leave one current revision.
  */
 import type { PoolClient } from "pg";
@@ -121,7 +121,7 @@ export async function saveReceiptRevision(
   actor: RevisionActor,
   expenseId: string,
   input: {
-    origin: Exclude<RevisionOrigin, "restore">;
+    origin: RevisionOrigin;
     lineItems: ExpenseLineItemInput[];
     taxCents?: number | null;
     adjustments?: ReceiptAdjustment[];
@@ -158,32 +158,30 @@ export async function saveReceiptRevision(
   return { revision, line_items: saved, reconciliation, catalog_learned };
 }
 
-/** Make an earlier revision current again: its lines come back, and so do its prices. */
+/**
+ * Bring an earlier revision back: its lines, tax and adjustments are saved again as
+ * a new "restore" revision, reconciled against the expense total as it is now, so
+ * its prices come back with a current reconciled flag (the ledger stays append-only).
+ */
 export async function restoreReceiptRevision(
   client: PoolClient,
   actor: RevisionActor,
   expenseId: string,
   revision: number,
 ): Promise<SavedRevision> {
-  const expense = await lockExpense(client, actor.accountId, expenseId);
-  const { rows } = await client.query<{ line_items: ExpenseLineItemInput[]; reconciliation: ReceiptParseReconciliation }>(
-    `SELECT line_items, reconciliation FROM expense_parse_revisions
+  await lockExpense(client, actor.accountId, expenseId);
+  const { rows } = await client.query<{ line_items: ExpenseLineItemInput[]; tax_cents: number | null; adjustments: ReceiptAdjustment[] }>(
+    `SELECT line_items, tax_cents, adjustments FROM expense_parse_revisions
      WHERE account_id = $1 AND expense_id = $2 AND revision = $3`,
     [actor.accountId, expenseId, revision],
   );
   if (!rows[0]) throw new ReceiptRevisionError("That version of the receipt was not found", "NO_REVISION");
-  const saved = await replaceExpenseLineItems(
-    client,
-    actor.accountId,
-    expenseId,
-    rows[0].line_items.map((li, i) => ({ ...li, sort_order: i })),
-  );
-  await client.query(`UPDATE expenses SET parse_revision = $3, updated_at = now() WHERE id = $1 AND account_id = $2`, [
-    expenseId, actor.accountId, revision,
-  ]);
-  const reconciliation = rows[0].reconciliation;
-  const catalog_learned = await learnRevision(client, actor, expenseId, expense, revision, saved, reconciliation.balanced === true);
-  return { revision, line_items: saved, reconciliation, catalog_learned };
+  return saveReceiptRevision(client, actor, expenseId, {
+    origin: "restore",
+    lineItems: rows[0].line_items.map((li, i) => ({ ...li, sort_order: i })),
+    taxCents: rows[0].tax_cents,
+    adjustments: rows[0].adjustments,
+  });
 }
 
 export async function listReceiptRevisions(

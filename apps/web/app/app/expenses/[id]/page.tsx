@@ -253,6 +253,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
             <Card>
               <SectionHeader title="Line Items" />
               <ExpenseLineItemsEditor
+                key={versions.current /* a restored version remounts the editor with its lines */}
                 expenseId={expense.id}
                 initialLineItems={lineItems}
                 billed={lineItemsBilled}

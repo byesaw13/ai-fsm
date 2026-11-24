@@ -87,22 +87,33 @@ describe.skipIf(!RUN)("receipt parse revisions", () => {
     expect(counts[0].purchase_count).toBe(1);
   });
 
-  it("restoring an earlier revision brings its lines and prices back", async () => {
+  it("restoring an earlier revision brings its lines and prices back as the newest revision", async () => {
     const id = await receipt(997 + 2 * 4298);
     await tx((c) => saveReceiptRevision(c, actor, id, { origin: "parse", lineItems: lines() }));
     await tx((c) => saveReceiptRevision(c, actor, id, { origin: "edit", lineItems: lines(3999) }));
     expect((await active(id)).map((o) => o.unit_price_cents).sort((a, b) => a - b)).toEqual([997, 3999]);
 
     const restored = await tx((c) => restoreReceiptRevision(c, actor, id, 1));
-    expect(restored.revision).toBe(1);
-    expect(await current(id)).toBe(1);
+    expect(restored.revision).toBe(3);
+    expect(await current(id)).toBe(3);
     const now = await active(id);
     expect(now.map((o) => o.unit_price_cents).sort((a, b) => a - b)).toEqual([997, 4298]);
-    expect(now.every((o) => o.dedupe_key.includes(":r1:"))).toBe(true);
+    expect(now.every((o) => o.dedupe_key.includes(":r3:"))).toBe(true);
     const restoredLines = await q<{ unit_cost_cents: number }>(
       `SELECT unit_cost_cents FROM expense_line_items WHERE expense_id = $1 ORDER BY sort_order`, [id],
     );
     expect(restoredLines.map((l) => l.unit_cost_cents)).toEqual([997, 4298]);
+  });
+
+  it("a restored version is reconciled against the expense total as it is now", async () => {
+    const id = await receipt(997 + 2 * 4298);
+    const first = await tx((c) => saveReceiptRevision(c, actor, id, { origin: "parse", lineItems: lines() }));
+    expect(first.reconciliation.balanced).toBe(true);
+    await tx((c) => saveReceiptRevision(c, actor, id, { origin: "edit", lineItems: lines(3999) }));
+    await pool.query(`UPDATE expenses SET amount_cents = 20000 WHERE id = $1`, [id]); // total corrected since
+    const restored = await tx((c) => restoreReceiptRevision(c, actor, id, 1));
+    expect(restored.reconciliation.balanced).toBe(false);
+    expect((await active(id)).every((o) => !o.reconciled)).toBe(true);
   });
 
   it("two concurrent re-parses of one receipt leave one current revision and one set of lines and prices", async () => {
