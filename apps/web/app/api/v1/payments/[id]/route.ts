@@ -4,13 +4,11 @@ import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { getPathId } from "@/lib/route-utils";
-import { deriveInvoiceStatus } from "@/lib/invoices/payments";
 
 export const dynamic = "force-dynamic";
 
 // === Delete Payment (DELETE /api/v1/payments/[id]) ===
-// Owner-only. Deletes the payment and recalculates invoice paid_cents.
-// Note: The DB trigger only fires on INSERT. Deletion requires manual recalculation.
+// Owner-only. Deletes the payment; the payment trigger updates the invoice.
 
 export const DELETE = withRole(["owner"], async (request, session) => {
   const paymentId = getPathId(request.nextUrl.pathname);
@@ -68,45 +66,14 @@ export const DELETE = withRole(["owner"], async (request, session) => {
         );
       }
 
-      // Delete the payment
+      // The payment trigger recalculates paid_cents and status (migration 217).
       await client.query(`DELETE FROM payments WHERE id = $1`, [paymentId]);
 
-      // Recalculate paid_cents from remaining COMPLETED payments only —
-      // pending links and refund rows must not count toward the paid total
-      // (mirrors sync_invoice_on_payment, migration 117).
-      const sumResult = await client.query<{ total_paid: string }>(
-        `SELECT COALESCE(SUM(amount_cents), 0) AS total_paid
-         FROM payments WHERE invoice_id = $1 AND status = 'paid'`,
+      const after = await client.query<{ status: string; paid_cents: number }>(
+        `SELECT status, paid_cents FROM invoices WHERE id = $1`,
         [payment.invoice_id]
       );
-
-      const newPaidCents = parseInt(sumResult.rows[0].total_paid, 10);
-
-      // Deposit credit counts toward paid (mirrors sync_invoice_on_payment / 164)
-      let newStatus: string = deriveInvoiceStatus(
-        invBefore.total_cents,
-        newPaidCents,
-        invBefore.deposit_cents,
-      );
-      if (invBefore.status === "draft") {
-        // Reopened for edit (TASK-154): stays draft until re-sent (mirrors 192).
-        newStatus = "draft";
-      } else if (newPaidCents === 0 && newStatus !== "paid") {
-        // No payments remaining — revert to sent (the pre-payment state)
-        newStatus = "sent";
-      }
-
-      // Update invoice
-      await client.query(
-        `UPDATE invoices SET paid_cents = $1, status = $2, paid_at = $3, updated_at = now()
-         WHERE id = $4`,
-        [
-          newPaidCents,
-          newStatus,
-          newStatus === "paid" ? new Date().toISOString() : null,
-          payment.invoice_id,
-        ]
-      );
+      const { status: newStatus, paid_cents: newPaidCents } = after.rows[0];
 
       // Audit log for payment deletion
       await appendAuditLog(client, {

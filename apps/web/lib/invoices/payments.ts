@@ -1,4 +1,3 @@
-import type { InvoiceStatus } from "@ai-fsm/domain";
 
 /**
  * Pure payment math for invoices.
@@ -44,23 +43,6 @@ export function isInvoiceFullyPaid(
 ): boolean {
   if (totalCents <= 0) return false;
   return paidCents + Math.max(0, depositCreditCents) >= totalCents;
-}
-
-/**
- * Derive the expected invoice status after a payment changes paid_cents.
- *
- * Pure-logic equivalent of the DB trigger `sync_invoice_on_payment`.
- * Deposit credit counts toward "fully paid" so a final invoice that credits
- * a $1,500 deposit is paid once the remaining balance is collected.
- */
-export function deriveInvoiceStatus(
-  totalCents: number,
-  paidCents: number,
-  depositCreditCents = 0,
-): InvoiceStatus {
-  if (isInvoiceFullyPaid(totalCents, paidCents, depositCreditCents)) return "paid";
-  if (paidCents > 0) return "partial";
-  return "sent"; // fallback — should not happen after a payment
 }
 
 /**
