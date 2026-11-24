@@ -2202,3 +2202,49 @@ Whole-app pass for a non-technical user. Tasks: TASK-235 to TASK-240.
 **Unknown / verify**
 
 - Click-through with a non-technical user was not done; counts come from code. Each task's test plan includes a hands-on check.
+
+## 32. Prototype frontend as the target (2026-11-24)
+
+Owner decision 2026-11-24: the "Dovetails CRM + FSM — Test Build" prototype
+(Claude artifact `https://claude.ai/artifact/CTZmL9SUdwqg9GskX9ohWc`, single HTML file)
+is the reference for how screens look and behave. It is easier to use than the app.
+It replaces the presentation, not the system: database, roles, portal, Square, SMS,
+pricing rules and RLS stay. Screens are rebuilt one at a time on the existing APIs.
+Tasks: TASK-241 to TASK-245.
+
+**What to copy**
+
+- **Look.** Cream page (`#f5f2ec`), navy sidebar (`#1f3246`), orange primary
+  (`#e0702a`), white cards with a thin warm border, DM Sans for text and DM Mono for
+  every money amount and count. The brand values already exist in `styles/brand.css`;
+  `styles/tokens.css` does not use them. TASK-241.
+- **A job is one page with tabs.** Estimate, Visits, Invoice & payments, Costs, Activity.
+  The estimate and invoice lines are edited on the job, not on separate pages. Quick
+  actions (record payment, book visit, log a call) open in a dialog and return to the
+  job. Builds on TASK-239 (next step + Work/Money/History). TASK-242.
+- **Edit where you read.** Titles, line items and notes are fields that save themselves
+  with a visible "Saved" state. No Edit → Save → back. Applies inside each task above;
+  quotes keep the TASK-222 stale-save guard.
+- **Today is a list of sentences.** Each row says what to do and why ("Follow up on
+  estimate — $900 sent to Sagar 5 days ago") and opens the place to do it. TASK-243.
+- **Property page in four parts.** Header (address, Map, Edit, New request here), job
+  history with status and amount, people connected with their roles, access & site notes
+  edited in place. Everything else behind a tab. Access notes also show on the job and
+  visit. TASK-244.
+- **One intake form.** Who called, who pays and which house in one dialog, with "Use
+  this" matches for existing people and addresses. TASK-245.
+
+**Do not copy**
+
+- Its storage (browser / artifact storage), its single-file structure, or its pricing
+  math. Numbers come from the app's existing APIs and rules.
+- Its 11-item menu. The 5-place menu from TASK-237 stays.
+- "Pipeline" and CRM wording as product positioning. A job board already exists
+  (`jobs/JobBoard.tsx`); keep the shop words from TASK-235.
+
+**Order**
+
+TASK-241 first (every screen benefits, smallest change). Then TASK-242 (most used),
+TASK-243, TASK-244, TASK-245. Each ships alone; the app keeps working between them.
+Each task's test plan includes a side-by-side check against the prototype screen on a
+phone and a laptop.
