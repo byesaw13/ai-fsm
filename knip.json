@@ -21,7 +21,7 @@
       "ignoreDependencies": ["pg"]
     },
     "apps/web": {
-      "entry": ["public/sw.js", "scripts/**/*.mjs"]
+      "entry": ["public/sw.js", "scripts/**/*.mjs", "scripts/**/*.ts"]
     },
     "services/worker": {},
     "packages/*": {}

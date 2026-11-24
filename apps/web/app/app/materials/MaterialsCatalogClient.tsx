@@ -43,6 +43,7 @@ export default function MaterialsCatalogClient({ materials: initial, canManage }
   const [editId, setEditId] = useState<string | null>(null);
   const [editNotes, setEditNotes] = useState("");
   const [editLastCents, setEditLastCents] = useState("");
+  const [editPriceSource, setEditPriceSource] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,6 +116,7 @@ export default function MaterialsCatalogClient({ materials: initial, canManage }
     setEditId(m.id);
     setEditNotes(m.notes ?? "");
     setEditLastCents((m.unit_cost_cents / 100).toFixed(2));
+    setEditPriceSource("");
     setError(null);
   }
 
@@ -123,7 +125,14 @@ export default function MaterialsCatalogClient({ materials: initial, canManage }
     setError(null);
     const dollars = Number(editLastCents);
     if (!Number.isFinite(dollars) || dollars < 0) {
-      setError("Enter a valid last price");
+      setError("Enter a valid price");
+      setSaving(false);
+      return;
+    }
+    const current = materials.find((m) => m.id === id);
+    const priceChanged = Math.round(dollars * 100) !== current?.unit_cost_cents;
+    if (priceChanged && !editPriceSource.trim()) {
+      setError("Say where you saw this price (for example: Home Depot shelf, price from a phone call).");
       setSaving(false);
       return;
     }
@@ -131,9 +140,12 @@ export default function MaterialsCatalogClient({ materials: initial, canManage }
       const res = await fetch(`/api/v1/materials/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        // A new price is a manual check in the price history (TASK-210).
         body: JSON.stringify({
-          unit_cost_cents: Math.round(dollars * 100),
           notes: editNotes.trim() || null,
+          ...(priceChanged
+            ? { observed_price_cents: Math.round(dollars * 100), observed_source: editPriceSource.trim() }
+            : {}),
         }),
       });
       const json = await res.json();
@@ -368,10 +380,19 @@ export default function MaterialsCatalogClient({ materials: initial, canManage }
                   }}
                 >
                   <label style={{ fontSize: "var(--text-sm)" }}>
-                    Last paid ($)
+                    Price you saw ($)
                     <input
                       value={editLastCents}
                       onChange={(e) => setEditLastCents(e.target.value)}
+                      style={{ display: "block", width: "100%", marginTop: 4, padding: 8 }}
+                    />
+                  </label>
+                  <label style={{ fontSize: "var(--text-sm)" }}>
+                    Where you saw it (needed for a new price)
+                    <input
+                      value={editPriceSource}
+                      onChange={(e) => setEditPriceSource(e.target.value)}
+                      placeholder="Home Depot shelf, price from a phone call…"
                       style={{ display: "block", width: "100%", marginTop: 4, padding: 8 }}
                     />
                   </label>

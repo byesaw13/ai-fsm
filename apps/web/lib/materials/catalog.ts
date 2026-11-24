@@ -1,8 +1,17 @@
 /**
- * Materials catalog learn helpers — upsert last/avg paid from receipt lines.
- * Spec: docs/superpowers/specs/2026-07-31-materials-catalog-receipt-learning-design.md
+ * Materials catalog learning: purchases become price observations (TASK-210).
+ * The catalog row's price, average and last-paid fields are a cache the ledger
+ * recomputes (lib/materials/ledger.ts); nothing here writes them directly.
+ * Spec: docs/working/estimating-assistant-phase3.md §1.
  */
 import type { PoolClient } from "pg";
+import {
+  findOrCreateVariant,
+  observationFingerprints,
+  recordObservations,
+  replaceSourceObservations,
+  type NewObservation,
+} from "./ledger";
 
 export type CatalogLineInput = {
   name: string;
@@ -10,6 +19,10 @@ export type CatalogLineInput = {
   sku?: string | null;
   quantity?: number;
   unit?: string;
+  /** A discounted purchase: kept as evidence, never the regular price. */
+  is_sale?: boolean;
+  /** Overrides the generated key (the CSV import keys rows across the whole file). */
+  dedupe_key?: string;
 };
 
 export type CatalogLearnContext = {
@@ -17,204 +30,70 @@ export type CatalogLearnContext = {
   supplier?: string | null;
   purchasedAt?: string | null; // YYYY-MM-DD
   category?: string;
+  /** Where the purchase was seen. A receipt replaces its own earlier observations. */
+  source: { kind: "receipt"; expenseId: string } | { kind: "supplier_csv"; ref: string };
+  enteredBy?: string | null;
 };
 
-export type MaterialsPriceBookRow = {
-  id: string;
-  account_id: string;
-  name: string;
-  brand: string | null;
-  category: string;
-  unit: string;
-  unit_cost_cents: number;
-  supplier: string | null;
-  sku: string | null;
-  last_purchased_at: string | null;
-  notes: string | null;
-  is_active: boolean;
-  avg_paid_cents: number | null;
-  purchase_count: number;
-};
-
-/** Running average after incorporating one new unit cost. */
-export function computeRunningAverage(
-  prevAvgCents: number | null | undefined,
-  prevCount: number,
-  newCostCents: number,
-): { avg_paid_cents: number; purchase_count: number } {
-  const cost = Math.round(newCostCents);
-  if (prevCount <= 0 || prevAvgCents == null || prevAvgCents < 0) {
-    return { avg_paid_cents: cost, purchase_count: 1 };
-  }
-  const nextCount = prevCount + 1;
-  const avg = Math.round((prevAvgCents * prevCount + cost) / nextCount);
-  return { avg_paid_cents: avg, purchase_count: nextCount };
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 /**
- * Whether an incoming observation should overwrite "last paid" fields.
- * null incoming date always updates (treat as latest observation).
- * Otherwise update only when at least as recent as the stored last purchase.
- */
-export function shouldUpdateLastPaid(
-  existingLastPurchasedAt: string | null | undefined,
-  incomingPurchasedAt: string | null | undefined,
-): boolean {
-  if (!incomingPurchasedAt) return true;
-  if (!existingLastPurchasedAt) return true;
-  const existing = existingLastPurchasedAt.slice(0, 10);
-  const incoming = incomingPurchasedAt.slice(0, 10);
-  return incoming >= existing;
-}
-
-function normalizeSku(sku: string | null | undefined): string | null {
-  const s = sku?.trim() ?? "";
-  return s.length > 0 ? s : null;
-}
-
-function normalizeName(name: string): string {
-  return name.trim();
-}
-
-const VALID_CATEGORIES = new Set([
-  "paint",
-  "lumber",
-  "hardware",
-  "concrete",
-  "fasteners",
-  "sheet_goods",
-  "trim",
-  "flooring",
-  "other",
-]);
-
-function normalizeCategory(category?: string): string {
-  if (category && VALID_CATEGORIES.has(category)) return category;
-  return "other";
-}
-
-/**
- * Upsert a single catalog row from a purchase observation.
- * Match: SKU first (active rows), else lower(name)+unit.
- */
-export async function upsertMaterialFromPurchase(
-  client: PoolClient,
-  ctx: CatalogLearnContext,
-  line: CatalogLineInput,
-): Promise<MaterialsPriceBookRow | null> {
-  const name = normalizeName(line.name);
-  const unitCost = Math.round(line.unit_cost_cents);
-  if (!name || unitCost <= 0) return null;
-
-  const sku = normalizeSku(line.sku);
-  const unit = (line.unit?.trim() || "each").slice(0, 50);
-  const category = normalizeCategory(ctx.category);
-  const supplier = ctx.supplier?.trim() || null;
-  const purchasedAt = ctx.purchasedAt?.slice(0, 10) || null;
-
-  let existing: MaterialsPriceBookRow | null = null;
-
-  if (sku) {
-    const bySku = await client.query<MaterialsPriceBookRow>(
-      `SELECT id, account_id, name, brand, category, unit, unit_cost_cents, supplier, sku,
-              last_purchased_at::text AS last_purchased_at, notes, is_active,
-              avg_paid_cents, purchase_count
-       FROM materials_price_book
-       WHERE account_id = $1
-         AND is_active = true
-         AND sku IS NOT NULL
-         AND lower(btrim(sku)) = lower(btrim($2))
-       LIMIT 1`,
-      [ctx.accountId, sku],
-    );
-    existing = bySku.rows[0] ?? null;
-  }
-
-  if (!existing) {
-    const byName = await client.query<MaterialsPriceBookRow>(
-      `SELECT id, account_id, name, brand, category, unit, unit_cost_cents, supplier, sku,
-              last_purchased_at::text AS last_purchased_at, notes, is_active,
-              avg_paid_cents, purchase_count
-       FROM materials_price_book
-       WHERE account_id = $1
-         AND is_active = true
-         AND lower(btrim(name)) = lower(btrim($2))
-         AND unit = $3
-       LIMIT 1`,
-      [ctx.accountId, name, unit],
-    );
-    existing = byName.rows[0] ?? null;
-  }
-
-  if (existing) {
-    const { avg_paid_cents, purchase_count } = computeRunningAverage(
-      existing.avg_paid_cents,
-      existing.purchase_count,
-      unitCost,
-    );
-    const updateLast = shouldUpdateLastPaid(existing.last_purchased_at, purchasedAt);
-    const nextUnitCost = updateLast ? unitCost : existing.unit_cost_cents;
-    const nextLastPurchased = updateLast
-      ? purchasedAt ?? existing.last_purchased_at
-      : existing.last_purchased_at;
-    const updated = await client.query<MaterialsPriceBookRow>(
-      `UPDATE materials_price_book SET
-         unit_cost_cents   = $2,
-         avg_paid_cents    = $3,
-         purchase_count    = $4,
-         sku               = COALESCE(NULLIF(btrim($5), ''), sku),
-         supplier          = COALESCE($6, supplier),
-         last_purchased_at = $7::date,
-         name              = CASE
-                               WHEN length(btrim($8)) > length(btrim(name)) THEN btrim($8)
-                               ELSE name
-                             END,
-         updated_at        = now()
-       WHERE id = $1 AND account_id = $9
-       RETURNING id, account_id, name, brand, category, unit, unit_cost_cents, supplier, sku,
-                 last_purchased_at::text AS last_purchased_at, notes, is_active,
-                 avg_paid_cents, purchase_count`,
-      [
-        existing.id,
-        nextUnitCost,
-        avg_paid_cents,
-        purchase_count,
-        sku,
-        supplier,
-        nextLastPurchased,
-        name,
-        ctx.accountId,
-      ],
-    );
-    return updated.rows[0] ?? null;
-  }
-
-  const inserted = await client.query<MaterialsPriceBookRow>(
-    `INSERT INTO materials_price_book
-       (account_id, name, category, unit, unit_cost_cents, supplier, sku,
-        last_purchased_at, avg_paid_cents, purchase_count)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $5, 1)
-     RETURNING id, account_id, name, brand, category, unit, unit_cost_cents, supplier, sku,
-               last_purchased_at::text AS last_purchased_at, notes, is_active,
-               avg_paid_cents, purchase_count`,
-    [ctx.accountId, name, category, unit, unitCost, supplier, sku, purchasedAt],
-  );
-  return inserted.rows[0] ?? null;
-}
-
-/**
- * Learn catalog prices from a batch of expense line items.
- * Returns how many rows were upserted (skips invalid lines).
+ * Learn catalog prices from purchased lines. Returns how many lines became
+ * observations (invalid lines are skipped; repeats of an existing observation
+ * count as learned but add nothing).
  */
 export async function learnMaterialsFromLineItems(
   client: PoolClient,
   ctx: CatalogLearnContext,
   lines: CatalogLineInput[],
 ): Promise<{ learned: number }> {
-  let learned = 0;
-  for (const line of lines) {
-    const row = await upsertMaterialFromPurchase(client, ctx, line);
-    if (row) learned += 1;
+  const valid = lines.filter((l) => l.name.trim() && Math.round(l.unit_cost_cents) > 0);
+  if (valid.length === 0) {
+    // A receipt with no priced lines left keeps no observations.
+    if (ctx.source.kind === "receipt") {
+      await replaceSourceObservations(client, ctx.accountId, `expense:${ctx.source.expenseId}`, []);
+    }
+    return { learned: 0 };
   }
-  return { learned };
+  const observedOn = ctx.purchasedAt?.slice(0, 10) || today();
+  const fingerprints = observationFingerprints(
+    valid.map((l) => ({ sku: l.sku, name: l.name, unitPriceCents: l.unit_cost_cents, quantity: l.quantity ?? 1 })),
+  );
+  const sourceRef = ctx.source.kind === "receipt" ? `expense:${ctx.source.expenseId}` : ctx.source.ref;
+
+  const rows: NewObservation[] = [];
+  for (let i = 0; i < valid.length; i++) {
+    const line = valid[i];
+    const variant = await findOrCreateVariant(
+      client,
+      ctx.accountId,
+      { name: line.name, sku: line.sku, supplier: ctx.supplier, unit: line.unit, category: ctx.category },
+      ctx.enteredBy ?? null,
+    );
+    if (!variant) continue;
+    rows.push({
+      variantId: variant.id,
+      kind: ctx.source.kind,
+      observedOn,
+      unitPriceCents: Math.round(line.unit_cost_cents),
+      storeFamily: variant.storeFamily,
+      isSale: line.is_sale ?? false,
+      sourceRef,
+      dedupeKey:
+        line.dedupe_key ??
+        (ctx.source.kind === "receipt"
+          ? `receipt:${ctx.source.expenseId}:${fingerprints[i]}`
+          : `csv:${variant.storeFamily}:${observedOn}:${fingerprints[i]}`),
+      enteredBy: ctx.enteredBy ?? null,
+    });
+  }
+
+  if (ctx.source.kind === "receipt") {
+    await replaceSourceObservations(client, ctx.accountId, sourceRef, rows);
+  } else {
+    await recordObservations(client, ctx.accountId, rows);
+  }
+  return { learned: rows.length };
 }

@@ -7,6 +7,8 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { learnMaterialsFromLineItems } from "@/lib/materials/catalog";
+import { observationFingerprints } from "@/lib/materials/ledger";
+import { storeFamilyOf } from "@ai-fsm/domain";
 import {
   mapHdDepartmentToCategory,
   parseHomeDepotPurchaseCsv,
@@ -87,8 +89,19 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.userId, session.accountId, session.role],
     );
 
+    // Keys from the whole file: identical rows on one day stay distinct, and the same
+    // file imported again adds no observations (TASK-210; TASK-211 replaces this import).
+    const fileKeys = observationFingerprints(
+      parsed.lines.map((l) => ({
+        sku: l.sku,
+        name: `${l.purchasedAt ?? ""}|${l.name}`,
+        unitPriceCents: l.unit_cost_cents,
+        quantity: l.quantity ?? 1,
+      })),
+    );
+
     // Per-row savepoints so one bad row does not abort the whole import txn.
-    for (const line of parsed.lines) {
+    for (const [rowIndex, line] of parsed.lines.entries()) {
       const sp = `import_row_${line.rawIndex}`;
       try {
         await client.query(`SAVEPOINT ${sp}`);
@@ -99,6 +112,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
             supplier: line.supplier,
             purchasedAt: line.purchasedAt,
             category: mapHdDepartmentToCategory(line.department),
+            source: { kind: "supplier_csv", ref: "materials-import" },
+            enteredBy: session.userId,
           },
           [
             {
@@ -107,6 +122,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
               sku: line.sku,
               quantity: line.quantity,
               unit: line.unit,
+              dedupe_key: `csv:${storeFamilyOf(line.supplier)}:${fileKeys[rowIndex]}`,
             },
           ],
         );
