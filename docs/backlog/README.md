@@ -228,7 +228,7 @@ closed in tests; owner-flow AC still open.
 | TASK-243 | [Today reads as a list of sentences](TASK-243-today-sentences.md) | 006 | Proposed |
 | TASK-244 | [The property page in four parts](TASK-244-property-page-four-parts.md) | 006 | Proposed |
 | TASK-245 | [One intake form that finds who and where you already have](TASK-245-intake-duplicate-matches.md) | 006 | Proposed |
-| TASK-246 | [Deleting a payment updates the invoice through the database trigger](TASK-246-payment-delete-uses-trigger.md) | 004 | Proposed |
+| TASK-246 | [Deleting a payment updates the invoice through the database trigger](TASK-246-payment-delete-uses-trigger.md) | 004 | In Progress |
 | TASK-247 | [One function creates invoices, with one set of duplicate rules](TASK-247-one-invoice-writer.md) | 004 | Proposed |
 | TASK-248 | [Both estimate forms save through one payload builder](TASK-248-one-estimate-save-payload.md) | 002 | Proposed |
 | TASK-249 | [The server never creates a second customer for the same phone](TASK-249-no-duplicate-customers.md) | 003 | Proposed |

@@ -19,21 +19,17 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : C2 TASK-211 Verified (2 PRs). PR 1 #770 (e83864f7,
-                      migration 215): imports in book and price-history
-                      modes, review records, old catalog import retired.
-                      PR 2 #771 (0b58b702, migration 216; backup
-                      ai_fsm_20261124T043423Z.dump verified): receipt parse
-                      revisions, signed returns/discounts, reconciliation.
-                      Deployed ~04:40 UTC; health ok, /login 200, revisions
-                      API 401 unauth, no expense or price changed.
-In-flight PR        : none
-Next step           : C3 TASK-212 (package sizes; needs C1).
+Last step           : I0 merged (#775, 2b47f648): TASK-246..255 and
+                      Track I. G9 Active. C2 TASK-211 Verified before it
+                      (#770, #771; last deploy 0b58b702).
+In-flight PR        : I1 TASK-246 (payment delete through the trigger,
+                      migration 217)
+Next step           : I1 TASK-246 merge, backup, deploy, verify; then I2.
 Blocked on          : nothing
 Last known-good     : 0b58b702 (deploy-good/e83864f7 before it)
-Notes               : Main checkout holds another session's uncommitted
-                      drafts of TASK-235..240 (duplicates of #755); left
-                      untouched. Owner checks after deploy (non-blocking):
+Notes               : The stale TASK-235..240 drafts in the main checkout
+                      were discarded at the owner's request 2026-11-24.
+                      C3 TASK-212 resumes after Track I. Owner checks after deploy (non-blocking):
                       - TASK-238: on your phone, tap Switch to Desk; Desk
                         stays open. Tap the logo; you land on Today.
                       - TASK-236: hand someone "a customer called about a
@@ -66,7 +62,7 @@ this one, as an approval.
 | G4 | Any database restore or data repair on production | Ask every time | |
 | G6 | TASK-225 table-freeze exception (one nullable column for chosen add-ons) | Approved 2026-10-31 | Owner in session: "approve both, use craftsman factors, start TASK-227", answering (1) TASK-225's one new column and (2) TASK-228's factors. |
 | G8 | Track E: build TASK-235 to TASK-240 in the order and with the decisions in "Plan: Track E", merging and deploying under G0 | **Active** 2026-11-23 | Owner comment on PR #755 at 2026-11-23 15:06 UTC, from `byesaw13`: `I approve Track E as described in docs/working/build-runbook.md` (issuecomment-7105048753). |
-| G9 | Track I: build TASK-246 to TASK-255 in the order and with the gates in "Plan: Track I", merging and deploying under G0 | Pending | |
+| G9 | Track I: build TASK-246 to TASK-255 in the order and with the gates in "Plan: Track I", merging and deploying under G0 | **Active** 2026-11-24 | Owner in session 2026-11-24 asked the agent to post the approval and merge: "comment I approve Track I as described in docs/working/build-runbook.md on #775, merge it". Posted from `byesaw13` at 2026-11-24 21:42 UTC (issuecomment-7145287174). |
 | G7 | TASK-228 height factors: Craftsman ×1.23 (9–13 ft), ×1.46 (13–17 ft), ×1.69 (17–19 ft), ×1.92 (19–21 ft) | Approved 2026-10-31 | Same session answer as G6. |
 
 **Without G0 active** the agent works in "PRs only" mode: it builds, tests and
@@ -161,7 +157,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | E4 | TASK-237 | 2026-11-23 (#759, CI green incl. menu e2e) | 2026-11-23 (#759, 9fcc6b20) | 2026-11-23 (~18:02 UTC) | 2026-11-23 (health ok, /login 200, hub pages 307 to /login signed out, no web errors; the Money page queries run read-only on production) |
 | E5 | TASK-239 | 2026-11-23 (#760, #761, CI green incl. phone and sections e2e) | 2026-11-23 (#760 c2e76d6a, #761 7cb13859) | 2026-11-23 (~18:54, ~19:17 UTC) | 2026-11-23 (health ok, /login 200, job page 307 signed out, no web errors) |
 | E6 | TASK-240 | 2026-11-23 (#762, CI green incl. progress-line e2e) | 2026-11-23 (#762, a4a6aaa4) | 2026-11-23 (~19:56 UTC) | 2026-11-23 (health ok, /login 200, customer page 307 signed out, no web errors; loader SQL run read-only on production) |
-| I0 | Backlog TASK-246..255 + Track I | | | | |
+| I0 | Backlog TASK-246..255 + Track I | 2026-11-24 (#775, CI green) | 2026-11-24 (#775, 2b47f648) | n/a | n/a |
 | I1 | TASK-246 | | | | |
 | I2 | TASK-247 | | | | |
 | I3 | TASK-251 | | | | |
