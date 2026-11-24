@@ -19,17 +19,15 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : B5 TASK-194 Verified: #764 (d1fdba88) deployed
-                      ~23:25 UTC 2026-11-23, no migration. Health ok,
-                      /login 200, send 401 unauth, no web errors; 17 sent
-                      estimates have no snapshot (show "Hours not
-                      recorded"), totals unchanged; prod has 0 drafts.
-In-flight PR        : B6 TASK-195 (review rewrite), branch
-                      task/195-review-rewrite; no migration (review_result
-                      columns are migration 209).
-Next step           : B6 TASK-195 merge, deploy, verify.
+Last step           : B6 TASK-195 Verified: #766 (f151f04e) deployed
+                      ~00:34 UTC 2026-11-24, no migration. Health ok,
+                      /login 200, review 401 unauth, no web errors, AI key
+                      set; 0 of 47 estimates have a stored review (no
+                      review runs on page open). Track B complete.
+In-flight PR        : none
+Next step           : C1 TASK-210 (price observation ledger; needs B1).
 Blocked on          : nothing
-Last known-good     : d1fdba88 (deploy-good/a4a6aaa4 before it)
+Last known-good     : f151f04e (deploy-good/d1fdba88 before it)
 Notes               : Main checkout holds another session's uncommitted
                       drafts of TASK-235..240 (duplicates of #755); left
                       untouched. Owner checks after deploy (non-blocking):
@@ -128,7 +126,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | B3 | TASK-192 | 2026-10-27 (CI 40437008165, 40437011775, #728) | 2026-10-27 (#728, 2842780e) | 2026-10-27 (~02:32 UTC) | 2026-10-27 (equipment cost apart, 02:33 UTC) |
 | B4 | TASK-193 | PR 1 2026-10-31 (#743, CI green) | PR 1 2026-10-31 (#743, 8f158a7a) | PR 1 2026-10-31 (~19:13 UTC) | PR 1 2026-10-31 (health ok, /login 200, rates API 401 unauth); PR 2 2026-10-31 (#745, 6cbce4d3; deployed, verified) |
 | B5 | TASK-194 | 2026-11-23 (#764, CI green) | 2026-11-23 (#764, d1fdba88) | 2026-11-23 (~23:25 UTC) | 2026-11-23 (health ok, /login 200, sent estimates unchanged, no snapshots on old quotes) |
-| B6 | TASK-195 | | | | |
+| B6 | TASK-195 | 2026-11-24 (#766, CI green) | 2026-11-24 (#766, f151f04e) | 2026-11-24 (~00:34 UTC) | 2026-11-24 (health ok, /login 200, review 401 unauth, no stored reviews from page opens) |
 | C1 | TASK-210 | | | | |
 | C2 | TASK-211 | | | | |
 | C3 | TASK-212 | | | | |
@@ -697,6 +695,9 @@ Per step:
 
 ## Log
 
+- 2026-11-24 · B6 · Verified · health ok, /login 200, review 401 unauth, no web errors, 0 stored reviews (page open runs none); Track B complete
+- 2026-11-24 · B6 · Deployed · f151f04e · ~00:34 UTC, no migration; known-good deploy-good/d1fdba88
+- 2026-11-24 · B6 · Merged · #766 · squash f151f04e; Codex findings fixed before merge (panel follows in-page edits; option quotes reviewed by their own lines)
 - 2026-11-23 · B6 · In progress · TASK-195: review input = baseline + lines + prepared gaps + Settings rates; button-only, stored in review_result; Zod-validated; cut-off/refusal are errors; model unchanged
 - 2026-11-23 · B5 · Verified · health ok, /login 200, send 401 unauth, no web errors, 17 old sent estimates without snapshot (Hours not recorded), totals unchanged
 - 2026-11-23 · B5 · Deployed · d1fdba88 · ~23:25 UTC, no migration; known-good deploy-good/a4a6aaa4
