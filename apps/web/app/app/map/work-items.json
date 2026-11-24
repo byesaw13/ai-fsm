@@ -100,5 +100,10 @@
   { "id": "TASK-055", "title": "Operational intelligence", "branch": "floor", "status": "backlog", "phase": "Phase 4", "fit": "Profit figures driving automation. It stays under the floor so it is not mistaken for a step of a job." },
   { "id": "TASK-036", "title": "A gatekeeper on pull requests", "branch": "floor", "status": "deferred", "phase": "Cross-cutting", "fit": "Out of scope until it is proven in daily use." },
   { "id": "TASK-048", "title": "Confidence engine", "branch": "floor", "status": "deferred", "phase": "Phase 4", "fit": "A scorer for production intelligence. Deferred." },
-  { "id": "TASK-207", "title": "Password changes are recorded", "branch": "floor", "status": "backlog", "phase": "Cross-cutting", "fit": "You can tell when a password was changed. Plumbing, not a job step." }
+  { "id": "TASK-207", "title": "Password changes are recorded", "branch": "floor", "status": "backlog", "phase": "Cross-cutting", "fit": "You can tell when a password was changed. Plumbing, not a job step." },
+  { "id": "TASK-241", "title": "The prototype look on every screen", "branch": "floor", "status": "backlog", "phase": "Cross-cutting", "fit": "Cream, navy and orange from your brand, and money in a font that lines up. Every screen, no layout change." },
+  { "id": "TASK-242", "title": "A job is one page with tabs", "branch": "job", "status": "backlog", "phase": "Cross-cutting", "fit": "Estimate, visits, invoice, costs and history on the job itself, so you never leave it to follow one job." },
+  { "id": "TASK-243", "title": "Today as a list of sentences", "branch": "desk", "status": "backlog", "phase": "Cross-cutting", "fit": "Each row says what to do, for whom and how much, and opens the place to do it." },
+  { "id": "TASK-244", "title": "Property page in four parts", "branch": "house", "status": "backlog", "phase": "Cross-cutting", "fit": "Jobs, people, and access notes first; history, health and vault one tap away." },
+  { "id": "TASK-245", "title": "Intake that finds who you already have", "branch": "request", "status": "backlog", "phase": "Cross-cutting", "fit": "As you type a phone or street it offers the person or house you already have, so no duplicates." }
 ]
