@@ -1,7 +1,7 @@
 # TASK-241: The app wears the prototype's look
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-006 Role-Based Workspaces

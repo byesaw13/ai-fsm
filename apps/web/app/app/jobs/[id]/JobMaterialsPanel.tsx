@@ -3,6 +3,7 @@ import type { Route } from "next";
 import { formatCents } from "@ai-fsm/money";
 import { formatLineQuantityDisplay } from "@/lib/invoices/quantity";
 import type { JobMaterialExpenseWithLines } from "@/lib/invoices/job-expenses";
+import { Money } from "@/components/ui/Money";
 
 interface Props {
   expenses: JobMaterialExpenseWithLines[];
@@ -37,7 +38,7 @@ export function JobMaterialsPanel({ expenses }: Props) {
                 {expense.vendor_name}
               </Link>
               <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
-                {formatCents(expense.amount_cents)}
+                <Money>{formatCents(expense.amount_cents)}</Money>
               </span>
             </div>
             <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: "2px" }}>
@@ -64,8 +65,8 @@ export function JobMaterialsPanel({ expenses }: Props) {
               <ul style={{ margin: "6px 0 0", paddingLeft: "1rem", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
                 {expense.line_items.map((li) => (
                   <li key={li.id}>
-                    {li.name} · {formatLineQuantityDisplay(li.quantity)} × {formatCents(li.unit_cost_cents)} ={" "}
-                    {formatCents(li.line_total_cents)}
+                    {li.name} · {formatLineQuantityDisplay(li.quantity)} × <Money>{formatCents(li.unit_cost_cents)}</Money> ={" "}
+                    <Money>{formatCents(li.line_total_cents)}</Money>
                   </li>
                 ))}
               </ul>

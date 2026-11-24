@@ -21,6 +21,7 @@ import { hoursSourceLabel, kindLabel, methodLabel, quantityLabel, tmRangeLabel, 
 import { QuoteSaveAlert } from "@/components/QuoteSaveAlert";
 import { quoteSaveOffersReload, rememberQuoteVersion, useQuoteVersion } from "@/components/QuoteVersion";
 import { PreparedOptionsEditor } from "@/components/features/estimates/PreparedOptionsEditor";
+import { Money } from "@/components/ui/Money";
 
 interface Props {
   estimateId: string;
@@ -322,12 +323,12 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
                   </span>
                   {flags && <span style={{ ...label, display: "block", color: "var(--warning, var(--fg))" }}>{flags}</span>}
                 </span>
-                <span style={{ textAlign: "right" }}>{formatCents(area.labor_cents)}</span>
+                <span style={{ textAlign: "right" }}><Money>{formatCents(area.labor_cents)}</Money></span>
                 <span style={{ textAlign: "right" }}>
-                  {formatCents(area.materials_cents)}
+                  <Money>{formatCents(area.materials_cents)}</Money>
                   <span style={{ ...label, display: "block" }}>{area.materials_itemized ? "itemized" : "allowance"}</span>
                 </span>
-                <span style={{ textAlign: "right", fontWeight: 600 }}>{formatCents(area.total_cents)}</span>
+                <span style={{ textAlign: "right", fontWeight: 600 }}><Money>{formatCents(area.total_cents)}</Money></span>
               </button>
               {open && (
                 <div style={{ paddingBottom: "var(--space-2)" }}>
@@ -403,9 +404,9 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
         })}
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "var(--space-3)", borderTop: "2px solid var(--border)", padding: "var(--space-2) 0", fontWeight: 600 }}>
           <span>Total</span>
-          <span style={{ textAlign: "right" }}>{formatCents(areas.labor_cents)}</span>
-          <span style={{ textAlign: "right" }}>{formatCents(areas.materials_cents)}</span>
-          <span style={{ textAlign: "right" }} data-testid="work-area-total">{formatCents(areas.total_cents)}</span>
+          <span style={{ textAlign: "right" }}><Money>{formatCents(areas.labor_cents)}</Money></span>
+          <span style={{ textAlign: "right" }}><Money>{formatCents(areas.materials_cents)}</Money></span>
+          <span style={{ textAlign: "right" }} data-testid="work-area-total"><Money>{formatCents(areas.total_cents)}</Money></span>
         </div>
         {poolable.length > 0 && (
           <div style={{ padding: "var(--space-2) 0" }} data-testid="pool-paint">
@@ -483,7 +484,7 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
               )}
               {proposedAreas && (
                 <p style={{ margin: "0 0 var(--space-2)", fontWeight: 600 }}>
-                  Total {formatCents(areas.total_cents)} → {formatCents(proposedAreas.total_cents)}
+                  Total <Money>{formatCents(areas.total_cents)}</Money> → <Money>{formatCents(proposedAreas.total_cents)}</Money>
                 </p>
               )}
               <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
@@ -572,10 +573,10 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
             <table style={{ width: "100%", marginTop: "var(--space-2)", fontSize: "var(--text-sm)" }}>
               <tbody>
                 <tr><td>{pricing.mode === "fixed" ? "Fixed price" : `T&M at ${fmtHours(profit.expected_hours)} h`}</td><td style={{ textAlign: "right" }}>{profit.sell_cents === null ? "—" : formatCents(profit.sell_cents)}</td></tr>
-                <tr><td>Labor cost ({fmtHours(profit.expected_hours)} h × {formatCents(laborCostCents)})</td><td style={{ textAlign: "right" }}>−{formatCents(profit.labor_cost_cents)}</td></tr>
-                <tr><td>Materials</td><td style={{ textAlign: "right" }}>−{formatCents(profit.materials_cents)}</td></tr>
-                <tr><td>Overhead</td><td style={{ textAlign: "right" }}>−{formatCents(profit.overhead_cents)}</td></tr>
-                <tr><td>Reserve ({pricing.reserve_pct}% of {formatCents(profit.modeled_cost_cents)})</td><td style={{ textAlign: "right" }}>−{formatCents(profit.reserve_cents)}</td></tr>
+                <tr><td>Labor cost ({fmtHours(profit.expected_hours)} h × <Money>{formatCents(laborCostCents)}</Money>)</td><td style={{ textAlign: "right" }}>−<Money>{formatCents(profit.labor_cost_cents)}</Money></td></tr>
+                <tr><td>Materials</td><td style={{ textAlign: "right" }}>−<Money>{formatCents(profit.materials_cents)}</Money></td></tr>
+                <tr><td>Overhead</td><td style={{ textAlign: "right" }}>−<Money>{formatCents(profit.overhead_cents)}</Money></td></tr>
+                <tr><td>Reserve ({pricing.reserve_pct}% of <Money>{formatCents(profit.modeled_cost_cents)}</Money>)</td><td style={{ textAlign: "right" }}>−<Money>{formatCents(profit.reserve_cents)}</Money></td></tr>
                 <tr style={{ fontWeight: 600 }}><td>Modeled remainder</td><td style={{ textAlign: "right" }}>{profit.remainder_cents === null ? "—" : formatCents(profit.remainder_cents)}{profit.margin_pct === null ? "" : ` (${profit.margin_pct}%)`}</td></tr>
               </tbody>
             </table>
@@ -635,7 +636,7 @@ function MaterialsList({
   const total = list.lines.reduce((s, l) => s + (materialLineCents(l) ?? 0), 0);
   return (
     <div style={{ paddingLeft: "var(--space-5)", marginTop: "var(--space-2)" }} data-testid="materials-list">
-      <span style={{ ...label, fontWeight: 600 }}>Materials · {formatCents(total)}</span>
+      <span style={{ ...label, fontWeight: 600 }}>Materials · <Money>{formatCents(total)}</Money></span>
       {stale && <span style={{ ...label, display: "block" }}>Made before the tasks changed. Itemize again to update it.</span>}
       {list.lines.map((l) => (
         <div key={l.id} style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end", flexWrap: "wrap", marginTop: "var(--space-1)" }}>

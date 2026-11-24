@@ -3,6 +3,7 @@ import type { RoomSpec, Role } from "@ai-fsm/domain";
 import type { AiMaterialsDeltaItem as AiMaterialsDeltaEntry } from "@/lib/estimates/materials-delta";
 import { formatDollars } from "../format";
 import type { EstimateRow } from "../detail-data";
+import { Money } from "@/components/ui/Money";
 
 interface Props {
   estimate: EstimateRow;
@@ -39,16 +40,16 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
       {/* Money anchor: total quote */}
       <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flexWrap: "wrap", margin: "var(--space-2) 0 var(--space-1)" }}>
         <span data-testid="estimate-total" style={{ fontSize: "var(--text-3xl, 1.875rem)", fontWeight: 800, letterSpacing: "-0.02em" }}>
-          {formatDollars(estimate.total_cents)}
+          <Money>{formatDollars(estimate.total_cents)}</Money>
         </span>
         {estimate.deposit_cents > 0 && (
           <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, padding: "3px 10px", borderRadius: 99, background: "color-mix(in srgb, var(--accent) 10%, transparent)", color: "var(--accent)", whiteSpace: "nowrap" }}>
-            Deposit {formatDollars(estimate.deposit_cents)}
+            Deposit <Money>{formatDollars(estimate.deposit_cents)}</Money>
           </span>
         )}
         {estimate.balance_cents > 0 && (
           <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, padding: "3px 10px", borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--fg-secondary)", whiteSpace: "nowrap" }}>
-            Balance {formatDollars(estimate.balance_cents)}
+            Balance <Money>{formatDollars(estimate.balance_cents)}</Money>
           </span>
         )}
       </div>
@@ -82,23 +83,23 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--space-2)" }}>
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Direct Labor Cost</span>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}>{formatDollars(laborCostCents)}</p>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{effectiveHours} hrs @ {formatDollars(laborCostRateCents)}/hr</span>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}><Money>{formatDollars(laborCostCents)}</Money></p>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{effectiveHours} hrs @ <Money>{formatDollars(laborCostRateCents)}</Money>/hr</span>
             </div>
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Material Cost Basis</span>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}>{formatDollars(materialCostCents)}</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}><Money>{formatDollars(materialCostCents)}</Money></p>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>+15% handling ({formatDollars(materialHandlingCents)})</span>
             </div>
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Total Direct Job Cost</span>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}>{formatDollars(totalDirectCostCents)}</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}><Money>{formatDollars(totalDirectCostCents)}</Money></p>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Labor + Materials</span>
             </div>
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Gross Profit ($)</span>
               <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)", color: grossProfitCents > 0 ? "var(--status-success)" : "var(--status-error)" }}>
-                {formatDollars(grossProfitCents)}
+                <Money>{formatDollars(grossProfitCents)}</Money>
               </p>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{grossMarginPct}% of Estimate</span>
             </div>
@@ -117,20 +118,20 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
             {/* Fixed Rate Column */}
             <div style={{ padding: "var(--space-2)", borderRadius: 6, border: "1px solid var(--accent)", background: "color-mix(in srgb, var(--accent) 4%, transparent)" }}>
               <span style={{ fontWeight: 700, fontSize: "var(--text-xs)", color: "var(--accent)" }}>📌 FIXED RATE (Current Estimate)</span>
-              <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}>{formatDollars(totalQuoteCents)}</p>
-              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong>{formatDollars(grossProfitCents)}</strong> ({grossMarginPct}% margin)</p>
+              <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}><Money>{formatDollars(totalQuoteCents)}</Money></p>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong><Money>{formatDollars(grossProfitCents)}</Money></strong> ({grossMarginPct}% margin)</p>
             </div>
 
             {/* T&M Column */}
             <div style={{ padding: "var(--space-2)", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg)" }}>
               <span style={{ fontWeight: 700, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>⏱️ T&amp;M ESTIMATE (Est {tmEstimatedLaborHrs} hrs)</span>
-              <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}>{formatDollars(tmTotalQuoteCents)}</p>
-              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong>{formatDollars(tmGrossProfitCents)}</strong> ({tmGrossMarginPct}% margin)</p>
+              <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}><Money>{formatDollars(tmTotalQuoteCents)}</Money></p>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong><Money>{formatDollars(tmGrossProfitCents)}</Money></strong> ({tmGrossMarginPct}% margin)</p>
             </div>
           </div>
 
           <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-secondary)" }}>
-            💡 <strong>Recommendation:</strong> Fixed Rate yields {formatDollars(grossProfitCents - tmGrossProfitCents)} additional margin while giving the customer an exact guaranteed price.
+            💡 <strong>Recommendation:</strong> Fixed Rate yields <Money>{formatDollars(grossProfitCents - tmGrossProfitCents)}</Money> additional margin while giving the customer an exact guaranteed price.
           </p>
         </div>
       )}
@@ -216,7 +217,7 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
             {(estimate.travel_surcharge_cents > 0 || estimate.risk_adjustment_cents > 0) && (
               <p>
                 <strong>Adjustments:</strong>{" "}
-                {formatDollars(estimate.travel_surcharge_cents + estimate.risk_adjustment_cents)}
+                <Money>{formatDollars(estimate.travel_surcharge_cents + estimate.risk_adjustment_cents)}</Money>
               </p>
             )}
             {estimate.minimum_service_override_reason && (

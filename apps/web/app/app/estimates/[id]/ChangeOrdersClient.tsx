@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { Money } from "@/components/ui/Money";
 
 interface LineItem {
   id?: string;
@@ -255,7 +256,7 @@ export function ChangeOrdersClient({ estimateId, initialChangeOrders }: ChangeOr
                   />
                 </div>
                 <div style={{ textAlign: "right", fontSize: "var(--text-sm)", fontWeight: 600, minWidth: 80 }}>
-                  {formatDollars(item.quantity * item.unit_price_cents)}
+                  <Money>{formatDollars(item.quantity * item.unit_price_cents)}</Money>
                 </div>
                 {lineItems.length > 1 && (
                   <button
@@ -344,7 +345,7 @@ export function ChangeOrdersClient({ estimateId, initialChangeOrders }: ChangeOr
                   >
                     {statusLabels[co.status] ?? co.status}
                   </span>
-                  <span style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}>{formatDollars(co.total_cents)}</span>
+                  <span style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}><Money>{formatDollars(co.total_cents)}</Money></span>
                 </div>
               </div>
 
@@ -355,10 +356,10 @@ export function ChangeOrdersClient({ estimateId, initialChangeOrders }: ChangeOr
                       <tr key={item.id ?? i} style={{ borderBottom: "1px solid var(--border)" }}>
                         <td style={{ padding: "4px 0" }}>{item.description}</td>
                         <td style={{ padding: "4px 0", textAlign: "right", color: "var(--fg-muted)" }}>
-                          {item.quantity} × {formatDollars(item.unit_price_cents)}
+                          {item.quantity} × <Money>{formatDollars(item.unit_price_cents)}</Money>
                         </td>
                         <td style={{ padding: "4px 0", textAlign: "right", fontWeight: 600 }}>
-                          {formatDollars(item.total_cents ?? item.quantity * item.unit_price_cents)}
+                          <Money>{formatDollars(item.total_cents ?? item.quantity * item.unit_price_cents)}</Money>
                         </td>
                       </tr>
                     ))}

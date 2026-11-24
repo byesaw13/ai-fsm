@@ -1,7 +1,7 @@
 import "./globals.css";
 import "./styles/brand.css";
 import type { Metadata, Viewport } from "next";
-import { Archivo } from "next/font/google";
+import { Archivo, DM_Mono } from "next/font/google";
 import { ServiceWorkerRegistrar } from "./ServiceWorkerRegistrar";
 
 // Archivo — matches the Dovetails marketing site (mydovetails-site uses
@@ -11,6 +11,14 @@ const archivo = Archivo({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-archivo",
+});
+
+// DM Mono — money amounts and counts, so figures line up (TASK-241).
+const dmMono = DM_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
+  variable: "--font-dm-mono",
 });
 
 export const metadata: Metadata = {
@@ -30,7 +38,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={archivo.variable}>
+    <html lang="en" className={`${archivo.variable} ${dmMono.variable}`}>
       <body>
         {children}
         <ServiceWorkerRegistrar />

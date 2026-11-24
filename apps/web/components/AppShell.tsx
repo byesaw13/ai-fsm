@@ -270,13 +270,13 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
           <div style={{ position: "relative" }}>
             <Link href={homeHref as Route} className="p7-sidebar-brand">
               <div className="p7-brand-logo" aria-hidden="true">
-                <Logo variant="icon" height={29} alt="" />
+                <Logo variant="icon" tone="reverse" height={29} alt="" />
               </div>
               <span className="p7-brand-name">Dovetails</span>
             </Link>
             {isAdminOrOwner && !collapsed && (
               <div style={{ position: "absolute", top: 10, right: 40, zIndex: 2 }}>
-                <AttentionBell summary={attention} onChanged={() => void refreshAttention()} />
+                <AttentionBell summary={attention} onChanged={() => void refreshAttention()} onDark />
               </div>
             )}
             <button
@@ -290,12 +290,16 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
             </button>
           </div>
 
-          <div style={{ display: "flex", gap: 8, padding: collapsed ? "0 8px" : "0 0 4px", alignItems: "center" }}>
-            <FindButton testId="command-palette-open" />
+          <div style={{ display: "flex", gap: 8, padding: collapsed ? "8px 8px 0" : "12px 12px 0", alignItems: "center" }}>
+            <FindButton testId="command-palette-open" onDark />
           </div>
 
           {/* The one New button (TASK-236) — owner/admin only */}
-          {isAdminOrOwner && <NewButton placement="sidebar" />}
+          {isAdminOrOwner && (
+            <div style={{ padding: collapsed ? "0 8px" : "0 12px" }}>
+              <NewButton placement="sidebar" />
+            </div>
+          )}
 
           {/* Scrollable nav sections */}
           <nav className="p7-nav" aria-label="Primary navigation">
@@ -574,7 +578,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
   );
 }
 
-function FindButton({ testId }: { testId?: string }) {
+function FindButton({ testId, onDark = false }: { testId?: string; onDark?: boolean }) {
   return (
     <button
       type="button"
@@ -588,9 +592,10 @@ function FindButton({ testId }: { testId?: string }) {
         gap: 6,
         padding: "6px 10px",
         borderRadius: 6,
-        border: "1px solid var(--border)",
-        background: "var(--bg-card)",
-        color: "var(--fg-muted)",
+        border: onDark ? "1px solid var(--sidebar-line)" : "1px solid var(--border)",
+        background: onDark ? "var(--sidebar-hover-bg)" : "var(--bg-card)",
+        color: onDark ? "var(--sidebar-fg)" : "var(--fg-muted)",
+        width: onDark ? "100%" : undefined,
         fontSize: 13,
         fontWeight: 600,
         cursor: "pointer",

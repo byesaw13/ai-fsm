@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { formatCents } from "@ai-fsm/money";
+import { Money } from "@/components/ui/Money";
 
 export type TimelineEventType = "visit" | "estimate" | "invoice" | "payment" | "work_order" | "vault_item" | "membership" | "photo" | "issue" | "note";
 
@@ -117,7 +118,7 @@ export function PropertyTimeline({ events }: { events: TimelineEvent[] }) {
                 </span>
                 {event.total_cents != null && (
                   <span style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--fg-secondary)" }}>
-                    {formatCents(event.total_cents)}
+                    <Money>{formatCents(event.total_cents)}</Money>
                   </span>
                 )}
               </div>

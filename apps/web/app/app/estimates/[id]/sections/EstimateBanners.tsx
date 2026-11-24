@@ -3,6 +3,7 @@ import { CreateJobFromEstimateButton } from "../CreateJobFromEstimateButton";
 import { EstimateConvertButton } from "../EstimateConvertButton";
 import { formatDollars } from "../format";
 import type { EstimateRow, EstimateInvoiceRow } from "../detail-data";
+import { Money } from "@/components/ui/Money";
 
 interface Props {
   estimate: EstimateRow;
@@ -88,13 +89,13 @@ export function EstimateBanners({
               {depositInvoice && (
                 <Link href={`/app/invoices/${depositInvoice.id}`} style={{ color: "#065f46", textDecoration: "none" }} data-testid="deposit-invoice-link">
                   <strong>Deposit invoice</strong> {depositInvoice.invoice_number} ·{" "}
-                  {formatDollars(depositInvoice.total_cents)} · {depositInvoice.status} →
+                  <Money>{formatDollars(depositInvoice.total_cents)}</Money> · {depositInvoice.status} →
                 </Link>
               )}
               {finalInvoice ? (
                 <Link href={`/app/invoices/${finalInvoice.id}`} style={{ color: "#065f46", textDecoration: "none" }} data-testid="final-invoice-link">
                   <strong>Final invoice</strong> {finalInvoice.invoice_number} · balance{" "}
-                  {formatDollars(finalInvoice.balance_cents)} · {finalInvoice.status} →
+                  <Money>{formatDollars(finalInvoice.balance_cents)}</Money> · {finalInvoice.status} →
                 </Link>
               ) : (
                 <span style={{ color: "#065f46", opacity: 0.8 }}>

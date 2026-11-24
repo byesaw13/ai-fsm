@@ -89,6 +89,7 @@ import {
   truncateTaskChipLabel,
   type VisitPlanDay,
 } from "@/lib/jobs/project-board";
+import { Money } from "@/components/ui/Money";
 
 export const dynamic = "force-dynamic";
 
@@ -1669,7 +1670,7 @@ export default async function JobDetailPage({
                         Labor est → actual
                       </span>
                       <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                        {formatCents(estimatedLaborCents)} → {formatCents(laborMargin.actualLaborCostCents)}
+                        <Money>{formatCents(estimatedLaborCents)}</Money> → <Money>{formatCents(laborMargin.actualLaborCostCents)}</Money>
                       </span>
                       <span
                         style={{
@@ -1711,13 +1712,13 @@ export default async function JobDetailPage({
                     {laborMargin.actualLaborCostCents !== null && (
                       <div className="p7-detail-row" data-testid="actual-labor-cost">
                         <dt>Actual Labor Cost</dt>
-                        <dd>{formatCents(laborMargin.actualLaborCostCents)}</dd>
+                        <dd><Money>{formatCents(laborMargin.actualLaborCostCents)}</Money></dd>
                       </div>
                     )}
                     {estimatedLaborCents !== null && (
                       <div className="p7-detail-row">
                         <dt>Est. Labor Cost</dt>
-                        <dd>{formatCents(estimatedLaborCents)}</dd>
+                        <dd><Money>{formatCents(estimatedLaborCents)}</Money></dd>
                       </div>
                     )}
                     {materialsForPnl.source === "receipts" && materialsForPnl.materialsCents > 0 && (
@@ -1736,7 +1737,7 @@ export default async function JobDetailPage({
                         <div className="p7-detail-row" style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-1)" }}>
                           <dt>Total Cost</dt>
                           <dd>
-                            {formatCents(costCents)}
+                            <Money>{formatCents(costCents)}</Money>
                             {laborMargin.source === "tracked" && (
                               <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 6 }}>
                                 uses actual labor
