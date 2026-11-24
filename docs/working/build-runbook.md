@@ -66,6 +66,7 @@ this one, as an approval.
 | G4 | Any database restore or data repair on production | Ask every time | |
 | G6 | TASK-225 table-freeze exception (one nullable column for chosen add-ons) | Approved 2026-10-31 | Owner in session: "approve both, use craftsman factors, start TASK-227", answering (1) TASK-225's one new column and (2) TASK-228's factors. |
 | G8 | Track E: build TASK-235 to TASK-240 in the order and with the decisions in "Plan: Track E", merging and deploying under G0 | **Active** 2026-11-23 | Owner comment on PR #755 at 2026-11-23 15:06 UTC, from `byesaw13`: `I approve Track E as described in docs/working/build-runbook.md` (issuecomment-7105048753). |
+| G9 | Track I: build TASK-246 to TASK-255 in the order and with the gates in "Plan: Track I", merging and deploying under G0 | Pending | |
 | G7 | TASK-228 height factors: Craftsman ×1.23 (9–13 ft), ×1.46 (13–17 ft), ×1.69 (17–19 ft), ×1.92 (19–21 ft) | Approved 2026-10-31 | Same session answer as G6. |
 
 **Without G0 active** the agent works in "PRs only" mode: it builds, tests and
@@ -160,6 +161,17 @@ docs-only commit after the event. Planned tests are not passing tests.
 | E4 | TASK-237 | 2026-11-23 (#759, CI green incl. menu e2e) | 2026-11-23 (#759, 9fcc6b20) | 2026-11-23 (~18:02 UTC) | 2026-11-23 (health ok, /login 200, hub pages 307 to /login signed out, no web errors; the Money page queries run read-only on production) |
 | E5 | TASK-239 | 2026-11-23 (#760, #761, CI green incl. phone and sections e2e) | 2026-11-23 (#760 c2e76d6a, #761 7cb13859) | 2026-11-23 (~18:54, ~19:17 UTC) | 2026-11-23 (health ok, /login 200, job page 307 signed out, no web errors) |
 | E6 | TASK-240 | 2026-11-23 (#762, CI green incl. progress-line e2e) | 2026-11-23 (#762, a4a6aaa4) | 2026-11-23 (~19:56 UTC) | 2026-11-23 (health ok, /login 200, customer page 307 signed out, no web errors; loader SQL run read-only on production) |
+| I0 | Backlog TASK-246..255 + Track I | | | | |
+| I1 | TASK-246 | | | | |
+| I2 | TASK-247 | | | | |
+| I3 | TASK-251 | | | | |
+| I4 | TASK-249 | | | | |
+| I5 | TASK-250 | | | | |
+| I6 | TASK-248 | | | | |
+| I7 | TASK-252 | | | | |
+| I8 | TASK-255 | | | | |
+| I9 | TASK-253 | | | | |
+| I10 | TASK-254 | | | | |
 | D5 | TASK-228 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC) | 2026-10-31 (health ok, /login 200) |
 
 ## Operating rules
@@ -389,6 +401,26 @@ menu, the shortcut lists and their tests:
 - **E4** TASK-237 Shorter menu, Money on one page (needs E1, E3).
 - **E5** TASK-239 Job page leads with one next step (needs E1; two PRs).
 - **E6** TASK-240 Progress line (needs E5).
+
+### Track I: one writer per record (plan: "Plan: Track I")
+
+Proposed 2026-11-24 after a whole-repo audit for duplicate code paths; the
+owner agreed with every finding in session ("im on board with all of it").
+Money paths first. Track I starts only when G9 is Active, then runs ahead of
+the remaining B, C and F steps. One step at a time, in this order:
+
+- **I0** Backlog TASK-246 to TASK-255 and this track (docs only).
+- **I1** TASK-246 Payment delete through the trigger (migration).
+- **I2** TASK-247 One invoice writer (needs I1).
+- **I3** TASK-251 Invoice lock rules in one place (migration; needs I2).
+- **I4** TASK-249 No duplicate customers (owner gate before the index).
+- **I5** TASK-250 One job writer, always with a property (needs I4).
+- **I6** TASK-248 One estimate save payload (needs TASK-223 PR 2 merged; skip
+  and come back if it is not).
+- **I7** TASK-252 The job page works out where a job stands once.
+- **I8** TASK-255 Shared helper cleanup.
+- **I9** TASK-253 Estimate starts (owner gate after the usage table).
+- **I10** TASK-254 Print shows the PDF (owner gate first).
 
 Not in this runbook: TASK-183 (deferred until Good/Better/Best is used) and
 the Phase 4 items in `docs/canonical/ROADMAP.md`.
@@ -695,6 +727,58 @@ Per step:
   action that existed before and where it lives now.
 - **E6 · TASK-240.** A pure step-derivation function with unit tests and one
   small component, in the job header from E5 and on `app/app/clients/[id]`.
+
+## Plan: Track I
+
+Breadcrumbs for whoever continues. The task files hold scope and acceptance
+criteria; this section holds the rest.
+
+All steps:
+
+- The rule for every step: one function owns the write, every caller uses it,
+  and the copies are deleted in the same PR. Behavior the owner sees does not
+  change unless the task says so.
+- Steps with a migration (I1, I3, I4 index, I8 index drop) take a verified
+  backup before deploy, the same as C2.
+- Any query that finds bad rows (duplicate invoices in I2, duplicate customers
+  in I4, jobs without a property in I5) goes in the PR as a read-only result.
+  Fixing those rows is a data repair: G4, ask every time. It does not block the
+  code change.
+- Post-deploy check for every step: health ok, `/login` 200, changed staff
+  routes 307 to `/login` signed out, plus the step's own check below.
+
+Per step:
+
+- **I1 · TASK-246.** New migration redefining `sync_invoice_on_payment` from
+  192 with `TG_OP = 'DELETE'` handling (`OLD.invoice_id`, `RETURN OLD`) and the
+  route's zero-payments rule; trigger `AFTER INSERT OR DELETE OR UPDATE OF
+  status, amount_cents`. Then strip the recalculation from
+  `app/api/v1/payments/[id]/route.ts`. Check: one production invoice with
+  payments shows the same paid total after deploy.
+- **I2 · TASK-247.** Start from the convert route (it has the fullest
+  insert), extract `lib/invoices/create-invoice.ts`, then move callers one at
+  a time: convert, `final-invoice.ts`, `approve.ts`, deposit route, progress
+  route, manual route. Integration test for convert-after-manual first (it
+  fails today).
+- **I3 · TASK-251.** Diff the function bodies in 112 → 194 to name each
+  exception; the new migration must be behavior-identical to 194.
+- **I4 · TASK-249.** PR 1: lookup in client create and quick-book, plus the
+  duplicate query. Stop and ask the owner to resolve duplicates (G4). PR 2:
+  normalized column + unique partial index.
+- **I5 · TASK-250.** Extract from `lib/intake/records.ts` (it already handles
+  property). SMS with no known property creates a request.
+- **I6 · TASK-248.** Write the round-trip unit test first against the edit
+  form's current body; it should fail on TASK-232 and TASK-233 cases.
+- **I7 · TASK-252.** Pin current output with a table test over every state in
+  the TASK-239/240 tests before changing anything. If TASK-242 (job page tabs)
+  is in flight, rebase on it.
+- **I8 · TASK-255.** Formatters and shims first (no risk), then the package
+  fold (update `pnpm-workspace`, tsconfig paths, the worker and
+  `email-templates` imports), then the index drop, then the my-day move.
+- **I9 · TASK-253.** The usage query needs a way to tell starts apart; if
+  estimates do not record it, say so in the PR and ask the owner instead.
+- **I10 · TASK-254.** Ask first; do nothing until the owner says the PDF is
+  fine for office printing.
 
 ## Log
 
