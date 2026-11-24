@@ -1,7 +1,7 @@
 # TASK-247: One function creates invoices, with one set of duplicate rules
 
 Status:
-In Progress
+Done
 
 Epic:
 EPIC-004 Billing & Profitability
@@ -34,9 +34,9 @@ Out of scope:
 - Merging existing duplicate invoices (list any found in the PR for the owner; G4).
 
 Acceptance Criteria:
-- [ ] `rg "INSERT INTO invoices\b" apps/web services` finds one hit.
-- [ ] Convert on a job that already has a non-void standard invoice returns that invoice and creates none.
-- [ ] A voided deposit does not block a new deposit invoice from approval or from the job page.
+- [x] `rg "INSERT INTO invoices\b" apps/web services` finds one hit.
+- [x] Convert on a job that already has a non-void standard invoice returns that invoice and creates none.
+- [x] A voided deposit does not block a new deposit invoice from approval or from the job page.
 
 Test Plan:
 - Unit/integration: each kind's duplicate rule; the convert-after-manual case.
