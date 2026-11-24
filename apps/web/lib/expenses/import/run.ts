@@ -15,6 +15,7 @@ import { findOrCreateVariant, recordObservations, type NewObservation } from "@/
 import {
   classifyTrip,
   expenseDateKey,
+  normalizeTxnId,
   vendorFamily,
   type ExpenseFingerprint,
   type ReviewReason,
@@ -54,13 +55,27 @@ export type TripPlan =
   | { action: "link"; matchId: string }
   | { action: "import" };
 
-/** Existing expenses on the dates a file covers. */
+/**
+ * Imports and review confirmations for one account run one at a time, so two
+ * overlapping commits of the same file can never both book a trip.
+ */
+export async function lockAccountImports(client: PoolClient, accountId: string): Promise<void> {
+  await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`purchase-import:${accountId}`]);
+}
+
+/**
+ * Existing expenses a file's trips could match: everything on the file's dates,
+ * plus any expense sharing one of its transaction IDs on another date (a
+ * conflicting transaction ID).
+ */
 export async function loadExpenseFingerprints(
   client: PoolClient,
   accountId: string,
-  dates: string[],
+  trips: Pick<ImportTrip, "date" | "external_ref">[],
 ): Promise<ExpenseFingerprint[]> {
-  if (dates.length === 0) return [];
+  const dates = [...new Set(trips.map((t) => t.date))];
+  const txns = [...new Set(trips.map((t) => normalizeTxnId(t.external_ref)).filter((x): x is string => !!x))];
+  if (dates.length === 0 && txns.length === 0) return [];
   const { rows } = await client.query<{
     id: string;
     vendor_name: string;
@@ -72,8 +87,11 @@ export async function loadExpenseFingerprints(
   }>(
     `SELECT id, vendor_name, amount_cents, expense_date, external_ref, store_number, source
      FROM expenses
-     WHERE account_id = $1 AND expense_date = ANY($2::date[])`,
-    [accountId, dates],
+     WHERE account_id = $1
+       AND (expense_date = ANY($2::date[])
+            OR (external_ref IS NOT NULL
+                AND lower(regexp_replace(external_ref, '[^a-zA-Z0-9]', '', 'g')) = ANY($3::text[])))`,
+    [accountId, dates, txns],
   );
   return rows.map((r) => ({ ...r, expense_date: expenseDateKey(r.expense_date) }));
 }
@@ -88,7 +106,11 @@ function fingerprintOf(trip: ImportTrip): ExpenseFingerprint {
   };
 }
 
-/** The key a trip's review record is stored under (one record per trip and mode). */
+/**
+ * A trip's stable identity: its transaction identity, or for a trip without one a
+ * key built from the file row grouping. The same in both modes, so a review record
+ * (one per trip and mode) and the trip's price keys never depend on the mode.
+ */
 export function reviewIdentity(trip: ImportTrip): string {
   return (
     transactionIdentity(trip) ??
@@ -190,8 +212,20 @@ async function receiptHasPrices(client: PoolClient, accountId: string, expenseId
   return rows.length > 0;
 }
 
-/** Book a trip as its own expense with its line items. Returns the expense id. */
-export async function bookTrip(client: PoolClient, actor: Actor, source: ImportSource, trip: ImportTrip): Promise<string> {
+/**
+ * Book a trip as its own expense with its line items. Returns the expense id.
+ * `confirmedDistinct`: the owner confirmed this trip differs from one already
+ * booked under the same transaction number (another store); only then may the
+ * reference be suffixed. Otherwise an existing booking is an error, never a second
+ * expense.
+ */
+export async function bookTrip(
+  client: PoolClient,
+  actor: Actor,
+  source: ImportSource,
+  trip: ImportTrip,
+  confirmedDistinct = false,
+): Promise<string> {
   const label = source === "lowes_csv" ? "Lowe's" : "Home Depot";
   const notes = trip.notes ?? `${trip.line_items.length} item(s) · imported from ${label}`;
   const insert = (externalRef: string | null) =>
@@ -210,8 +244,9 @@ export async function bookTrip(client: PoolClient, actor: Actor, source: ImportS
       ],
     );
   let ins = await insert(trip.external_ref);
-  // The same transaction number at another store (confirmed as a different trip).
-  if (!ins.rows[0] && trip.external_ref) ins = await insert(`${trip.external_ref} @${trip.store_number ?? "?"}`);
+  if (!ins.rows[0] && trip.external_ref && confirmedDistinct) {
+    ins = await insert(`${trip.external_ref} @${trip.store_number ?? "?"}`);
+  }
   if (!ins.rows[0]) throw new Error(`Transaction ${trip.external_ref} is already booked`);
   const expenseId = ins.rows[0].id;
 
@@ -286,7 +321,8 @@ export async function importTrips(
   input: { mode: ImportMode; source: ImportSource; trips: ImportTrip[]; rowsRead?: number; rejected?: number },
 ): Promise<ImportReport> {
   const { mode, source, trips } = input;
-  const existing = await loadExpenseFingerprints(client, actor.accountId, [...new Set(trips.map((t) => t.date))]);
+  await lockAccountImports(client, actor.accountId);
+  const existing = await loadExpenseFingerprints(client, actor.accountId, trips);
   const known = mode === "history" ? await loadKnownKeys(client, actor.accountId, trips) : new Set<string>();
   const plans = planTrips(trips, existing, mode, known);
 

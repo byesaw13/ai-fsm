@@ -106,7 +106,6 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
   }
 
   try {
-    const dates = [...new Set(parsed.transactions.map((t) => t.date))];
     const { existing, known, jobs, pending } = await withExpenseContext(session, async (client) => {
       const jobRows = await client.query<JobRow>(
         `SELECT j.id, j.title, j.job_number, j.client_id, c.name AS client_name, p.address
@@ -120,7 +119,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         [session.accountId]
       );
       return {
-        existing: await loadExpenseFingerprints(client, session.accountId, dates),
+        existing: await loadExpenseFingerprints(client, session.accountId, parsed.transactions),
         known: mode === "history" ? await loadKnownKeys(client, session.accountId, parsed.transactions) : new Set<string>(),
         jobs: jobRows.rows,
         pending: await pendingSummary(client, session.accountId),

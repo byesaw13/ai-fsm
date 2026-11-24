@@ -10,9 +10,10 @@ import type { PoolClient } from "pg";
 import { appendAuditLog } from "@/lib/db/audit";
 import { recordObservations } from "@/lib/materials/ledger";
 import type { ReviewReason } from "../duplicate-match";
-import { transactionIdentity } from "./identity";
 import {
   bookTrip,
+  lockAccountImports,
+  reviewIdentity,
   linkTrip,
   linkedTripObservations,
   tripObservations,
@@ -104,10 +105,12 @@ export async function confirmReview(
   id: string,
   decision: "same" | "different",
 ): Promise<{ expenseId: string | null; observations: number }> {
+  await lockAccountImports(client, actor.accountId);
   const review = await lockReview(client, actor.accountId, id);
   if (review.status !== "pending") throw new ReviewStateError("This record is not pending");
   const { source, trip } = review.payload;
-  const scope = transactionIdentity(trip) ?? `review:${review.id}`;
+  // The same keys whichever mode the trip is confirmed in, so history then book never doubles prices.
+  const scope = reviewIdentity(trip);
 
   let expenseId: string | null = null;
   let observations = 0;
@@ -120,7 +123,7 @@ export async function confirmReview(
       observations = (await recordObservations(client, actor.accountId, rows)).inserted;
     }
   } else {
-    if (review.mode === "book") expenseId = await bookTrip(client, actor, source, trip);
+    if (review.mode === "book") expenseId = await bookTrip(client, actor, source, trip, true);
     const rows = await tripObservations(client, actor, source, trip, scope);
     observations = (await recordObservations(client, actor.accountId, rows)).inserted;
   }

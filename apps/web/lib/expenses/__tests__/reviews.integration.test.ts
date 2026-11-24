@@ -246,6 +246,47 @@ describe.skipIf(!RUN)("store purchase imports", () => {
     expect(log.map((l) => l.new_value.status)).toEqual(["dismissed", "pending"]);
   });
 
+  it("two overlapping book imports of the same trip book it once", async () => {
+    const t = trip();
+    const reports = await Promise.all([run("book", [t]), run("book", [t])]);
+    expect(reports.map((r) => r.imported).sort()).toEqual([0, 1]);
+    expect(reports.map((r) => r.alreadyImported).sort()).toEqual([0, 1]);
+    expect(await expensesFor(t)).toBe(1);
+    expect(await observationsFor(t)).toBe(3);
+  });
+
+  it("a receipt with the same transaction id on another date is a conflicting transaction id", async () => {
+    const t = trip();
+    const rows = await q<{ id: string }>(
+      `INSERT INTO expenses (account_id, vendor_name, category, amount_cents, expense_date, notes, external_ref, created_by)
+       VALUES ($1, 'Home Depot', 'materials', $2, '2026-02-01', $3, $4, $5) RETURNING id`,
+      [actor.accountId, t.amount_cents, `${tag} receipt`, t.external_ref, actor.userId],
+    );
+    expect(await run("book", [t])).toMatchObject({ pending: 1, imported: 0, observations: 0 });
+    const review = (await q<{ reason: string; match_expense_id: string }>(
+      `SELECT reason, match_expense_id FROM purchase_import_reviews WHERE account_id = $1 AND payload->'trip'->>'external_ref' = $2`,
+      [actor.accountId, t.external_ref],
+    ))[0];
+    expect(review).toEqual({ reason: "conflicting_transaction_id", match_expense_id: rows[0].id });
+  });
+
+  it("a trip without a transaction id confirmed in history mode and then in book mode counts its prices once", async () => {
+    const t = trip({ external_ref: null, trip_key: `nt:2026-03-15:${store}:${tag}` });
+    const prices = () =>
+      count(`SELECT count(*) AS n FROM price_observations o JOIN materials_price_book m ON m.id = o.variant_id
+             WHERE o.account_id = $1 AND m.name LIKE $2 AND o.source_ref LIKE 'import:%:nt:%' AND o.status = 'active'`,
+        [actor.accountId, `${tag} Paint ${seq}`]);
+    for (const mode of ["history", "book"] as const) {
+      expect(await run(mode, [t])).toMatchObject({ pending: 1 });
+      const id = (await q<{ id: string }>(
+        `SELECT id FROM purchase_import_reviews WHERE account_id = $1 AND mode = $2 AND payload->'trip'->>'trip_key' = $3`,
+        [actor.accountId, mode, t.trip_key],
+      ))[0].id;
+      await tx((c) => confirmReview(c, actor, id, "different"));
+      expect(await prices()).toBe(1);
+    }
+  });
+
   it("the preview route reports skipped rows, plans and the pending count", async () => {
     const csv = [
       "Date,Store Number,Transaction ID,SKU Number,SKU Description,Quantity,Department Name,Net Unit Price",
