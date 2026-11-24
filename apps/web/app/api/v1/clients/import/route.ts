@@ -105,10 +105,18 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
           `SELECT id FROM clients WHERE account_id = $1 AND LOWER(name) = LOWER($2) AND LOWER(COALESCE(email,'')) = LOWER(COALESCE($3,''))`,
           [session.accountId, normalizeClientName(row.name), row.email ?? ""]
         )).rows[0]?.id;
+      // A contact or name match never takes over a customer tied to a different Square id.
+      const sameSquare = async (id: string | null | undefined) => {
+        if (!id || !row.square_customer_id) return id ?? undefined;
+        const other = (await client.query<{ square_customer_id: string | null }>(
+          `SELECT square_customer_id FROM clients WHERE id = $1`, [id]
+        )).rows[0]?.square_customer_id;
+        return other && other !== row.square_customer_id ? undefined : id;
+      };
       const existingId =
         bySquare ??
-        (await findClientByContact(client, session.accountId, { phone: row.phone, email: row.email })) ??
-        (await byName());
+        (await sameSquare(await findClientByContact(client, session.accountId, { phone: row.phone, email: row.email }))) ??
+        (await sameSquare(await byName()));
       if (existingId) {
         // Refresh Square history fields on match — CSV re-import is the way to
         // pull lifetime spend / transaction counts onto existing clients.

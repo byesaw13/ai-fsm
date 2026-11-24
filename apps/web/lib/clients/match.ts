@@ -1,15 +1,17 @@
 import type { PoolClient } from "pg";
 
-/** Last 10 digits of a US phone however it was typed, or null if it isn't one. */
+/** The 10 digits of a US phone however it was typed (optional leading 1), or null if it isn't one. */
 export function phoneDigits(raw: string | null | undefined): string | null {
-  const d = (raw ?? "").replace(/\D/g, "").slice(-10);
-  return d.length === 10 ? d : null;
+  const d = (raw ?? "").replace(/\D/g, "");
+  if (d.length === 10) return d;
+  if (d.length === 11 && d.startsWith("1")) return d.slice(1);
+  return null;
 }
 
 /**
  * The existing customer with this email (any case) or phone (any format), so
  * every door that adds a customer finds the one already on file (TASK-249).
- * A number that isn't 10 digits still matches when typed exactly the same.
+ * A number that isn't a US number (e.g. international) matches only when typed exactly the same.
  */
 export async function findClientByContact(
   client: PoolClient,
@@ -31,7 +33,7 @@ export async function findClientByContact(
       digits
         ? `SELECT id FROM clients
            WHERE account_id = $1
-             AND right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 10) = $2
+             AND regexp_replace(coalesce(phone, ''), '\\D', '', 'g') IN ($2, '1' || $2)
            ORDER BY created_at LIMIT 1`
         : `SELECT id FROM clients WHERE account_id = $1 AND phone = $2 ORDER BY created_at LIMIT 1`,
       [accountId, digits ?? phone],

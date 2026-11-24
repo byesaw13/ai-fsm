@@ -16,6 +16,7 @@ describe("phoneDigits", () => {
     expect(phoneDigits("(603) 555-0100")).toBe("6035550100");
     expect(phoneDigits("+1 603.555.0100")).toBe("6035550100");
     expect(phoneDigits("555-0100")).toBeNull();
+    expect(phoneDigits("+44 20 7946 0958")).toBeNull(); // international: exact match only
     expect(phoneDigits(null)).toBeNull();
   });
 });
@@ -50,6 +51,11 @@ describe.skipIf(!RUN)("findClientByContact (TASK-249)", () => {
 
   it("finds the customer by email in another case", async () => {
     expect(await findClientByContact(db, SEED_ACCOUNT, { email: email.toUpperCase() })).toBe(id);
+  });
+
+  it("does not match a foreign number that shares the last 10 digits", async () => {
+    const foreign = "+44" + phone.replace(/\D/g, "");
+    expect(await findClientByContact(db, SEED_ACCOUNT, { phone: foreign })).toBeNull();
   });
 
   it("returns null for someone new", async () => {
