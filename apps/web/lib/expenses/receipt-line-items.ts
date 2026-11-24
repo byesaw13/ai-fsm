@@ -26,6 +26,13 @@ Return ONLY valid JSON (no markdown fences):
   "po_number": "string or null — job / supply PO if written or printed (e.g. J260029, J-2026-0029, PO J260029). Do NOT invent.",
   "transaction_id": "string or null — store transaction / invoice / order number as printed (Home Depot Transaction ID, Lowe's order/invoice #). Copy digits/letters only as shown. Do NOT invent.",
   "gallons": number or null — gallons pumped on a fuel receipt (e.g. 23.707). Null if not a fuel fill or not printed.,
+  "adjustments": [
+    {
+      "kind": "return|discount|coupon",
+      "name": "string — as printed (e.g. RETURN 2x4x8, PRO XTRA 5% OFF, MFR COUPON)",
+      "amount_cents": number — how much it took off the receipt, as a NEGATIVE number of cents
+    }
+  ],
   "line_items": [
     {
       "name": "string — product description (prefer full description, not just SKU abbreviation)",
@@ -51,6 +58,7 @@ Return ONLY valid JSON (no markdown fences):
 10. po_number: only when a job/PO reference is clearly present (handwritten or printed). Prefer the short form when both appear (J260029). Never invent a PO.
 11. gallons: only on gas/fuel receipts. Copy the gallons figure printed on the pump/receipt. Do not invent. Do not use dollars as gallons.
 12. transaction_id: copy the printed store transaction / invoice / order number when visible. Never invent.
+13. adjustments: returned items, receipt-level discounts and coupons that are NOT already inside a line's net unit price. Never list a line discount that you already subtracted from that line's unit_cost_cents. A returned item goes here, not in line_items. Empty array when there are none.
 
 ## Store-specific hints
 - Home Depot: often shows SKU, short name, qty @ unit, then line total. Internet SKU may appear.
@@ -69,6 +77,13 @@ export type ParsedReceiptLineItem = {
   sku?: string | null;
 };
 
+/** A return, receipt-level discount or coupon. Never a price. amount_cents is negative. */
+export type ReceiptAdjustment = {
+  kind: "return" | "discount" | "coupon";
+  name: string;
+  amount_cents: number;
+};
+
 export type ParsedReceipt = {
   vendor_name?: string | null;
   amount_cents?: number | null;
@@ -83,13 +98,16 @@ export type ParsedReceipt = {
   /** Gallons pumped when this is a fuel receipt. */
   gallons?: number | null;
   line_items?: ParsedReceiptLineItem[];
+  adjustments?: ReceiptAdjustment[];
 };
 
 export type ReceiptParseReconciliation = {
   line_items_subtotal_cents: number;
+  /** Sum of returns, receipt-level discounts and coupons (zero or negative). */
+  adjustments_cents: number;
   amount_cents: number | null;
   tax_cents: number | null;
-  /** Absolute gap between sum(line totals) and amount (or amount - tax when tax known). */
+  /** Absolute gap between line totals + adjustments and amount (or amount - tax when tax known). */
   delta_cents: number | null;
   /** True when delta is within tolerance for a trustworthy parse. */
   balanced: boolean | null;
@@ -164,6 +182,8 @@ export function normalizeParsedReceiptLineItems(
 ): ParsedReceiptLineItem[] {
   if (!raw?.length) return [];
   return raw
+    // A return (negative quantity, price or total) is an adjustment, never a line price.
+    .filter((item) => !isReturnLine(item))
     .map((item) => {
       const name = item.name?.trim() ?? "";
       const quantity =
@@ -201,11 +221,57 @@ export function normalizeParsedReceiptLineItems(
     .filter((item) => item.name.length > 0 && item.unit_cost_cents > 0);
 }
 
-/** Sum line totals and compare to receipt total for a quality signal. */
+const ADJUSTMENT_KINDS = new Set(["return", "discount", "coupon"]);
+
+function isReturnLine(line: ParsedReceiptLineItem): boolean {
+  const qty = typeof line.quantity === "number" ? line.quantity : 1;
+  const unit = typeof line.unit_cost_cents === "number" ? line.unit_cost_cents : 0;
+  const total = typeof line.line_total_cents === "number" ? line.line_total_cents : null;
+  return qty < 0 || unit < 0 || (total != null && total < 0);
+}
+
+/**
+ * Returns, receipt-level discounts and coupons as signed (negative) adjustments
+ * (TASK-211, D11-8). A line with a negative quantity, price or total is a return:
+ * it moves here and is never a price. Net line prices already include their line
+ * discounts, so nothing is subtracted from them twice.
+ */
+export function receiptAdjustmentsFrom(
+  rawLines: ParsedReceiptLineItem[] | undefined,
+  rawAdjustments: ReceiptAdjustment[] | undefined,
+): ReceiptAdjustment[] {
+  const out: ReceiptAdjustment[] = [];
+  for (const line of rawLines ?? []) {
+    if (isReturnLine(line)) {
+      const qty = typeof line.quantity === "number" ? line.quantity : 1;
+      const unit = typeof line.unit_cost_cents === "number" ? line.unit_cost_cents : 0;
+      const total = typeof line.line_total_cents === "number" ? line.line_total_cents : null;
+      const cents = Math.abs(Math.round(total ?? unit * qty));
+      if (cents > 0) out.push({ kind: "return", name: line.name?.trim() || "Return", amount_cents: -cents });
+    }
+  }
+  for (const adj of rawAdjustments ?? []) {
+    if (!adj || typeof adj.amount_cents !== "number" || !Number.isFinite(adj.amount_cents)) continue;
+    const cents = Math.abs(Math.round(adj.amount_cents));
+    if (cents === 0) continue;
+    out.push({
+      kind: ADJUSTMENT_KINDS.has(adj.kind) ? adj.kind : "discount",
+      name: (adj.name ?? "").trim().slice(0, 200) || "Adjustment",
+      amount_cents: -cents,
+    });
+  }
+  return out;
+}
+
+/**
+ * Line totals plus adjustments (returns, receipt discounts, coupons) against the
+ * receipt total less tax. Balanced means the receipt is reconciled.
+ */
 export function reconcileReceiptParse(
   lineItems: ParsedReceiptLineItem[],
   amountCents: number | null | undefined,
   taxCents?: number | null,
+  adjustments: ReceiptAdjustment[] = [],
 ): ReceiptParseReconciliation {
   const line_items_subtotal_cents = lineItems.reduce((sum, li) => {
     const line =
@@ -214,6 +280,7 @@ export function reconcileReceiptParse(
         : Math.round(li.unit_cost_cents * (li.quantity > 0 ? li.quantity : 1));
     return sum + line;
   }, 0);
+  const adjustments_cents = adjustments.reduce((sum, a) => sum - Math.abs(Math.round(a.amount_cents)), 0);
 
   const amount =
     typeof amountCents === "number" && amountCents > 0 ? Math.round(amountCents) : null;
@@ -223,6 +290,7 @@ export function reconcileReceiptParse(
   if (amount == null) {
     return {
       line_items_subtotal_cents,
+      adjustments_cents,
       amount_cents: null,
       tax_cents: tax,
       delta_cents: null,
@@ -232,9 +300,10 @@ export function reconcileReceiptParse(
 
   // Prefer comparing lines to pre-tax when tax known; else to grand total.
   const target = tax != null ? amount - tax : amount;
-  const delta_cents = Math.abs(line_items_subtotal_cents - target);
+  const delta_cents = Math.abs(line_items_subtotal_cents + adjustments_cents - target);
   return {
     line_items_subtotal_cents,
+    adjustments_cents,
     amount_cents: amount,
     tax_cents: tax,
     delta_cents,

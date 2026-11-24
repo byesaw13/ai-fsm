@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Input } from "@/components/ui";
 import { formatCents } from "@ai-fsm/money";
 
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function ExpenseLineItemsEditor({ expenseId, initialLineItems, billed, canEdit }: Props) {
+  const router = useRouter();
   const [items, setItems] = useState<ExpenseLineItemDraft[]>(initialLineItems);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +69,7 @@ export function ExpenseLineItemsEditor({ expenseId, initialLineItems, billed, ca
         return;
       }
       setSaved(true);
+      router.refresh(); // the receipt's new version and whether it adds up
     } catch {
       setError("Network error — please try again.");
     } finally {
