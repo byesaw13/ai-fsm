@@ -42,6 +42,7 @@ import {
 import { RoomByRoomEditor } from "../../estimates/new/components/RoomByRoomEditor";
 import { PersonHoursFields } from "../components/PersonHoursFields";
 import { formHourColumns, formatHourInput, withHourEdit } from "@/lib/estimates/stored-hours";
+import { Money } from "@/components/ui/Money";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -853,14 +854,14 @@ function StandardEstimateEditForm({
               {mode === "itemized" && (
                 <>
                   <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
-                  <span data-testid="edit-subtotal">{formatDollars(subtotalCents)}</span>
+                  <span data-testid="edit-subtotal"><Money>{formatDollars(subtotalCents)}</Money></span>
                 </>
               )}
 
               {guardrailAdjustmentCents > 0 && (
                 <>
                   <span style={{ color: "var(--fg-muted)" }}>Pricing Adjustments</span>
-                  <span>{formatDollars(guardrailAdjustmentCents)}</span>
+                  <span><Money>{formatDollars(guardrailAdjustmentCents)}</Money></span>
                 </>
               )}
 
@@ -887,12 +888,12 @@ function StandardEstimateEditForm({
               {taxCents > 0 && (
                 <>
                   <span style={{ color: "var(--fg-muted)" }}>Tax</span>
-                  <span data-testid="edit-tax-amount">{formatDollars(taxCents)}</span>
+                  <span data-testid="edit-tax-amount"><Money>{formatDollars(taxCents)}</Money></span>
                 </>
               )}
 
               <strong>Total</strong>
-              <strong data-testid="edit-total">{formatDollars(totalCents)}</strong>
+              <strong data-testid="edit-total"><Money>{formatDollars(totalCents)}</Money></strong>
             </div>
           </div>
         </div>

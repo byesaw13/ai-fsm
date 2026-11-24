@@ -223,7 +223,7 @@ closed in tests; owner-flow AC still open.
 | TASK-238 | [Today and Desk never bounce you away](TASK-238-homes-never-bounce.md) | 006 | Done |
 | TASK-239 | [The job page leads with one next step](TASK-239-job-page-one-next-step.md) | 006 | Done |
 | TASK-240 | [A progress line on every job and customer](TASK-240-progress-line.md) | 006 | Done |
-| TASK-241 | [The app wears the prototype's look](TASK-241-prototype-look.md) | 006 | Proposed |
+| TASK-241 | [The app wears the prototype's look](TASK-241-prototype-look.md) | 006 | In Progress |
 | TASK-242 | [A job is one page with tabs](TASK-242-job-page-tabs.md) | 006 | Proposed |
 | TASK-243 | [Today reads as a list of sentences](TASK-243-today-sentences.md) | 006 | Proposed |
 | TASK-244 | [The property page in four parts](TASK-244-property-page-four-parts.md) | 006 | Proposed |

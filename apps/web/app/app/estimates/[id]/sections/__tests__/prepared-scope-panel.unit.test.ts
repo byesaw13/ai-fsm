@@ -50,7 +50,7 @@ describe("PreparedScopePanel work areas (TASK-185)", () => {
     // Kitchen: 6 h x $85 + $20 = $530; Hall: 3 h x $85 + $10 = $265
     expect(html).toContain("$530.00");
     expect(html).toContain("1 open question");
-    expect(html).toMatch(/data-testid="work-area-total">\$795\.00/);
+    expect(html).toMatch(/data-testid="work-area-total"><span class="p7-money">\$795\.00/);
   });
 });
 

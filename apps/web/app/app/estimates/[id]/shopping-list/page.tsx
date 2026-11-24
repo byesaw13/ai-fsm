@@ -13,6 +13,7 @@ import {
 import type { ServiceMaterial, ScopeComponentValues, ComplexityValues, MaterialsBySection, RoomSpec, ShoppingList } from "@ai-fsm/domain";
 import { PrintButton } from "../print/PrintButton";
 import { shoppingListToMaterialsBySection } from "@/lib/estimates/shopping-list-display";
+import { Money } from "@/components/ui/Money";
 
 export const dynamic = "force-dynamic";
 
@@ -329,7 +330,7 @@ export default async function ShoppingListPage({
                   {section.section}
                 </h2>
                 <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--fg-muted)" }}>
-                  {formatDollars(section.section_total_cents)}
+                  <Money>{formatDollars(section.section_total_cents)}</Money>
                 </span>
               </div>
 
@@ -374,7 +375,7 @@ export default async function ShoppingListPage({
                         {item.material.unit}
                       </td>
                       <td style={{ textAlign: "right", padding: "var(--space-2) 0", fontWeight: 500 }}>
-                        {formatDollars(item.total_cost_cents)}
+                        <Money>{formatDollars(item.total_cost_cents)}</Money>
                       </td>
                       <td style={{ textAlign: "center", padding: "var(--space-2) 0" }} className="no-print">
                         <input type="checkbox" style={{ width: 16, height: 16 }} />
@@ -404,7 +405,7 @@ export default async function ShoppingListPage({
               </span>
             </div>
             <span style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>
-              {formatDollars(materialTotalCents)}
+              <Money>{formatDollars(materialTotalCents)}</Money>
             </span>
           </div>
 

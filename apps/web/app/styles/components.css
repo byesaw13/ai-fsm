@@ -1714,3 +1714,13 @@
   font-size: var(--text-base);
   font-variant-numeric: tabular-nums;
 }
+
+/* -------------------------------------------------------------------------
+   Money — mono figures that line up (TASK-241). <Money> and KPI values.
+   ---------------------------------------------------------------------- */
+.p7-money,
+.p7-metric-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}

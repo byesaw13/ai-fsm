@@ -76,9 +76,12 @@ export function useAttentionSummary(enabled: boolean) {
 export function AttentionBell({
   summary,
   onChanged,
+  onDark = false,
 }: {
   summary: AttentionSummary;
   onChanged?: () => void;
+  /** Sits on the navy sidebar (TASK-241). */
+  onDark?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [events, setEvents] = useState<AttentionEvent[]>([]);
@@ -176,9 +179,9 @@ export function AttentionBell({
           width: 36,
           height: 36,
           borderRadius: 8,
-          border: "1px solid var(--border)",
-          background: "var(--bg-elevated, var(--bg))",
-          color: "var(--fg)",
+          border: onDark ? "1px solid var(--sidebar-line)" : "1px solid var(--border)",
+          background: onDark ? "var(--sidebar-hover-bg)" : "var(--bg-elevated, var(--bg))",
+          color: onDark ? "var(--color-white)" : "var(--fg)",
           cursor: "pointer",
           display: "inline-flex",
           alignItems: "center",

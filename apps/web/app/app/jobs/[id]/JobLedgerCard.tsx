@@ -5,6 +5,7 @@ import { formatCents } from "@ai-fsm/money";
 import { Card, SectionHeader, LinkButton } from "@/components/ui";
 import { DraftCoFromVarianceButton } from "./DraftCoFromVarianceButton";
 import { buildCoDraftFromLedger } from "@/lib/jobs/job-ledger-co-draft";
+import { Money } from "@/components/ui/Money";
 
 type Props = {
   ledger: JobLedgerSummary;
@@ -118,21 +119,21 @@ export function JobLedgerCard({
           <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 700, textTransform: "uppercase" }}>
             Sold
           </div>
-          <div style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{money(ledger.soldCents)}</div>
+          <div style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}><Money>{money(ledger.soldCents)}</Money></div>
         </div>
         <div>
           <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 700, textTransform: "uppercase" }}>
             Actual
           </div>
           <div style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }} data-testid="ledger-actual">
-            {money(ledger.actualCents)}
+            <Money>{money(ledger.actualCents)}</Money>
           </div>
         </div>
         <div>
           <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 700, textTransform: "uppercase" }}>
             Paid
           </div>
-          <div style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{money(ledger.paidCents)}</div>
+          <div style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}><Money>{money(ledger.paidCents)}</Money></div>
         </div>
         <div>
           <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 700, textTransform: "uppercase" }}>
@@ -142,7 +143,7 @@ export function JobLedgerCard({
             style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}
             data-testid="ledger-balance"
           >
-            {money(ledger.balanceCents)}
+            <Money>{money(ledger.balanceCents)}</Money>
           </div>
         </div>
       </div>
@@ -193,10 +194,10 @@ export function JobLedgerCard({
                 ) : null}
               </div>
               <div role="cell" style={{ padding: "10px 0", borderBottom: "1px solid var(--border)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {money(row.estimateCents)}
+                <Money>{money(row.estimateCents)}</Money>
               </div>
               <div role="cell" style={{ padding: "10px 0", borderBottom: "1px solid var(--border)", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
-                {money(row.actualCents)}
+                <Money>{money(row.actualCents)}</Money>
               </div>
               <div
                 role="cell"

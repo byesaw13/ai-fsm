@@ -44,6 +44,22 @@
 
   --color-white:     #ffffff;
 
+  /* Prototype look (TASK-241, UX direction §32): brand cream, navy and warm
+     borders. Values match styles/brand.css. */
+  --color-cream:        #f6f3ee;
+  --color-navy:         #13263c;
+  --color-navy-soft:    #1c2b4a;
+  --color-ink:          #1c2531;
+  --color-ink-2:        #3a4656;
+  --color-ink-muted:    #5f6a7a;  /* 4.9:1 on cream */
+  --color-warm-line:    #e6e0d6;
+  --color-warm-line-2:  #d6cdbf;
+  --color-warm-line-3:  #efeae2;
+  --color-orange:       #d2672a;  /* brand orange: fills, rings, not small text */
+  --color-orange-dark:  #b3541f;  /* white text 5:1; text on white 5:1 */
+  --color-orange-deeper:#9a4719;
+  --color-orange-soft:  #fcebdd;
+
   --color-red-600:   #dc2626;
   --color-red-500:   #ef4444;
   --color-red-200:   #fecaca;
@@ -69,23 +85,29 @@
   /* -------------------------------------------------------------------------
      Color — Semantic Aliases
      ---------------------------------------------------------------------- */
-  --bg:            var(--color-slate-50);
-  --bg-subtle:     var(--color-slate-50);
+  --bg:            var(--color-cream);
+  --bg-subtle:     var(--color-cream);
   --bg-card:       var(--color-white);
   --bg-elevated:   var(--color-white);
   --bg-overlay:    rgba(2, 6, 23, 0.4);
-  --fg:            var(--color-slate-900);
-  --fg-secondary:  var(--color-slate-600);
-  --fg-muted:      var(--color-slate-500);
+  --fg:            var(--color-ink);
+  --fg-secondary:  var(--color-ink-2);
+  --fg-muted:      var(--color-ink-muted);
   --fg-inverse:    var(--color-white);
-  --border:        var(--color-slate-200);
-  --border-strong: var(--color-slate-300);
-  --border-subtle: var(--color-slate-100);
-  --accent:        var(--color-forest-800);
-  --accent-hover:  var(--color-forest-700);
-  --accent-subtle: var(--color-forest-50);
+  --sidebar-bg:        var(--color-navy-soft);
+  --sidebar-fg:        #c9d6e3;  /* 8.9:1 on navy */
+  --sidebar-fg-muted:  #8ea3b9;  /* 5:1 on navy */
+  --sidebar-hover-bg:  rgba(255, 255, 255, 0.06);
+  --sidebar-active-bg: rgba(255, 255, 255, 0.11);
+  --sidebar-line:      rgba(255, 255, 255, 0.08);
+  --border:        var(--color-warm-line);
+  --border-strong: var(--color-warm-line-2);
+  --border-subtle: var(--color-warm-line-3);
+  --accent:        var(--color-orange-dark);
+  --accent-hover:  var(--color-orange-deeper);
+  --accent-subtle: var(--color-orange-soft);
   --accent-fg:     var(--color-white);
-  --ring:          var(--color-forest-700);
+  --ring:          var(--color-orange);
   --color-success: var(--color-green-600);
   --color-warning: var(--color-amber-600);
   --color-danger:  var(--color-red-600);
@@ -144,7 +166,7 @@
      Typography
      ---------------------------------------------------------------------- */
   --font-sans:      var(--font-archivo), -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
-  --font-mono:      'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+  --font-mono:      var(--font-dm-mono), 'SF Mono', 'Fira Code', 'Roboto Mono', monospace;
   --text-xs:        0.75rem;    /* 12px */
   --text-sm:        0.8125rem;  /* 13px */
   --text-base:      0.9375rem;  /* 15px — slightly smaller base for denser info */

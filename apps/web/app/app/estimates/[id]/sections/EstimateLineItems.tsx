@@ -8,6 +8,7 @@ import {
   PERSON_HOURS_LABEL,
   formatHourInput,
 } from "@/lib/estimates/stored-hours";
+import { Money } from "@/components/ui/Money";
 
 function hoursText(low: number | string | null | undefined, high: number | string | null | undefined): string | null {
   const left = formatHourInput(low);
@@ -111,8 +112,8 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                         <HoursNote item={item} />
                       </td>
                       <td>{fmtQty(item.quantity)}</td>
-                      <td>{formatDollars(item.unit_price_cents)}</td>
-                      <td>{formatDollars(item.total_cents)}</td>
+                      <td><Money>{formatDollars(item.unit_price_cents)}</Money></td>
+                      <td><Money>{formatDollars(item.total_cents)}</Money></td>
                     </tr>
                   ))}
                 </tbody>
@@ -122,12 +123,12 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                 {option.tax_cents > 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
                     <span>Tax</span>
-                    <span>{formatDollars(option.tax_cents)}</span>
+                    <span><Money>{formatDollars(option.tax_cents)}</Money></span>
                   </div>
                 )}
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "var(--space-1)" }}>
                   <strong>Total</strong>
-                  <strong>{formatDollars(option.total_cents)}</strong>
+                  <strong><Money>{formatDollars(option.total_cents)}</Money></strong>
                 </div>
               </div>
             </div>
@@ -149,7 +150,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
             <div style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg)", border: "1px solid var(--border)" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ fontWeight: 600 }}>Flat rate</span>
-                <span style={{ fontWeight: 700 }}>{formatDollars(estimate.subtotal_cents)}</span>
+                <span style={{ fontWeight: 700 }}><Money>{formatDollars(estimate.subtotal_cents)}</Money></span>
               </div>
               <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
                 {hoursText(estimate.labor_hours_low, estimate.labor_hours_high) ?? HOURS_MISSING_LABEL}
@@ -166,11 +167,11 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                       <MarkupNote item={item} />
                       <HoursNote item={item} />
                     </span>
-                    <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>{formatDollars(item.total_cents)}</span>
+                    <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}><Money>{formatDollars(item.total_cents)}</Money></span>
                   </div>
                   {Number(item.quantity) !== 1 && (
                     <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
-                      {fmtQty(item.quantity)} × {formatDollars(item.unit_price_cents)}
+                      {fmtQty(item.quantity)} × <Money>{formatDollars(item.unit_price_cents)}</Money>
                     </div>
                   )}
                 </div>
@@ -178,15 +179,15 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
               <div style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg-card)", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "var(--space-1)", marginTop: "var(--space-1)" }}>
                 {estimate.tax_cents > 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                    <span>Tax</span><span>{formatDollars(estimate.tax_cents)}</span>
+                    <span>Tax</span><span><Money>{formatDollars(estimate.tax_cents)}</Money></span>
                   </div>
                 )}
                 <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: "var(--text-base)" }}>
-                  <span>Total</span><span>{formatDollars(estimate.total_cents)}</span>
+                  <span>Total</span><span><Money>{formatDollars(estimate.total_cents)}</Money></span>
                 </div>
                 {estimate.deposit_cents > 0 && (
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                    <span>Deposit</span><span>{formatDollars(estimate.deposit_cents)}</span>
+                    <span>Deposit</span><span><Money>{formatDollars(estimate.deposit_cents)}</Money></span>
                   </div>
                 )}
               </div>
@@ -213,7 +214,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                     </span>
                   </td>
                   <td colSpan={2}></td>
-                  <td>{formatDollars(estimate.subtotal_cents)}</td>
+                  <td><Money>{formatDollars(estimate.subtotal_cents)}</Money></td>
                 </tr>
               </tbody>
               <tfoot>
@@ -221,13 +222,13 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                   <tr>
                     <td colSpan={2}></td>
                     <td className="subtotal-label">Tax</td>
-                    <td>{formatDollars(estimate.tax_cents)}</td>
+                    <td><Money>{formatDollars(estimate.tax_cents)}</Money></td>
                   </tr>
                 )}
                 <tr>
                   <td colSpan={2}></td>
                   <td className="subtotal-label"><strong>Total</strong></td>
-                  <td><strong data-testid="estimate-total-footer">{formatDollars(estimate.total_cents)}</strong></td>
+                  <td><strong data-testid="estimate-total-footer"><Money>{formatDollars(estimate.total_cents)}</Money></strong></td>
                 </tr>
               </tfoot>
             </table>
@@ -257,8 +258,8 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                         <HoursNote item={item} />
                       </td>
                       <td>{fmtQty(item.quantity)}</td>
-                      <td>{formatDollars(item.unit_price_cents)}</td>
-                      <td>{formatDollars(item.total_cents)}</td>
+                      <td><Money>{formatDollars(item.unit_price_cents)}</Money></td>
+                      <td><Money>{formatDollars(item.total_cents)}</Money></td>
                     </tr>
                   );
                   return (
@@ -300,19 +301,19 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                 <tr>
                   <td colSpan={2}></td>
                   <td className="subtotal-label"><strong>Subtotal</strong></td>
-                  <td data-testid="estimate-subtotal">{formatDollars(estimate.subtotal_cents)}</td>
+                  <td data-testid="estimate-subtotal"><Money>{formatDollars(estimate.subtotal_cents)}</Money></td>
                 </tr>
                 {estimate.tax_cents > 0 && (
                   <tr>
                     <td colSpan={2}></td>
                     <td className="subtotal-label">Tax</td>
-                    <td>{formatDollars(estimate.tax_cents)}</td>
+                    <td><Money>{formatDollars(estimate.tax_cents)}</Money></td>
                   </tr>
                 )}
                 <tr>
                   <td colSpan={2}></td>
                   <td className="subtotal-label"><strong>Total</strong></td>
-                  <td><strong data-testid="estimate-total-footer">{formatDollars(estimate.total_cents)}</strong></td>
+                  <td><strong data-testid="estimate-total-footer"><Money>{formatDollars(estimate.total_cents)}</Money></strong></td>
                 </tr>
               </tfoot>
             </table>
