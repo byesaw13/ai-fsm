@@ -103,7 +103,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-246**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-256**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -228,6 +228,16 @@ closed in tests; owner-flow AC still open.
 | TASK-243 | [Today reads as a list of sentences](TASK-243-today-sentences.md) | 006 | Proposed |
 | TASK-244 | [The property page in four parts](TASK-244-property-page-four-parts.md) | 006 | Proposed |
 | TASK-245 | [One intake form that finds who and where you already have](TASK-245-intake-duplicate-matches.md) | 006 | Proposed |
+| TASK-246 | [Deleting a payment updates the invoice through the database trigger](TASK-246-payment-delete-uses-trigger.md) | 004 | Proposed |
+| TASK-247 | [One function creates invoices, with one set of duplicate rules](TASK-247-one-invoice-writer.md) | 004 | Proposed |
+| TASK-248 | [Both estimate forms save through one payload builder](TASK-248-one-estimate-save-payload.md) | 002 | Proposed |
+| TASK-249 | [The server never creates a second customer for the same phone](TASK-249-no-duplicate-customers.md) | 003 | Proposed |
+| TASK-250 | [One function creates jobs, and a job always has a property](TASK-250-one-job-writer.md) | 003 | Proposed |
+| TASK-251 | [Invoice lock exceptions live in one place](TASK-251-invoice-lock-rules-in-one-place.md) | 004 | Proposed |
+| TASK-252 | [The job page works out where a job stands once](TASK-252-one-job-stage.md) | 006 | Proposed |
+| TASK-253 | [Keep only the estimate starts the owner uses](TASK-253-retire-unused-estimate-starts.md) | 002 | Proposed |
+| TASK-254 | [Print shows the same PDF the customer gets](TASK-254-one-rendering-per-document.md) | 004 | Proposed |
+| TASK-255 | [Shared helpers used once, not copied](TASK-255-shared-helper-cleanup.md) | 005 | Proposed |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
