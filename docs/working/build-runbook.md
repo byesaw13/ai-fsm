@@ -24,8 +24,10 @@ Last step           : B5 TASK-194 Verified: #764 (d1fdba88) deployed
                       /login 200, send 401 unauth, no web errors; 17 sent
                       estimates have no snapshot (show "Hours not
                       recorded"), totals unchanged; prod has 0 drafts.
-In-flight PR        : none
-Next step           : B6 TASK-195 (review rewrite; needs B5, now Verified).
+In-flight PR        : B6 TASK-195 (review rewrite), branch
+                      task/195-review-rewrite; no migration (review_result
+                      columns are migration 209).
+Next step           : B6 TASK-195 merge, deploy, verify.
 Blocked on          : nothing
 Last known-good     : d1fdba88 (deploy-good/a4a6aaa4 before it)
 Notes               : Main checkout holds another session's uncommitted
@@ -695,6 +697,7 @@ Per step:
 
 ## Log
 
+- 2026-11-23 · B6 · In progress · TASK-195: review input = baseline + lines + prepared gaps + Settings rates; button-only, stored in review_result; Zod-validated; cut-off/refusal are errors; model unchanged
 - 2026-11-23 · B5 · Verified · health ok, /login 200, send 401 unauth, no web errors, 17 old sent estimates without snapshot (Hours not recorded), totals unchanged
 - 2026-11-23 · B5 · Deployed · d1fdba88 · ~23:25 UTC, no migration; known-good deploy-good/a4a6aaa4
 - 2026-11-23 · B5 · Merged · #764 · squash d1fdba88; Codex findings fixed before merge (painting Materials/handling rows typed; panel saves carry the quote version); e2e locators scoped to #main-content

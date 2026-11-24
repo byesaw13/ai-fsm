@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { useQuoteVersion } from "@/components/QuoteVersion";
 
 export interface Suggestion {
   type: "warning" | "info" | "tip";
   field: string;
   message: string;
   suggestion?: string;
-  actionCode?: string;
 }
 
 export interface ReviewResult {
@@ -17,9 +17,18 @@ export interface ReviewResult {
   summary: string;
 }
 
+interface StoredReviewProps {
+  result: ReviewResult;
+  source: "ai" | "rules";
+  reviewed_at: string;
+  /** False once the estimate changed after this review ran. */
+  current: boolean;
+}
+
 interface Props {
   estimateId: string;
-  autoLoad?: boolean;
+  /** The stored review, if any. Opening the page never runs a new one (TASK-195). */
+  initial?: StoredReviewProps | null;
 }
 
 const TYPE_STYLE: Record<Suggestion["type"], { label: string; color: string; bg: string }> = {
@@ -28,35 +37,56 @@ const TYPE_STYLE: Record<Suggestion["type"], { label: string; color: string; bg:
   tip:     { label: "Profit Tip",      color: "#16a34a", bg: "color-mix(in srgb, #16a34a 8%, transparent)" },
 };
 
-export function EstimateReviewPanel({ estimateId, autoLoad = true }: Props) {
-  const [loading, setLoading] = useState(autoLoad);
-  const [result, setResult] = useState<ReviewResult | null>(null);
+export function EstimateReviewPanel({ estimateId, initial = null }: Props) {
+  const [loading, setLoading] = useState(false);
+  const [stored, setStored] = useState<StoredReviewProps | null>(initial);
   const [dismissed, setDismissed] = useState(false);
+  const { updatedAt, setUpdatedAt } = useQuoteVersion();
   const { error } = useToast();
+  // The quote version this review was made for. A save in this tab moves the version on.
+  const [reviewedVersion, setReviewedVersion] = useState<string | null>(initial?.current ? updatedAt : null);
+
+  // router.refresh() keeps client state; follow the server's stored review and its current flag.
+  useEffect(() => {
+    if (!initial) return;
+    setStored(initial);
+    setReviewedVersion(initial.current ? updatedAt : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-sync only when the server's review changes
+  }, [initial?.reviewed_at, initial?.current]);
+
+  const result = stored?.result ?? null;
+  const current = !!stored?.current && reviewedVersion !== null && reviewedVersion === updatedAt;
 
   async function fetchReview() {
     setLoading(true);
     setDismissed(false);
     try {
       const res = await fetch(`/api/v1/estimates/${estimateId}/review`, { method: "POST" });
-      const json = (await res.json()) as ReviewResult & { error?: { message?: string } };
-      if (!res.ok) {
+      const json = (await res.json()) as {
+        review?: { result: ReviewResult; source: "ai" | "rules"; reviewed_at: string };
+        stored?: boolean;
+        previous_updated_at?: string;
+        updated_at?: string | null;
+        error?: { message?: string };
+      };
+      if (!res.ok || !json.review) {
         error(json.error?.message ?? "Failed to review estimate");
         return;
       }
-      setResult(json);
+      setStored({ ...json.review, current: json.stored === true });
+      // Storing the review touches the row. Keep this tab's version current only if it was.
+      if (json.updated_at && updatedAt && json.previous_updated_at === updatedAt) {
+        setUpdatedAt(json.updated_at);
+        setReviewedVersion(json.updated_at);
+      } else {
+        setReviewedVersion(null);
+      }
     } catch {
       error("Network error — could not review estimate");
     } finally {
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    if (autoLoad) {
-      void fetchReview();
-    }
-  }, [estimateId, autoLoad]);
 
   const scoreColor = !result
     ? "var(--accent)"
@@ -67,7 +97,7 @@ export function EstimateReviewPanel({ estimateId, autoLoad = true }: Props) {
     : "var(--status-error)";
 
   return (
-    <div className="card action-card">
+    <div className="card action-card" data-testid="estimate-review-panel">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <h2 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
@@ -97,6 +127,7 @@ export function EstimateReviewPanel({ estimateId, autoLoad = true }: Props) {
           <button
             type="button"
             onClick={fetchReview}
+            data-testid="review-run"
             disabled={loading}
             style={{
               display: "inline-flex",
@@ -113,10 +144,22 @@ export function EstimateReviewPanel({ estimateId, autoLoad = true }: Props) {
               opacity: loading ? 0.7 : 1,
             }}
           >
-            {loading ? "Refreshing…" : "Re-check"}
+            {loading ? "Checking…" : !stored ? "Check estimate" : "Re-check"}
           </button>
         </div>
       </div>
+
+      {!loading && !result && (
+        <p style={{ margin: "var(--space-3) 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }} data-testid="review-not-run">
+          Not checked yet. Check estimate reviews the hours, costs and price against your hourly baseline.
+        </p>
+      )}
+
+      {stored && !current && !loading && (
+        <p style={{ margin: "var(--space-3) 0 0", fontSize: "var(--text-sm)", color: "var(--color-warning)" }} data-testid="review-stale">
+          The estimate changed after this check. Re-check to update it.
+        </p>
+      )}
 
       {loading && !result && (
         <p style={{ margin: "var(--space-3) 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>

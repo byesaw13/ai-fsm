@@ -69,6 +69,9 @@ export interface EstimateRow {
   labor_hours_low: number | string | null;
   labor_hours_high: number | string | null;
   labor_hours_source: HourSource | null;
+  /** Stored estimate review (TASK-195) and the estimate version it was made for. */
+  review_result: unknown | null;
+  review_for_updated_at: string | Date | null;
 }
 
 export interface LineItemRow {
