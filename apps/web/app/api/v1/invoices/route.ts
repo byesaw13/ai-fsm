@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, withRole } from "@/lib/auth/middleware";
-import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
+import { withInvoiceContext } from "@/lib/invoices/db";
+import { createInvoice } from "@/lib/invoices/create-invoice";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { invoiceStatusSchema, resolveIssueDueDate } from "@ai-fsm/domain";
@@ -194,7 +195,6 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         businessPurpose: business_purpose,
       });
 
-      const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
       const invoiceKind = manualInvoiceKind(job_id);
 
       // Payment terms: due upon completion (TASK-078). A standard invoice tied to
@@ -213,36 +213,32 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         jobStatus,
       });
 
-      const result = await client.query<{ id: string }>(
-        `INSERT INTO invoices
-           (account_id, client_id, job_id, property_id,
-            billing_context, sponsored_purpose, beneficiary_property_contact_id, business_purpose,
-            status, invoice_kind, invoice_number,
-            subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-            notes, due_date, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'draft', $9, $10, $11, $12, $13, 0, $14, $15, $16, $17)
-         RETURNING id`,
-        [
-          session.accountId,
-          client_id,
-          job_id ?? null,
-          property_id ?? null,
-          billing_context,
-          sponsored_purpose ?? null,
-          beneficiary_property_contact_id ?? null,
-          business_purpose || null,
-          invoiceKind,
-          invoiceNumber,
-          subtotal_cents,
-          tax_cents,
-          total_cents,
-          deposit_cents,
-          notes ?? null,
-          resolvedDueDate,
-          session.userId,
-        ]
-      );
-      const invoiceId = result.rows[0].id;
+      const created = await createInvoice(client, {
+        account_id: session.accountId,
+        client_id,
+        job_id: job_id ?? null,
+        property_id: property_id ?? null,
+        billing_context,
+        sponsored_purpose: sponsored_purpose ?? null,
+        beneficiary_property_contact_id: beneficiary_property_contact_id ?? null,
+        business_purpose: business_purpose || null,
+        invoice_kind: invoiceKind,
+        subtotal_cents,
+        tax_cents,
+        total_cents,
+        deposit_cents,
+        notes: notes ?? null,
+        due_date: resolvedDueDate,
+        created_by: session.userId,
+      });
+      if (!created.created) {
+        // One open invoice per job: edit the existing one instead (TASK-247).
+        throw Object.assign(
+          new Error(`This job already has invoice ${created.invoice_number}. Edit that invoice instead.`),
+          { code: "INVOICE_EXISTS", invoiceId: created.id },
+        );
+      }
+      const { id: invoiceId, invoice_number: invoiceNumber } = created;
 
       for (let i = 0; i < line_items.length; i++) {
         const item = line_items[i];
@@ -279,11 +275,17 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
     return NextResponse.json({ id: invoice }, { status: 201 });
   } catch (error) {
-    const err = error as Error & { code?: string };
+    const err = error as Error & { code?: string; invoiceId?: string };
     if (err.code === "NOT_FOUND") {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: err.message, traceId: session.traceId } },
         { status: 404 }
+      );
+    }
+    if (err.code === "INVOICE_EXISTS") {
+      return NextResponse.json(
+        { error: { code: "INVOICE_EXISTS", message: err.message, invoice_id: err.invoiceId, traceId: session.traceId } },
+        { status: 409 }
       );
     }
     if (err.code === "VALIDATION_ERROR") {

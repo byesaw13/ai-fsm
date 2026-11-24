@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import { generateInvoiceNumber } from "@/lib/invoices/db";
+import { createInvoice } from "@/lib/invoices/create-invoice";
 import { createScheduleItem } from "./deposit-request";
 import type { DepositDueTrigger } from "./deposit-policy";
 
@@ -43,43 +43,23 @@ export async function createApprovalArtifacts(
 
   let depositInvoiceId: string | null = null;
   if (est && est.deposit_required && est.deposit_cents > 0) {
-    const existingDeposit = await client.query<{ id: string }>(
-      `SELECT id FROM invoices
-       WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'
-       LIMIT 1`,
-      [estimateId, accountId]
-    );
-
-    if (existingDeposit.rowCount === 0) {
-      const invoiceNumber = await generateInvoiceNumber(client, accountId);
-      // Deposit invoice: created as a reviewable DRAFT, not silently `sent`.
-      // deposit_cents = 0 on the deposit invoice itself (its own total IS the
-      // deposit); the credit is applied to the FINAL invoice instead.
-      const depositResult = await client.query<{ id: string }>(
-        `INSERT INTO invoices
-           (account_id, client_id, job_id, estimate_id, property_id,
-            status, invoice_kind, invoice_number,
-            subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-            notes, created_by)
-         VALUES ($1, $2, $3, $4, $5,
-                 'draft', 'deposit', $6,
-                 $7, 0, $7, 0, 0,
-                 $8, $9)
-         RETURNING id`,
-        [
-          accountId,
-          est.client_id,
-          est.job_id,
-          estimateId,
-          est.property_id,
-          invoiceNumber,
-          est.deposit_cents,
-          `Deposit: ${est.notes ?? "Estimate approved"}`,
-          userId,
-        ]
-      );
-      depositInvoiceId = depositResult.rows[0].id;
-    }
+    // Deposit invoice: a reviewable DRAFT, not silently `sent`. Its own total
+    // IS the deposit; the credit is applied on the FINAL invoice. Returns the
+    // open deposit instead when one exists (voided ones don't count).
+    const deposit = await createInvoice(client, {
+      account_id: accountId,
+      client_id: est.client_id,
+      job_id: est.job_id,
+      estimate_id: estimateId,
+      property_id: est.property_id,
+      invoice_kind: "deposit",
+      subtotal_cents: est.deposit_cents,
+      tax_cents: 0,
+      total_cents: est.deposit_cents,
+      notes: `Deposit: ${est.notes ?? "Estimate approved"}`,
+      created_by: userId,
+    });
+    if (deposit.created) depositInvoiceId = deposit.id;
   }
 
   // TASK-182: one "Schedule this job" item; whether booking waits on the deposit

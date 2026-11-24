@@ -1,7 +1,7 @@
 # TASK-247: One function creates invoices, with one set of duplicate rules
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-004 Billing & Profitability
@@ -26,7 +26,8 @@ Scope:
   - final: one non-void `final` or `standard` invoice per job (and per estimate);
   - progress and manual standard: no automatic dedupe (owner-chosen amounts).
 - The six callers use it. Remove their inline inserts and checks.
-- When a duplicate exists, return it with `created: false` (current convert/deposit behavior).
+- When a duplicate exists, return it with `created: false` (current convert/deposit behavior). The manual invoice route answers 409 `INVOICE_EXISTS` with the existing invoice's id instead of creating a second one.
+- Migration 218 backs the rule with unique partial indexes (void ignored): one open final-or-standard per job, one open final per estimate (replaces the 104 index, which also counted void so a voided final could never be replaced), one open deposit per estimate. Production had no violating rows on 2026-11-24.
 
 Out of scope:
 - Changing invoice totals, deposit math or line-item building (they stay in the callers).

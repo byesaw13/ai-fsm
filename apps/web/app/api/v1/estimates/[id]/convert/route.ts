@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
-import { withInvoiceContext, generateInvoiceNumber, loadCreditedInvoicesForEstimate } from "@/lib/invoices/db";
+import { withInvoiceContext, loadCreditedInvoicesForEstimate } from "@/lib/invoices/db";
+import { createInvoice, findOpenInvoice } from "@/lib/invoices/create-invoice";
 import { reconcileFinalInvoice } from "@/lib/invoices/billing";
 import { logger } from "@/lib/logger";
 import { loadTravelSettings } from "@/lib/travel/settings";
@@ -92,21 +93,15 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       //    converted". A deposit invoice (created on approval) must NOT short
       //    circuit this — otherwise Convert would return the deposit invoice
       //    and the real final invoice would never be created.
-      const existingFinal = await client.query<{
-        id: string;
-        status: string;
-      }>(
-        `SELECT id, status FROM invoices
-         WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'final'
-         LIMIT 1`,
-        [id, session.accountId]
-      );
-
-      if (existingFinal.rowCount !== null && existingFinal.rowCount > 0) {
-        // Already converted — return existing final invoice (idempotent)
+      //    A manual invoice on the same job counts too (one open final per job).
+      const existingFinal = await findOpenInvoice(client, {
+        kind: "final", accountId: session.accountId, jobId: estimate.job_id, estimateId: id,
+      });
+      if (existingFinal) {
+        // Already invoiced — return the existing invoice (idempotent)
         return {
-          invoice_id: existingFinal.rows[0].id,
-          invoice_status: existingFinal.rows[0].status,
+          invoice_id: existingFinal.id,
+          invoice_status: existingFinal.status,
           created: false,
         };
       }
@@ -211,12 +206,6 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         depositInvoices: await loadCreditedInvoicesForEstimate(client, id, session.accountId),
       });
 
-      // 5. Generate unique invoice number (inside transaction to avoid race)
-      const invoiceNumber = await generateInvoiceNumber(
-        client,
-        session.accountId
-      );
-
       // 6. Create the FINAL invoice as an immutable snapshot of the approved
       //    estimate. It carries the full project total; deposit_cents holds the
       //    deposit already billed so the generated balance_cents excludes it.
@@ -236,36 +225,28 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         : null;
       const finalDueDate = resolveIssueDueDate({ invoiceKind: "final", jobStatus });
 
-      const invoiceResult = await client.query<{ id: string }>(
-        `INSERT INTO invoices
-           (account_id, client_id, job_id, estimate_id, property_id,
-            status, invoice_kind, invoice_number,
-            subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-            notes, due_date, created_by, travel_snapshot_id, travel_billing_mode)
-         VALUES ($1, $2, $3, $4, $5,
-                 'draft', 'final', $6,
-                 $7, $8, $9, 0, $10,
-                 $11, $12, $13, $14, $15)
-         RETURNING id`,
-        [
-          session.accountId,
-          estimate.client_id,
-          estimate.job_id,
-          id, // estimate_id FK
-          estimate.property_id,
-          invoiceNumber,
-          money.subtotal_cents,
-          money.tax_cents,
-          money.total_cents,
-          reconciliation.depositCreditCents,
-          finalNotes,
-          finalDueDate, // TASK-078: null until job completes
-          session.userId,
-          estimate.travel_snapshot_id,
-          estimate.travel_snapshot_id ? "estimated" : null,
-        ]
-      );
-      const invoiceId = invoiceResult.rows[0].id;
+      const created = await createInvoice(client, {
+        account_id: session.accountId,
+        client_id: estimate.client_id,
+        job_id: estimate.job_id,
+        estimate_id: id,
+        property_id: estimate.property_id,
+        invoice_kind: "final",
+        subtotal_cents: money.subtotal_cents,
+        tax_cents: money.tax_cents,
+        total_cents: money.total_cents,
+        deposit_cents: reconciliation.depositCreditCents,
+        notes: finalNotes,
+        due_date: finalDueDate, // TASK-078: null until job completes
+        created_by: session.userId,
+        travel_snapshot_id: estimate.travel_snapshot_id,
+        travel_billing_mode: estimate.travel_snapshot_id ? "estimated" : null,
+      });
+      if (!created.created) {
+        // Another request invoiced this job between the check above and now.
+        return { invoice_id: created.id, invoice_status: created.status, created: false };
+      }
+      const { id: invoiceId, invoice_number: invoiceNumber } = created;
 
       // Carry travel snapshot forward (do not recalculate — rate/charge frozen at estimate time)
       if (estimate.travel_snapshot_id) {
