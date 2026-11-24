@@ -19,16 +19,15 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : I1 TASK-246 Verified (#776, c365fa9a, migration 217;
-                      backup ai_fsm_20261124T221733Z.dump verified). Deployed
-                      ~22:24 UTC together with #774 (TASK-241, merged by
-                      another session, not yet deployed). Health ok, /login
-                      200, payment DELETE 401 unauth, trigger fires on
-                      DELETE, 53 invoices with payments still match.
-In-flight PR        : I2 TASK-247 (one invoice writer, migration 218)
-Next step           : I2 TASK-247 merge, backup, deploy, verify; then I3.
+Last step           : I2 TASK-247 Verified (#777, dccaba55, migration 218;
+                      backup ai_fsm_20261124T225712Z.dump verified). Health
+                      ok, /login 200, changed routes 401 unauth, three
+                      indexes present, 61 invoices, no web errors.
+In-flight PR        : I3 TASK-251 (invoice lock rules in one place,
+                      migration 219)
+Next step           : I3 TASK-251 merge, backup, deploy, verify; then I4.
 Blocked on          : nothing
-Last known-good     : c365fa9a (deploy-good/0b58b702 before it)
+Last known-good     : dccaba55 (deploy-good/c365fa9a before it)
 Notes               : The stale TASK-235..240 drafts in the main checkout
                       were discarded at the owner's request 2026-11-24.
                       C3 TASK-212 resumes after Track I. Owner checks after deploy (non-blocking):
@@ -161,7 +160,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | E6 | TASK-240 | 2026-11-23 (#762, CI green incl. progress-line e2e) | 2026-11-23 (#762, a4a6aaa4) | 2026-11-23 (~19:56 UTC) | 2026-11-23 (health ok, /login 200, customer page 307 signed out, no web errors; loader SQL run read-only on production) |
 | I0 | Backlog TASK-246..255 + Track I | 2026-11-24 (#775, CI green) | 2026-11-24 (#775, 2b47f648) | n/a | n/a |
 | I1 | TASK-246 | 2026-11-24 (#776, CI green) | 2026-11-24 (#776, c365fa9a) | 2026-11-24 (~22:24 UTC, migration 217) | 2026-11-24 (health ok, /login 200, DELETE 401 unauth, trigger on DELETE, paid totals unchanged) |
-| I2 | TASK-247 | | | | |
+| I2 | TASK-247 | 2026-11-24 (#777, CI green) | 2026-11-24 (#777, dccaba55) | 2026-11-24 (~23:04 UTC, migration 218) | 2026-11-24 (health ok, /login 200, routes 401 unauth, indexes present, no web errors) |
 | I3 | TASK-251 | | | | |
 | I4 | TASK-249 | | | | |
 | I5 | TASK-250 | | | | |
@@ -780,6 +779,10 @@ Per step:
 
 ## Log
 
+- 2026-11-24 · I3 · In progress · TASK-251: migration 219 rebuilds enforce_invoice_immutability around invoice_document_columns() + invoice_changed(); found balance_cents (generated, NULL in BEFORE triggers) made the 146 document-link and 157 view branches dead, so paid invoices could never be relinked; new lock test pins every branch
+- 2026-11-24 · I2 · Verified · health ok, /login 200, invoice/convert/deposit routes 401 unauth, idx_invoices_one_final_per_job / _deposit_per_estimate / _final_per_estimate (void excluded) present, 61 invoices, no web errors. TASK-247 Done
+- 2026-11-24 · I2 · Deployed · dccaba55 · ~23:04 UTC, migration 218; backup ai_fsm_20261124T225712Z.dump verified; known-good deploy-good/c365fa9a
+- 2026-11-24 · I2 · Merged · #777 · squash dccaba55; Codex P1 fixed before merge (Convert and deposit route stop when a concurrent request invoiced first)
 - 2026-11-24 · I2 · In progress · TASK-247: lib/invoices/create-invoice.ts (findOpenInvoice, createInvoice) used by all six invoice writers; migration 218 unique indexes (one open final/standard per job, one open final and one open deposit per estimate, void ignored); manual invoice on a job that has one → 409 INVOICE_EXISTS. Prod read-only: no existing duplicates
 - 2026-11-24 · I1 · Verified · health ok, /login 200, payment DELETE 401 unauth, trg_payment_sync_invoice fires on DELETE, 0 of 53 invoices with payments drift. TASK-246 Done
 - 2026-11-24 · I1 · Deployed · c365fa9a · ~22:24 UTC, migration 217; backup ai_fsm_20261124T221733Z.dump verified; known-good deploy-good/0b58b702. Also shipped #774 (TASK-241), which another session merged at 21:58 and had not deployed. The deploy script recreated postgres-1 (image refresh); data intact
