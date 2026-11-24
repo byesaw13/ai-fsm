@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg";
 import { normalizePhone } from "../phone";
+import { findClientByContact } from "../clients/match";
 import { SMS_CONSENT_TEXT } from "../sms/consent";
 
 export { SMS_CONSENT_TEXT };
@@ -117,21 +118,8 @@ async function findOrCreateClient(
   // Normalize to E.164 so the same person always maps to one record.
   const normalizedPhone = normalizePhone(input.phone) ?? input.phone ?? null;
 
-  if (input.email) {
-    const { rows } = await client.query<{ id: string }>(
-      `SELECT id FROM clients WHERE account_id = $1 AND email = $2`,
-      [input.accountId, input.email]
-    );
-    clientId = rows[0]?.id ?? null;
-  }
-
-  if (!clientId && normalizedPhone) {
-    const { rows } = await client.query<{ id: string }>(
-      `SELECT id FROM clients WHERE account_id = $1 AND phone = $2`,
-      [input.accountId, normalizedPhone]
-    );
-    clientId = rows[0]?.id ?? null;
-  }
+  // Phone in any stored format, then email in any case (TASK-249).
+  clientId = await findClientByContact(client, input.accountId, { phone: input.phone, email: input.email });
 
   if (!clientId) {
     const { rows } = await client.query<{ id: string }>(

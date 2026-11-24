@@ -4,6 +4,7 @@ import { withAuth } from "../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../lib/db";
 import { normalizeClientName } from "../../../../../lib/crm/normalization";
+import { findClientByContact } from "../../../../../lib/clients/match";
 import { logger } from "../../../../../lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -91,21 +92,26 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     );
 
     for (const row of parsed) {
-      // Dedupe: prefer the Square customer id (stable, and many rows have no
-      // email); otherwise fall back to exact name+email.
-      const exists = row.square_customer_id
-        ? await client.query<{ id: string }>(
+      // Dedupe: the Square customer id (stable), else phone or email (TASK-249),
+      // else the same name — normalized the way it is stored — and email.
+      const bySquare = row.square_customer_id
+        ? (await client.query<{ id: string }>(
             `SELECT id FROM clients WHERE account_id = $1 AND square_customer_id = $2`,
             [session.accountId, row.square_customer_id]
-          )
-        : await client.query<{ id: string }>(
-            `SELECT id FROM clients WHERE account_id = $1 AND LOWER(name) = LOWER($2) AND LOWER(COALESCE(email,'')) = LOWER(COALESCE($3,''))`,
-            [session.accountId, row.name, row.email ?? ""]
-          );
-      if (exists.rows.length > 0) {
+          )).rows[0]?.id
+        : undefined;
+      const byName = async () =>
+        (await client.query<{ id: string }>(
+          `SELECT id FROM clients WHERE account_id = $1 AND LOWER(name) = LOWER($2) AND LOWER(COALESCE(email,'')) = LOWER(COALESCE($3,''))`,
+          [session.accountId, normalizeClientName(row.name), row.email ?? ""]
+        )).rows[0]?.id;
+      const existingId =
+        bySquare ??
+        (await findClientByContact(client, session.accountId, { phone: row.phone, email: row.email })) ??
+        (await byName());
+      if (existingId) {
         // Refresh Square history fields on match — CSV re-import is the way to
         // pull lifetime spend / transaction counts onto existing clients.
-        const existingId = exists.rows[0].id;
         await client.query(
           `UPDATE clients SET
              nickname = COALESCE($2, nickname),

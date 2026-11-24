@@ -1,7 +1,7 @@
 # TASK-251: Invoice lock exceptions live in one place
 
 Status:
-In Progress
+Done
 
 Epic:
 EPIC-004 Billing & Profitability
@@ -24,8 +24,8 @@ Out of scope:
 - Changing which changes are allowed.
 
 Acceptance Criteria:
-- [ ] Every existing integration test for invoice immutability passes unchanged.
-- [ ] The next exception can be added without copying the existing ones.
+- [x] Every existing integration test for invoice immutability passes unchanged.
+- [x] The next exception can be added without copying the existing ones.
 
 Test Plan:
 - Integration: the existing immutability suite, plus one case per named exception.

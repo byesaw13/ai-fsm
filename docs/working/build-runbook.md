@@ -19,15 +19,20 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : I2 TASK-247 Verified (#777, dccaba55, migration 218;
-                      backup ai_fsm_20261124T225712Z.dump verified). Health
-                      ok, /login 200, changed routes 401 unauth, three
-                      indexes present, 61 invoices, no web errors.
-In-flight PR        : I3 TASK-251 (invoice lock rules in one place,
-                      migration 219)
-Next step           : I3 TASK-251 merge, backup, deploy, verify; then I4.
-Blocked on          : nothing
-Last known-good     : dccaba55 (deploy-good/c365fa9a before it)
+Last step           : I3 TASK-251 Verified (#778, 75767d59, migration 219;
+                      backup ai_fsm_20261124T231951Z.dump verified). Health
+                      ok, /login 200, paid-invoice edit still refused (tried
+                      in a rolled-back transaction), no web errors.
+In-flight PR        : I4 TASK-249 PR 1 (one customer lookup for create,
+                      intake and import; no migration)
+Next step           : I4 PR 1 merge, deploy, verify. Then STOP for the owner
+                      (G4): 10 customers share a phone with an older record
+                      and 3 share an email (mostly a 2026-07-01 / 07-06 double
+                      import). PR 2 (unique index) waits until the owner has
+                      merged them. Meanwhile I5 may start (it needs I4 only for
+                      the lookup, which PR 1 ships).
+Blocked on          : nothing yet
+Last known-good     : 75767d59 (deploy-good/dccaba55 before it)
 Notes               : The stale TASK-235..240 drafts in the main checkout
                       were discarded at the owner's request 2026-11-24.
                       C3 TASK-212 resumes after Track I. Owner checks after deploy (non-blocking):
@@ -161,7 +166,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | I0 | Backlog TASK-246..255 + Track I | 2026-11-24 (#775, CI green) | 2026-11-24 (#775, 2b47f648) | n/a | n/a |
 | I1 | TASK-246 | 2026-11-24 (#776, CI green) | 2026-11-24 (#776, c365fa9a) | 2026-11-24 (~22:24 UTC, migration 217) | 2026-11-24 (health ok, /login 200, DELETE 401 unauth, trigger on DELETE, paid totals unchanged) |
 | I2 | TASK-247 | 2026-11-24 (#777, CI green) | 2026-11-24 (#777, dccaba55) | 2026-11-24 (~23:04 UTC, migration 218) | 2026-11-24 (health ok, /login 200, routes 401 unauth, indexes present, no web errors) |
-| I3 | TASK-251 | | | | |
+| I3 | TASK-251 | 2026-11-24 (#778, CI green) | 2026-11-24 (#778, 75767d59) | 2026-11-24 (~23:25 UTC, migration 219) | 2026-11-24 (health ok, /login 200, paid lock holds, no web errors) |
 | I4 | TASK-249 | | | | |
 | I5 | TASK-250 | | | | |
 | I6 | TASK-248 | | | | |
@@ -779,6 +784,10 @@ Per step:
 
 ## Log
 
+- 2026-11-24 · I4 · In progress · TASK-249 PR 1: lib/clients/match.ts findClientByContact (email any case, phone last 10 digits) used by client create (returns the existing customer, 200 matched), intake and the CSV import (which compared the raw name to the stored normalized name, the likely cause of the 07-01/07-06 doubles). Quick-book takes only a name, so it is out of scope. Prod read-only: 10 phone pairs, 3 email pairs
+- 2026-11-24 · I3 · Verified · health ok, /login 200, invoice_document_columns() live, paid edit refused (rolled back), 61 invoices, no web errors. TASK-251 Done
+- 2026-11-24 · I3 · Deployed · 75767d59 · ~23:25 UTC, migration 219; backup ai_fsm_20261124T231951Z.dump verified; known-good deploy-good/dccaba55
+- 2026-11-24 · I3 · Merged · #778 · squash 75767d59; no Codex findings
 - 2026-11-24 · I3 · In progress · TASK-251: migration 219 rebuilds enforce_invoice_immutability around invoice_document_columns() + invoice_changed(); found balance_cents (generated, NULL in BEFORE triggers) made the 146 document-link and 157 view branches dead, so paid invoices could never be relinked; new lock test pins every branch
 - 2026-11-24 · I2 · Verified · health ok, /login 200, invoice/convert/deposit routes 401 unauth, idx_invoices_one_final_per_job / _deposit_per_estimate / _final_per_estimate (void excluded) present, 61 invoices, no web errors. TASK-247 Done
 - 2026-11-24 · I2 · Deployed · dccaba55 · ~23:04 UTC, migration 218; backup ai_fsm_20261124T225712Z.dump verified; known-good deploy-good/c365fa9a

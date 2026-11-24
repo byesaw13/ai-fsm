@@ -1,7 +1,7 @@
 # TASK-249: The server never creates a second customer for the same phone
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-003 Property Intelligence
@@ -17,7 +17,7 @@ Problem:
 
 Scope:
 - Step 1 (read-only): a query listing existing customers that share a normalized phone, in the PR. The owner decides merges (G4); none are made by this task.
-- Client create and quick-book look up by normalized phone (then email) and return the existing customer with `matched: true` instead of inserting.
+- `lib/clients/match.ts` `findClientByContact`: email in any case, then phone by its last 10 digits (a shorter number matches only when typed the same). Client create returns the existing customer (200, `matched: true`) instead of inserting; intake and the CSV import use the same lookup. The import also compares the normalized name the way it is stored (a raw-vs-normalized mismatch let a re-import double customers). Quick-book takes only a name, so it cannot match by phone and is out of scope.
 - After the owner has cleared the duplicates: migration adding a unique partial index on `(account_id, phone_normalized)` where not null (add the normalized column if missing, backfilled with `normalizePhone`).
 
 Out of scope:
