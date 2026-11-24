@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import { withExpenseContext } from "@/lib/expenses/db";
-import { replaceExpenseLineItems } from "@/lib/expenses/line-items";
-import { learnMaterialsFromLineItems } from "@/lib/materials/catalog";
+import { ReceiptRevisionError, saveReceiptRevision } from "@/lib/expenses/receipt-revisions";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 
@@ -17,8 +16,19 @@ const lineItemSchema = z.object({
   billable: z.boolean().default(true),
 });
 
+const adjustmentSchema = z.object({
+  kind: z.enum(["return", "discount", "coupon"]),
+  name: z.string().max(200),
+  amount_cents: z.number().int(),
+});
+
 const putBodySchema = z.object({
   line_items: z.array(lineItemSchema).max(100),
+  /** "parse" when the lines come straight from a receipt scan; a hand edit otherwise. */
+  origin: z.enum(["parse", "edit"]).default("edit"),
+  /** From the scan. Omitted on a hand edit: the current revision's values carry forward. */
+  tax_cents: z.number().int().nonnegative().nullable().optional(),
+  adjustments: z.array(adjustmentSchema).max(50).optional(),
 });
 
 export const PUT = withRole(["owner", "admin"], async (request, session) => {
@@ -51,89 +61,25 @@ export const PUT = withRole(["owner", "admin"], async (request, session) => {
 
   try {
     const data = await withExpenseContext(session, async (client) => {
-      const expense = await client.query<{
-        id: string;
-        category: string;
-        vendor_name: string;
-        expense_date: string;
-      }>(
-        `SELECT id, category, vendor_name, expense_date::text AS expense_date
-         FROM expenses WHERE id = $1 AND account_id = $2`,
-        [expenseId, session.accountId],
-      );
-      if ((expense.rowCount ?? 0) === 0) {
-        throw Object.assign(new Error("Expense not found"), { code: "NOT_FOUND" });
-      }
-
-      const exp = expense.rows[0];
-
-      const billed = await client.query(
-        `SELECT 1 AS exists FROM invoice_line_items WHERE source_expense_id = $1 LIMIT 1`,
-        [expenseId],
-      );
-      if ((billed.rowCount ?? 0) > 0) {
-        throw Object.assign(
-          new Error("This receipt is already on an invoice — edit the invoice instead"),
-          { code: "ALREADY_BILLED" },
-        );
-      }
-
-      const saved = await replaceExpenseLineItems(
+      const body = parseResult.data;
+      const saved = await saveReceiptRevision(
         client,
-        session.accountId,
+        { accountId: session.accountId, userId: session.userId, traceId: session.traceId },
         expenseId,
-        parseResult.data.line_items.map((li, idx) => ({
-          name: li.name,
-          quantity: li.quantity,
-          unit_cost_cents: li.unit_cost_cents,
-          sku: li.sku ?? null,
-          sort_order: idx,
-          billable: li.billable,
-        })),
+        {
+          origin: body.origin,
+          lineItems: body.line_items.map((li, idx) => ({
+            name: li.name,
+            quantity: li.quantity,
+            unit_cost_cents: li.unit_cost_cents,
+            sku: li.sku ?? null,
+            sort_order: idx,
+            billable: li.billable,
+          })),
+          taxCents: body.tax_cents,
+          adjustments: body.adjustments?.map((a) => ({ ...a, amount_cents: -Math.abs(a.amount_cents) })),
+        },
       );
-
-      // Non-fatal: materials receipts teach the SKU/price catalog.
-      // Use a savepoint so a PG error does not abort the outer expense transaction.
-      let catalog_learned = 0;
-      if (exp.category === "materials" && saved.length > 0) {
-        try {
-          await client.query("SAVEPOINT materials_catalog_learn");
-          try {
-            const { learned } = await learnMaterialsFromLineItems(
-              client,
-              {
-                accountId: session.accountId,
-                supplier: exp.vendor_name,
-                purchasedAt: exp.expense_date?.slice(0, 10) ?? null,
-                source: { kind: "receipt", expenseId },
-                enteredBy: session.userId,
-              },
-              saved.map((li) => ({
-                name: li.name,
-                unit_cost_cents: li.unit_cost_cents,
-                sku: li.sku,
-                quantity: li.quantity,
-              })),
-            );
-            catalog_learned = learned;
-            await client.query("RELEASE SAVEPOINT materials_catalog_learn");
-          } catch (learnErr) {
-            await client.query("ROLLBACK TO SAVEPOINT materials_catalog_learn");
-            await client.query("RELEASE SAVEPOINT materials_catalog_learn");
-            logger.warn("materials catalog learn failed (non-fatal)", {
-              error: learnErr instanceof Error ? learnErr.message : String(learnErr),
-              expenseId,
-              traceId: session.traceId,
-            });
-          }
-        } catch (spErr) {
-          logger.warn("materials catalog learn savepoint failed (non-fatal)", {
-            error: spErr instanceof Error ? spErr.message : String(spErr),
-            expenseId,
-            traceId: session.traceId,
-          });
-        }
-      }
 
       await appendAuditLog(client, {
         account_id: session.accountId,
@@ -144,17 +90,19 @@ export const PUT = withRole(["owner", "admin"], async (request, session) => {
         trace_id: session.traceId,
         new_value: {
           action: "edit_line_items",
-          count: saved.length,
-          catalog_learned,
+          revision: saved.revision,
+          count: saved.line_items.length,
+          catalog_learned: saved.catalog_learned,
+          reconciliation: saved.reconciliation,
         },
       });
 
-      return { line_items: saved, catalog_learned };
+      return saved;
     });
 
     return NextResponse.json({ data });
   } catch (error) {
-    const err = error as Error & { code?: string };
+    const err = error instanceof ReceiptRevisionError ? error : (error as Error & { code?: string });
     if (err.code === "NOT_FOUND") {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Expense not found", traceId: session.traceId } },

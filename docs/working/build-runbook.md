@@ -19,21 +19,18 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : C1 TASK-210 Verified: #768 (2261c14a) deployed
-                      ~01:25 UTC 2026-11-24 with migration 214 (backup
-                      ai_fsm_20261124T011958Z.dump verified). Backfill run
-                      pl-2026-11-24-prod applied after a dry run: 1,314
-                      summaries (228 superseded), 260 receipt observations
-                      (15 receipt lines matched no item, skipped); re-run
-                      inserts 0 and changes 0. Cache before the run:
-                      /opt/business/ai-fsm/backups/price-cache-before-
-                      pl-2026-11-24-prod.json. Health ok, no web errors.
-In-flight PR        : C2 TASK-211 PR 1 of 2 (imports: history and book modes,
-                      review records, old catalog import retired).
-Next step           : C2 PR 2 (receipt parse revisions, signed returns and
-                      discounts, reconciliation), then C3.
+Last step           : C2 TASK-211 PR 1 Verified: #770 (e83864f7) deployed
+                      ~03:51 UTC 2026-11-24 with migration 215 (backup
+                      ai_fsm_20261124T034408Z.dump verified). Imports in two
+                      modes, review records, old catalog import retired.
+                      Health ok, /login 200, reviews API 401 unauth, 0 review
+                      records, expense and observation counts unchanged.
+In-flight PR        : C2 TASK-211 PR 2 of 2 (receipt parse revisions, signed
+                      returns/discounts, reconciliation; migration 216).
+Next step           : after PR 2 is Verified, close out TASK-211, then C3
+                      TASK-212 (package sizes; needs C1).
 Blocked on          : nothing
-Last known-good     : 2261c14a (deploy-good/f151f04e before it)
+Last known-good     : e83864f7 (deploy-good/2261c14a before it)
 Notes               : Main checkout holds another session's uncommitted
                       drafts of TASK-235..240 (duplicates of #755); left
                       untouched. Owner checks after deploy (non-blocking):
@@ -134,7 +131,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | B5 | TASK-194 | 2026-11-23 (#764, CI green) | 2026-11-23 (#764, d1fdba88) | 2026-11-23 (~23:25 UTC) | 2026-11-23 (health ok, /login 200, sent estimates unchanged, no snapshots on old quotes) |
 | B6 | TASK-195 | 2026-11-24 (#766, CI green) | 2026-11-24 (#766, f151f04e) | 2026-11-24 (~00:34 UTC) | 2026-11-24 (health ok, /login 200, review 401 unauth, no stored reviews from page opens) |
 | C1 | TASK-210 | 2026-11-24 (#768, CI green) | 2026-11-24 (#768, 2261c14a) | 2026-11-24 (~01:25 UTC, migration 214; backfill pl-2026-11-24-prod) | 2026-11-24 (health ok, ledger 1,314 summaries + 260 receipts, backfill re-run no-op) |
-| C2 | TASK-211 | | | | |
+| C2 | TASK-211 | PR 1 2026-11-24 (#770, CI green) | PR 1 2026-11-24 (#770, e83864f7) | PR 1 2026-11-24 (~03:51 UTC, migration 215) | PR 1 2026-11-24 (health ok, /login 200, reviews 401 unauth, counts unchanged) |
 | C3 | TASK-212 | | | | |
 | C4 | TASK-213 | | | | |
 | C5 | TASK-214 | | | | |
@@ -703,6 +700,7 @@ Per step:
 
 - 2026-11-24 · C1 · Verified · health ok, no web errors; backfill re-run inserts 0 / changes 0; no variant counts more purchases than its real active rows
 - 2026-11-24 · C1 · Backfill · run pl-2026-11-24-prod applied after dry run (1,314 summaries, 260 receipts; averages for ~1,095 Pro Xtra-only items now blank until the C7 re-import); cleanup: DELETE FROM price_observations WHERE note = 'backfill:pl-2026-11-24-prod' + restore from price-cache-before-pl-2026-11-24-prod.json
+- 2026-11-24 · C2 · PR 1 · #770 merged (e83864f7), deployed with migration 215 after backup ai_fsm_20261124T034408Z.dump; Codex P1 (overlapping imports) and two P2s fixed before merge; verified
 - 2026-11-24 · C1 · Deployed · 2261c14a · ~01:25 UTC, migration 214; backup ai_fsm_20261124T011958Z.dump verified; known-good deploy-good/f151f04e
 - 2026-11-24 · C1 · Merged · #768 · squash 2261c14a; three Codex findings fixed before merge (CSV keys carry the date, empty evidence clears the cache, store-suffixed variants reused)
 - 2026-11-24 · C1 · In progress · TASK-210: price_observations ledger (migration 214), variants per store family + SKU, every catalog writer through the ledger, backfill script (dry run on a prod copy: 1,314 summaries, 260/275 receipt lines matched)

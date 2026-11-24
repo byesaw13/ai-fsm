@@ -30,8 +30,13 @@ export type CatalogLearnContext = {
   supplier?: string | null;
   purchasedAt?: string | null; // YYYY-MM-DD
   category?: string;
-  /** Where the purchase was seen. A receipt replaces its own earlier observations. */
-  source: { kind: "receipt"; expenseId: string } | { kind: "supplier_csv"; ref: string };
+  /**
+   * Where the purchase was seen. A receipt replaces its own earlier observations;
+   * with a parse revision, each revision has its own keys (TASK-211).
+   */
+  source: { kind: "receipt"; expenseId: string; revision?: number } | { kind: "supplier_csv"; ref: string };
+  /** The receipt's lines, adjustments and tax add up to its total. */
+  reconciled?: boolean;
   enteredBy?: string | null;
 };
 
@@ -80,11 +85,12 @@ export async function learnMaterialsFromLineItems(
       unitPriceCents: Math.round(line.unit_cost_cents),
       storeFamily: variant.storeFamily,
       isSale: line.is_sale ?? false,
+      reconciled: ctx.reconciled ?? false,
       sourceRef,
       dedupeKey:
         line.dedupe_key ??
         (ctx.source.kind === "receipt"
-          ? `receipt:${ctx.source.expenseId}:${fingerprints[i]}`
+          ? `receipt:${ctx.source.expenseId}:${ctx.source.revision ? `r${ctx.source.revision}:` : ""}${fingerprints[i]}`
           : `csv:${variant.storeFamily}:${observedOn}:${fingerprints[i]}`),
       enteredBy: ctx.enteredBy ?? null,
     });

@@ -49,6 +49,25 @@ describe("learnMaterialsFromLineItems (TASK-210)", () => {
     expect(recordObservations).not.toHaveBeenCalled();
   });
 
+  it("a receipt parse revision keys its prices by revision and carries reconciliation (TASK-211)", async () => {
+    await learnMaterialsFromLineItems(
+      client,
+      {
+        accountId: "a1",
+        supplier: "The Home Depot",
+        purchasedAt: "2026-07-01",
+        source: { kind: "receipt", expenseId: "e3", revision: 4 },
+        reconciled: true,
+      },
+      [{ name: "Screws", unit_cost_cents: 500, sku: "123", quantity: 1 }],
+    );
+    const [, , , rows] = replaceSourceObservations.mock.calls[0] as unknown as [
+      unknown, string, string, { dedupeKey: string; reconciled: boolean }[],
+    ];
+    expect(rows[0].dedupeKey).toBe("receipt:e3:r4:123|500|1#1");
+    expect(rows[0].reconciled).toBe(true);
+  });
+
   it("a receipt with no priced lines clears its observations", async () => {
     await learnMaterialsFromLineItems(client, { accountId: "a1", source: { kind: "receipt", expenseId: "e2" } }, []);
     expect(replaceSourceObservations).toHaveBeenCalledWith(client, "a1", "expense:e2", []);

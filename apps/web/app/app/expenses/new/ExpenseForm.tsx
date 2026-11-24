@@ -70,6 +70,11 @@ export function ExpenseForm({
     { name: string; quantity: number; unit_cost_cents: number; sku?: string | null }[]
   >([]);
   const scannedTxnIdRef = useRef<string | null>(null);
+  // Tax and returns/discounts/coupons from the scan, so the saved receipt can reconcile.
+  const scannedReconcileRef = useRef<{
+    tax_cents: number | null;
+    adjustments: { kind: string; name: string; amount_cents: number }[];
+  }>({ tax_cents: null, adjustments: [] });
 
   /** Banner after OCR matched a Supply PO to an open project. */
   const [poMatchLabel, setPoMatchLabel] = useState<string | null>(null);
@@ -99,8 +104,14 @@ export function ExpenseForm({
         po_number,
         transaction_id,
         gallons,
+        tax_cents,
+        adjustments,
       } = data.data;
       scannedLineItemsRef.current = Array.isArray(line_items) ? line_items : [];
+      scannedReconcileRef.current = {
+        tax_cents: typeof tax_cents === "number" ? tax_cents : null,
+        adjustments: Array.isArray(adjustments) ? adjustments : [],
+      };
       scannedTxnIdRef.current =
         typeof transaction_id === "string" && transaction_id.trim()
           ? transaction_id.trim()
@@ -223,7 +234,11 @@ export function ExpenseForm({
         await fetch(`/api/v1/expenses/${expenseId}/line-items`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ line_items: scannedLineItemsRef.current }),
+          body: JSON.stringify({
+            line_items: scannedLineItemsRef.current,
+            origin: "parse",
+            ...scannedReconcileRef.current,
+          }),
         }).catch(() => null);
       }
 

@@ -8,6 +8,7 @@ import {
   RECEIPT_LINE_ITEMS_PROMPT,
   getReceiptParseModel,
   normalizeParsedReceiptLineItems,
+  receiptAdjustmentsFrom,
   reconcileReceiptParse,
   type ParsedReceipt,
 } from "@/lib/expenses/receipt-line-items";
@@ -132,7 +133,8 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     }
 
     const line_items = normalizeParsedReceiptLineItems(parsed.line_items);
-    const reconciliation = reconcileReceiptParse(line_items, amount_cents, tax_cents);
+    const adjustments = receiptAdjustmentsFrom(parsed.line_items, parsed.adjustments);
+    const reconciliation = reconcileReceiptParse(line_items, amount_cents, tax_cents, adjustments);
 
     if (reconciliation.balanced === false) {
       logger.warn("[scan-receipt] line totals vs receipt total unbalanced", {
@@ -172,6 +174,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         transaction_id,
         gallons,
         line_items,
+        adjustments,
         reconciliation,
         parse_model: model,
       },

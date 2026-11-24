@@ -2,15 +2,14 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { withRole } from "@/lib/auth/middleware";
 import { withExpenseContext } from "@/lib/expenses/db";
-import { replaceExpenseLineItems } from "@/lib/expenses/line-items";
 import {
   RECEIPT_LINE_ITEMS_PROMPT,
   getReceiptParseModel,
   normalizeParsedReceiptLineItems,
-  reconcileReceiptParse,
+  receiptAdjustmentsFrom,
   type ParsedReceipt,
 } from "@/lib/expenses/receipt-line-items";
-import { learnMaterialsFromLineItems } from "@/lib/materials/catalog";
+import { ReceiptRevisionError, saveReceiptRevision } from "@/lib/expenses/receipt-revisions";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import fs from "fs";
@@ -120,73 +119,37 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         });
       }
 
-      const amountCents =
-        typeof parsed.amount_cents === "number" && parsed.amount_cents > 0
-          ? Math.round(parsed.amount_cents)
-          : null;
       const taxCents =
         typeof parsed.tax_cents === "number" && parsed.tax_cents > 0
           ? Math.round(parsed.tax_cents)
           : null;
-      const reconciliation = reconcileReceiptParse(lineItems, amountCents, taxCents);
+
+      // A new numbered revision; the expense row lock serializes concurrent re-parses.
+      const saved = await saveReceiptRevision(
+        client,
+        { accountId: session.accountId, userId: session.userId, traceId: session.traceId },
+        expenseId,
+        {
+          origin: "parse",
+          lineItems: lineItems.map((li, idx) => ({
+            name: li.name,
+            quantity: li.quantity,
+            unit_cost_cents: li.unit_cost_cents,
+            sku: li.sku ?? null,
+            sort_order: idx,
+          })),
+          taxCents,
+          adjustments: receiptAdjustmentsFrom(parsed.line_items, parsed.adjustments),
+        },
+      );
+      const { reconciliation, catalog_learned } = saved;
       if (reconciliation.balanced === false) {
-        logger.warn("parse-line-items: line totals vs receipt total unbalanced", {
+        logger.warn("parse-line-items: receipt does not reconcile after tax, discounts and returns", {
           expenseId,
           model,
           ...reconciliation,
           traceId: session.traceId,
         });
-      }
-
-      const saved = await replaceExpenseLineItems(
-        client,
-        session.accountId,
-        expenseId,
-        lineItems.map((li, idx) => ({
-          name: li.name,
-          quantity: li.quantity,
-          unit_cost_cents: li.unit_cost_cents,
-          sku: li.sku ?? null,
-          sort_order: idx,
-        })),
-      );
-
-      // Non-fatal catalog learn (same path as line-items PUT)
-      let catalog_learned = 0;
-      if (row.category === "materials" && saved.length > 0) {
-        try {
-          await client.query("SAVEPOINT materials_catalog_learn");
-          try {
-            const { learned } = await learnMaterialsFromLineItems(
-              client,
-              {
-                accountId: session.accountId,
-                supplier: row.vendor_name,
-                purchasedAt: row.expense_date?.slice(0, 10) ?? null,
-                source: { kind: "receipt", expenseId },
-                enteredBy: session.userId,
-              },
-              saved.map((li) => ({
-                name: li.name,
-                unit_cost_cents: li.unit_cost_cents,
-                sku: li.sku,
-                quantity: li.quantity,
-              })),
-            );
-            catalog_learned = learned;
-            await client.query("RELEASE SAVEPOINT materials_catalog_learn");
-          } catch (learnErr) {
-            await client.query("ROLLBACK TO SAVEPOINT materials_catalog_learn");
-            await client.query("RELEASE SAVEPOINT materials_catalog_learn");
-            logger.warn("materials catalog learn failed after parse (non-fatal)", {
-              error: learnErr instanceof Error ? learnErr.message : String(learnErr),
-              expenseId,
-              traceId: session.traceId,
-            });
-          }
-        } catch {
-          /* outer savepoint create failed — ignore */
-        }
       }
 
       await appendAuditLog(client, {
@@ -198,7 +161,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         trace_id: session.traceId,
         new_value: {
           action: "parse_line_items",
-          count: saved.length,
+          revision: saved.revision,
+          count: saved.line_items.length,
           catalog_learned,
           reconciliation,
           parse_model: model,
@@ -206,7 +170,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       });
 
       return {
-        line_items: saved,
+        line_items: saved.line_items,
+        revision: saved.revision,
         catalog_learned,
         reconciliation,
         parse_model: model,
@@ -220,6 +185,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Expense not found", traceId: session.traceId } },
         { status: 404 },
+      );
+    }
+    if (error instanceof ReceiptRevisionError && error.code === "ALREADY_BILLED") {
+      return NextResponse.json(
+        { error: { code: "ALREADY_BILLED", message: error.message, traceId: session.traceId } },
+        { status: 409 },
       );
     }
     if (err.code === "NO_RECEIPT" || err.code === "PARSE_ERROR" || err.code === "NO_LINE_ITEMS") {

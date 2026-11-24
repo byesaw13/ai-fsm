@@ -5,6 +5,7 @@ import {
   reconcileReceiptParse,
   getReceiptParseModel,
   DEFAULT_RECEIPT_PARSE_MODEL,
+  receiptAdjustmentsFrom,
 } from "../receipt-line-items";
 
 describe("coerceUnitCostCents", () => {
@@ -156,5 +157,63 @@ describe("getReceiptParseModel", () => {
     expect(getReceiptParseModel()).toBe("claude-haiku-4-5-20251001");
     if (prev !== undefined) process.env.RECEIPT_PARSE_MODEL = prev;
     else delete process.env.RECEIPT_PARSE_MODEL;
+  });
+});
+
+describe("signed adjustments and reconciliation (TASK-211, D11-8)", () => {
+  it("keeps a returned line as a negative return adjustment, never a price", () => {
+    const raw = [
+      { name: "Paint 1 gal", quantity: 1, unit_cost_cents: 4298, line_total_cents: 4298 },
+      { name: "RETURN caulk", quantity: -1, unit_cost_cents: 547, line_total_cents: -547 },
+      { name: "RETURN tape", quantity: 1, unit_cost_cents: -698 },
+    ];
+    expect(normalizeParsedReceiptLineItems(raw).map((l) => l.name)).toEqual(["Paint 1 gal"]);
+    expect(receiptAdjustmentsFrom(raw, [])).toEqual([
+      { kind: "return", name: "RETURN caulk", amount_cents: -547 },
+      { kind: "return", name: "RETURN tape", amount_cents: -698 },
+    ]);
+  });
+
+  it("signs receipt-level discounts and coupons negative whatever the model returned", () => {
+    expect(
+      receiptAdjustmentsFrom([], [
+        { kind: "discount", name: "PRO XTRA 5%", amount_cents: 215 },
+        { kind: "coupon", name: "MFR COUPON", amount_cents: -100 },
+        { kind: "discount", name: "zero", amount_cents: 0 },
+      ]),
+    ).toEqual([
+      { kind: "discount", name: "PRO XTRA 5%", amount_cents: -215 },
+      { kind: "coupon", name: "MFR COUPON", amount_cents: -100 },
+    ]);
+  });
+
+  it("a receipt that balances once tax, discounts and returns are applied is reconciled", () => {
+    const lines = [
+      { name: "Paint", quantity: 2, unit_cost_cents: 4298, line_total_cents: 8596 },
+      { name: "Tape", quantity: 1, unit_cost_cents: 698, line_total_cents: 698 },
+    ];
+    const adjustments = [
+      { kind: "return" as const, name: "RETURN caulk", amount_cents: -547 },
+      { kind: "coupon" as const, name: "COUPON", amount_cents: -500 },
+    ];
+    // (8596 + 698 - 547 - 500) = 8247 merchandise, + 6.25% tax 515 = 8762
+    const r = reconcileReceiptParse(lines, 8762, 515, adjustments);
+    expect(r.adjustments_cents).toBe(-1047);
+    expect(r.delta_cents).toBe(0);
+    expect(r.balanced).toBe(true);
+    // Without the adjustments the same receipt does not add up.
+    expect(reconcileReceiptParse(lines, 8762, 515).balanced).toBe(false);
+  });
+
+  it("net line prices are never discounted twice", () => {
+    // The line's unit price already includes its $2 line discount; no adjustment repeats it.
+    const r = reconcileReceiptParse([{ name: "Saw blade", quantity: 1, unit_cost_cents: 1798 }], 1798, null, []);
+    expect(r.balanced).toBe(true);
+  });
+
+  it("only an unexplained mismatch is unreconciled", () => {
+    const r = reconcileReceiptParse([{ name: "Lumber", quantity: 1, unit_cost_cents: 5000 }], 9000, null, []);
+    expect(r.balanced).toBe(false);
+    expect(r.delta_cents).toBe(4000);
   });
 });
