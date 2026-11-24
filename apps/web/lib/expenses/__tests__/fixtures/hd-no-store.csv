@@ -1,0 +1,10 @@
+Company Name,DOVETAILS SERVICES LLC
+Phone Number,555-000-0000
+Source,Purchase Tracking
+Date Range,11/01/24 to 10/31/26
+Export Date,November 01 2026 09:00:00
+
+Date,Job Name,SKU Number,SKU Description,Quantity,Unit price,Department Name,Net Unit Price
+2026-06-09,SWIFT LANE,1001,"Wood screws #8 x 2 in. 1 lb",1,$9.97,HARDWARE,$9.97
+2026-06-09,SWIFT LANE,2001,Interior satin paint 1 gal,1,$42.98,PAINT,$42.98
+2026-06-10,,3001,2x4x8 stud,4,$3.98,LUMBER,$3.98

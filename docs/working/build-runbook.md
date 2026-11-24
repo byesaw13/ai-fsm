@@ -28,8 +28,10 @@ Last step           : C1 TASK-210 Verified: #768 (2261c14a) deployed
                       inserts 0 and changes 0. Cache before the run:
                       /opt/business/ai-fsm/backups/price-cache-before-
                       pl-2026-11-24-prod.json. Health ok, no web errors.
-In-flight PR        : none
-Next step           : C2 TASK-211 (duplicate-safe purchase imports; needs C1).
+In-flight PR        : C2 TASK-211 PR 1 of 2 (imports: history and book modes,
+                      review records, old catalog import retired).
+Next step           : C2 PR 2 (receipt parse revisions, signed returns and
+                      discounts, reconciliation), then C3.
 Blocked on          : nothing
 Last known-good     : 2261c14a (deploy-good/f151f04e before it)
 Notes               : Main checkout holds another session's uncommitted

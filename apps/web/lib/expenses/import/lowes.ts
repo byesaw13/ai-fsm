@@ -15,8 +15,11 @@ import {
   parseQuantity,
   materialCategoryFor,
   expenseCategoryFor,
+  rowSkipReason,
+  signedLineCents,
   type ImportTransaction,
   type ParseResult,
+  type SkippedRow,
 } from "./homedepot";
 import { findCol, parseDateISO } from "./csv-shared";
 
@@ -112,11 +115,7 @@ export function looksLikeLowesCsv(header: string[]): boolean {
 
   // HD has very specific columns — never claim those as Lowe's.
   const exact = header.map((h) => h.trim());
-  if (
-    exact.includes("Transaction ID") &&
-    exact.includes("SKU Description") &&
-    exact.includes("Net Unit Price")
-  ) {
+  if (exact.includes("SKU Description") && exact.includes("Net Unit Price")) {
     return false;
   }
 
@@ -160,16 +159,15 @@ export function parseLowesCsv(text: string): ParseResult {
   };
 
   const byTxn = new Map<string, ImportTransaction>();
+  const skipped: SkippedRow[] = [];
   let totalRows = 0;
 
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const r = rows[i];
     if (!r || r.every((c) => !String(c ?? "").trim())) continue;
+    const cell = (k: number) => (k >= 0 ? (r[k] ?? "").trim() : "");
 
-    const date = parseDateISO(r[ix.date] ?? "");
-    if (!date) continue;
-
-    const desc = (ix.desc >= 0 ? r[ix.desc] : "")?.trim() ?? "";
+    const desc = cell(ix.desc);
     const qty = parseQuantity(ix.qty >= 0 ? r[ix.qty] : "1");
     let unit = ix.unit >= 0 ? parseMoneyCents(r[ix.unit]) : 0;
     const ext = ix.ext >= 0 ? parseMoneyCents(r[ix.ext]) : 0;
@@ -177,27 +175,34 @@ export function parseLowesCsv(text: string): ParseResult {
     if (unit === 0 && ext !== 0 && qty !== 0) {
       unit = Math.round(ext / qty);
     }
-    // If still no money and no description, skip footer junk
+    // No money and no description: footer junk
     if (!desc && unit === 0 && ext === 0) continue;
+    totalRows++;
+    const line = i + 1;
 
-    let txnId = (ix.txn >= 0 ? r[ix.txn] : "")?.trim() ?? "";
-    if (!txnId) {
-      // Stable trip key without row index (re-import safe). Prefer store when present.
-      // Prefer rejecting ambiguous exports: require at least date + store, else date-only day bucket.
-      const store = ix.store >= 0 ? (r[ix.store] ?? "").trim() : "";
-      const job = ix.job >= 0 ? (r[ix.job] ?? "").trim() : "";
-      txnId = `LOWES-${date}${store ? `-S${store}` : ""}${job ? `-J${job}` : ""}`;
+    const date = parseDateISO(r[ix.date] ?? "");
+    if (!date) {
+      skipped.push({ line, reason: "bad_date", text: desc });
+      continue;
     }
 
-    totalRows++;
-    const jobName = ix.job >= 0 ? (r[ix.job] ?? "").trim() : "";
-    const dept = ix.dept >= 0 ? (r[ix.dept] ?? "").trim() : "";
+    const txnId = cell(ix.txn);
+    const store = cell(ix.store);
+    const jobName = cell(ix.job);
+    // Without a transaction number, rows of one day (and store and job tag) form one
+    // trip; such trips are review records, never counted automatically.
+    const tripKey = txnId
+      ? `${store}:${txnId}`
+      : `nt:${date}${store ? `:S${store}` : ""}${jobName ? `:J${jobName}` : ""}`;
+    const dept = cell(ix.dept);
     const lineTotal = ext !== 0 ? ext : Math.round(unit * qty);
 
-    let txn = byTxn.get(txnId);
+    let txn = byTxn.get(tripKey);
     if (!txn) {
       txn = {
-        external_ref: txnId,
+        external_ref: txnId || null,
+        store_number: store || null,
+        trip_key: tripKey,
         date,
         vendor: "Lowe's",
         job_name: jobName || null,
@@ -206,14 +211,20 @@ export function parseLowesCsv(text: string): ParseResult {
         line_items: [],
         is_return: false,
       };
-      byTxn.set(txnId, txn);
+      byTxn.set(tripKey, txn);
     }
     if (!txn.job_name && jobName) txn.job_name = jobName;
 
-    txn.amount_cents += lineTotal;
+    const rawPrice = ix.unit >= 0 && cell(ix.unit) ? r[ix.unit] : ix.ext >= 0 ? r[ix.ext] : undefined;
+    const reason = rowSkipReason(rawPrice, unit, qty);
+    if (reason !== "bad_price") txn.amount_cents += signedLineCents(lineTotal, unit, qty);
+    if (reason) {
+      skipped.push({ line, reason, text: desc });
+      continue;
+    }
     if (desc) {
       txn.line_items.push({
-        sku: ix.sku >= 0 ? ((r[ix.sku] ?? "").trim() || null) : null,
+        sku: cell(ix.sku) || null,
         name: desc,
         category: materialCategoryFor(dept, desc),
         unit_cost_cents: unit,
@@ -235,5 +246,5 @@ export function parseLowesCsv(text: string): ParseResult {
     throw new Error("Lowe's CSV parsed but no purchase rows were found. Check the date and amount columns.");
   }
 
-  return { transactions, totalRows };
+  return { transactions, totalRows, skipped };
 }

@@ -1,7 +1,7 @@
 # TASK-211: Duplicate-safe purchase imports (history and book modes)
 
 Status:
-Proposed
+In progress (PR 1 of 2: imports, review records, retire the old catalog import. PR 2: receipt parse revisions, signed returns and discounts, reconciliation.)
 
 Epic:
 EPIC-002 Estimating & Assessments

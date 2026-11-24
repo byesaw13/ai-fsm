@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { withExpenseContext } from "@/lib/expenses/db";
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui";
 import type { FilterDef, MetricCardData } from "@/components/ui";
 import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
+import { pendingSummary } from "@/lib/expenses/import/reviews";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +67,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
     },
   ];
 
-  const { expenses, summary } = await withExpenseContext(session, async (client) => {
+  const { expenses, summary, importPending } = await withExpenseContext(session, async (client) => {
     const conditions: string[] = [
       "e.account_id = $1",
       "e.expense_date >= $2::date",
@@ -122,6 +124,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
 
     return {
       expenses: rows.rows,
+      importPending: canManage ? await pendingSummary(client, session.accountId) : { count: 0, valueCents: 0 },
       summary: {
         total_cents: parseInt(summaryResult.rows[0]?.total_cents ?? "0", 10),
         count: parseInt(summaryResult.rows[0]?.count ?? "0", 10),
@@ -195,6 +198,14 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
         }
       />
       <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/expenses" />
+
+      {importPending.count > 0 && (
+        <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)" }} data-testid="expenses-import-pending">
+          <Link href="/app/expenses/import">
+            {importPending.count} trip{importPending.count === 1 ? "" : "s"} pending review, {formatCents(importPending.valueCents)}
+          </Link>
+        </p>
+      )}
 
       {metrics.length > 0 && <MetricGrid metrics={metrics} />}
 

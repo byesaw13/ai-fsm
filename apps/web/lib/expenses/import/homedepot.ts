@@ -27,7 +27,9 @@ export interface ImportLineItem {
 }
 
 export interface ImportTransaction {
-  external_ref: string;          // Transaction ID
+  external_ref: string | null;   // Transaction ID (null when the export has none)
+  store_number: string | null;   // Store Number (null when the export has none)
+  trip_key: string;              // how rows were grouped into this trip (unique in one file)
   date: string;                  // YYYY-MM-DD
   vendor: string;                // "The Home Depot"
   job_name: string | null;       // raw HD "Job Name" tag, trimmed
@@ -37,9 +39,32 @@ export interface ImportTransaction {
   is_return: boolean;            // true when the trip nets <= $0 (credit) — not importable as an expense
 }
 
+export type SkipReason = "bad_date" | "bad_price" | "return" | "zero_line";
+
+/** A row that did not become a price (listed in the import report). */
+export interface SkippedRow {
+  line: number;
+  reason: SkipReason;
+  text: string;
+}
+
 export interface ParseResult {
   transactions: ImportTransaction[];
   totalRows: number;
+  skipped: SkippedRow[];
+}
+
+/** A return may show a negative price, a negative quantity or both; it always reduces the trip. */
+export function signedLineCents(lineCents: number, unitCents: number, quantity: number): number {
+  return unitCents < 0 || quantity < 0 ? -Math.abs(lineCents) : lineCents;
+}
+
+/** The rule shared by both parsers for one priced row. */
+export function rowSkipReason(rawPrice: string | undefined, unitCents: number, quantity: number): SkipReason | null {
+  if (rawPrice !== undefined && rawPrice.trim() && !/\d/.test(rawPrice)) return "bad_price";
+  if (unitCents < 0 || quantity < 0) return "return";
+  if (unitCents === 0) return "zero_line";
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +158,8 @@ export function expenseCategoryFor(transactionDesc: string): ExpenseCategory {
 // Header detection + column mapping
 // ---------------------------------------------------------------------------
 
-const REQUIRED_HEADERS = ["Date", "Transaction ID", "SKU Description", "Net Unit Price"];
+// Store Number and Transaction ID are optional: rows without them become review records.
+const REQUIRED_HEADERS = ["Date", "SKU Description", "Net Unit Price"];
 
 function findHeaderRow(rows: string[][]): number {
   for (let i = 0; i < rows.length; i++) {
@@ -155,12 +181,13 @@ export function parseHomeDepotCsv(text: string): ParseResult {
   const rows = parseDelimited(text);
   const headerIdx = findHeaderRow(rows);
   if (headerIdx === -1) {
-    throw new Error("This doesn't look like a Home Depot purchase export (missing Date / Transaction ID / SKU columns).");
+    throw new Error("Not a Home Depot purchase export (missing the Date, SKU Description or Net Unit Price column).");
   }
   const header = rows[headerIdx];
   const ix = {
     date: colIndex(header, "Date"),
     txn: colIndex(header, "Transaction ID"),
+    store: colIndex(header, "Store Number"),
     job: colIndex(header, "Job Name"),
     sku: colIndex(header, "SKU Number"),
     desc: colIndex(header, "SKU Description"),
@@ -172,25 +199,37 @@ export function parseHomeDepotCsv(text: string): ParseResult {
   };
 
   const byTxn = new Map<string, ImportTransaction>();
+  const skipped: SkippedRow[] = [];
   let totalRows = 0;
 
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const r = rows[i];
-    const txnId = (r[ix.txn] ?? "").trim();
-    const date = (r[ix.date] ?? "").trim().slice(0, 10);
-    if (!txnId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue; // skip blanks/footers
+    const cell = (k: number) => (k >= 0 ? (r[k] ?? "").trim() : "");
+    const desc = cell(ix.desc);
+    const rawDate = cell(ix.date);
+    if (!desc && !/^\d{4}-\d{2}-\d{2}/.test(rawDate)) continue; // blanks and footers
     totalRows++;
+    const line = i + 1;
+    const date = rawDate.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      skipped.push({ line, reason: "bad_date", text: desc });
+      continue;
+    }
 
-    const desc = (r[ix.desc] ?? "").trim();
-    const dept = (r[ix.dept] ?? "").trim();
+    const txnId = cell(ix.txn);
+    const store = cell(ix.store);
+    const dept = cell(ix.dept);
     const qty = parseQuantity(r[ix.qty]);
     const netUnit = parseMoneyCents(r[ix.net]);
-    const jobName = ix.job >= 0 ? (r[ix.job] ?? "").trim() : "";
+    const jobName = cell(ix.job);
+    const tripKey = txnId ? `${store}:${txnId}` : `nt:${date}:${store}`;
 
-    let txn = byTxn.get(txnId);
+    let txn = byTxn.get(tripKey);
     if (!txn) {
       txn = {
-        external_ref: txnId,
+        external_ref: txnId || null,
+        store_number: store || null,
+        trip_key: tripKey,
         date,
         vendor: "The Home Depot",
         job_name: jobName || null,
@@ -199,18 +238,23 @@ export function parseHomeDepotCsv(text: string): ParseResult {
         line_items: [],
         is_return: false,
       };
-      byTxn.set(txnId, txn);
+      byTxn.set(tripKey, txn);
     }
     // earliest job name on the trip wins if not yet set
     if (!txn.job_name && jobName) txn.job_name = jobName;
 
-    txn.amount_cents += Math.round(netUnit * qty);
+    const reason = rowSkipReason(r[ix.net], netUnit, qty);
+    if (reason !== "bad_price") txn.amount_cents += signedLineCents(Math.round(netUnit * qty), netUnit, qty);
+    if (reason) {
+      skipped.push({ line, reason, text: desc });
+      continue;
+    }
     if (desc) {
       const discounted =
         (ix.progDisc >= 0 && parseMoneyCents(r[ix.progDisc]) > 0) ||
         (ix.otherDisc >= 0 && parseMoneyCents(r[ix.otherDisc]) > 0);
       txn.line_items.push({
-        sku: ix.sku >= 0 ? ((r[ix.sku] ?? "").trim() || null) : null,
+        sku: cell(ix.sku) || null,
         name: desc,
         category: materialCategoryFor(dept, desc),
         unit_cost_cents: netUnit,
@@ -229,5 +273,5 @@ export function parseHomeDepotCsv(text: string): ParseResult {
   // newest first
   transactions.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
-  return { transactions, totalRows };
+  return { transactions, totalRows, skipped };
 }
