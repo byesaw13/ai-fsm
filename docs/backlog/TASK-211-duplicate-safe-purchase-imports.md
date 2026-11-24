@@ -1,7 +1,7 @@
 # TASK-211: Duplicate-safe purchase imports (history and book modes)
 
 Status:
-In progress (PR 1 of 2: imports, review records, retire the old catalog import. PR 2: receipt parse revisions, signed returns and discounts, reconciliation.)
+Done (2026-11-24: #770 imports, review records, old catalog import retired; #771 receipt parse revisions, signed returns and discounts, reconciliation. Both deployed and verified.)
 
 Epic:
 EPIC-002 Estimating & Assessments
@@ -19,8 +19,8 @@ Scope:
 One import path through `apps/web/lib/expenses/import/` with two modes (price history only; book purchases); Store Number parsing; transaction identity = supplier family + store + transaction ID; transaction-scoped keys with occurrence numbers; persistent review records in both modes (pending count and value, safe re-import, atomic confirmation, dismiss with reason and reopen); only full transaction identity auto-links; sale flag kept; receipt parse revisions and signed return/discount lines; reject report; retire `/api/v1/materials/import` and `hd-import.ts`. Design section 3.
 
 Acceptance Criteria:
-- [ ] Design acceptance criteria 1, 1a to 1f, 2, 2a, 2b and 3 pass (re-import checks at a fixed evaluation date).
-- [ ] Regression: `duplicate-match.unit.test.ts` updated; store + date + amount no longer auto-links.
+- [x] Design acceptance criteria 1, 1a to 1f, 2, 2a, 2b and 3 pass (re-import checks at a fixed evaluation date).
+- [x] Regression: `duplicate-match.unit.test.ts` updated; store + date + amount no longer auto-links.
 
 Design:
 `docs/working/estimating-assistant-phase3.md` (owner decisions D1 to D11, eng decisions E1 to E10, correction passes of 2026-10-26).
