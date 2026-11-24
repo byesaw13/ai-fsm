@@ -41,13 +41,53 @@ export async function loadReviewInput(
     hours_source: l.hours_source,
   }));
 
+  // Good/Better/Best: each option's own lines, tagged with the option (no combined baseline).
+  if (baseline.optionQuote) {
+    const optionLines = await client.query<{
+      label: string;
+      line_item_type: string;
+      description: string;
+      quantity: string | number;
+      unit_price_cents: string | number;
+      unit_cost_cents: string | number | null;
+      hours_low: string | number | null;
+      hours_high: string | number | null;
+      hours_source: string | null;
+    }>(
+      `SELECT o.label, li.line_item_type, li.description, li.quantity, li.unit_price_cents,
+              li.unit_cost_cents, li.hours_low, li.hours_high, li.hours_source
+       FROM estimate_line_items li
+       JOIN estimate_options o ON o.id = li.option_id
+       WHERE li.estimate_id = $1
+       ORDER BY o.sort_order, li.sort_order, li.created_at`,
+      [estimateId],
+    );
+    for (const l of optionLines.rows) {
+      const quantity = num(l.quantity) ?? 0;
+      const unitCost = num(l.unit_cost_cents);
+      lines.push({
+        type: (["materials", "equipment", "handling_fee", "adjustment"].includes(l.line_item_type)
+          ? l.line_item_type
+          : "labor") as ReviewLine["type"],
+        description: l.description,
+        quantity,
+        price_cents: Math.round(quantity * (num(l.unit_price_cents) ?? 0)),
+        cost_cents: unitCost == null ? null : Math.round(quantity * unitCost),
+        hours_low: num(l.hours_low),
+        hours_high: num(l.hours_high),
+        hours_source: l.hours_source,
+        option: l.label,
+      });
+    }
+  }
+
   const billing_method: ReviewInput["billing_method"] = baseline.optionQuote
     ? "option_quote"
     : scope?.pricing?.mode === "fixed"
       ? "fixed_price"
       : scope
         ? "time_and_materials"
-        : lines.length === 0
+        : baseline.lines.length === 0
           ? "flat_price"
           : "itemized";
 

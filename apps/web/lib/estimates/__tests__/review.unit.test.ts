@@ -193,6 +193,25 @@ describe("ruleBasedReview", () => {
   });
 });
 
+describe("option quotes", () => {
+  it("reviews each option's own lines and names them with their option", () => {
+    const input: ReviewInput = {
+      ...fixtureInput(),
+      billing_method: "option_quote",
+      baseline: null,
+      prepared_gaps: null,
+      lines: [
+        { type: "labor", description: "Patch and paint", quantity: 1, price_cents: 60000, cost_cents: null, hours_low: null, hours_high: null, hours_source: null, option: "Good" },
+        { type: "labor", description: "Patch and paint", quantity: 1, price_cents: 90000, cost_cents: null, hours_low: 8, hours_high: 10, hours_source: "owner", option: "Best" },
+      ],
+    };
+    const r = ruleBasedReview(input);
+    expect(r.suggestions.map((s) => s.message).join(" ")).toContain("Patch and paint (Good)");
+    expect(r.summary).not.toContain("No problems");
+    expect(buildReviewMessage(input)).toContain('"option": "Best"');
+  });
+});
+
 describe("reviewEstimate", () => {
   it("uses the current model, forces the review tool and validates the result", async () => {
     const { client, stream } = fakeClient({ stop_reason: "tool_use", content: [goodToolUse] as Anthropic.ContentBlock[] });

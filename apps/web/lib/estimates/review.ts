@@ -39,6 +39,8 @@ export interface ReviewLine {
   hours_low: number | null;
   hours_high: number | null;
   hours_source: string | null;
+  /** Set on a Good/Better/Best line: the option it belongs to. */
+  option?: string;
 }
 
 export interface PreparedGaps {
@@ -108,7 +110,7 @@ Every estimate arrives as JSON with:
 - quoted_cents: the selling total before tax.
 - rates: the company's selling rate per hour, its labor cost floor per hour, the handling percent on materials, the warning threshold, and whether handling is in the baseline. These come from the owner's Settings. Use them; never assume other rates.
 - baseline: the hourly baseline already worked out by the app. hours (low, mid, high person-hours), baseline (what the work comes to at the selling rate plus materials cost, handling when on, equipment and travel charges), gapCents and gapPct (quoted price minus the baseline midpoint), effectiveRateCents (labor left after direct costs divided by high hours), belowCostFloor, warning, and missing (hours or costs not entered). Null means not available. Treat these numbers as correct; do not recompute them.
-- lines: every line with type, description, quantity, price, cost, hours and where the hours came from (owner, price_book, production_rate, ai_allowance, revision, travel_calc).
+- lines: every line with type, description, quantity, price, cost, hours and where the hours came from (owner, price_book, production_rate, ai_allowance, revision, travel_calc). On an option_quote, each option's lines carry "option" with the option's name; review each option on its own and never add options together.
 - prepared_gaps: from the walkthrough. Areas whose work has hours but no materials price, suggested tasks not yet confirmed, and unanswered questions. Null when the estimate was not prepared from a walkthrough.
 
 What to check:
@@ -252,6 +254,27 @@ export function ruleBasedReview(input: ReviewInput): EstimateReviewResult {
         field: "baseline",
         message: `The price is ${dollars(b.gapCents)} (${Math.abs(b.gapPct).toFixed(2)}%) below the hourly baseline midpoint.`,
         suggestion: "Make sure the lower price is deliberate.",
+      });
+    }
+  }
+
+  if (input.billing_method === "option_quote") {
+    const noHours = input.lines.filter((l) => l.type === "labor" && (l.hours_low == null || l.hours_high == null));
+    if (noHours.length > 0) {
+      suggestions.push({
+        type: "info",
+        field: "hours",
+        message: `Person-hours are missing for ${list(noHours.map((l) => (l.option ? `${l.description} (${l.option})` : l.description)))}.`,
+        suggestion: "Enter ranges so each option can be checked against your hourly rate.",
+      });
+    }
+    const noCost = input.lines.filter((l) => (l.type === "materials" || l.type === "equipment") && l.cost_cents == null);
+    if (noCost.length > 0) {
+      suggestions.push({
+        type: "info",
+        field: "materials",
+        message: `No cost entered for ${list(noCost.map((l) => (l.option ? `${l.description} (${l.option})` : l.description)))}.`,
+        suggestion: "Enter what each one costs you.",
       });
     }
   }

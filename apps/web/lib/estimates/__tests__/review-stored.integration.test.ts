@@ -158,6 +158,23 @@ describe.skipIf(!RUN)("estimate review is stored and never runs on page open", (
     expect((await api("POST", `/api/v1/estimates/${estimateId}/review`, undefined, techCookie)).status).toBe(403);
   });
 
+  it("an option estimate's review reads each option's own lines", async () => {
+    const opt = await api("POST", "/api/v1/estimates", {
+      client_id: clientId,
+      presentation_mode: "multi_option",
+      options: [
+        { label: "Good", sort_order: 0, is_recommended: false, line_items: [{ description: "Patch walls", quantity: 1, unit_price_cents: 60000, line_item_type: "labor" }] },
+        { label: "Best", sort_order: 1, is_recommended: true, line_items: [{ description: "Patch and skim walls", quantity: 1, unit_price_cents: 90000, line_item_type: "labor", hours_low: 8, hours_high: 10, hours_source: "owner" }] },
+      ],
+    });
+    expect(opt.status).toBe(201);
+    const res = await api("POST", `/api/v1/estimates/${opt.data.id}/review`);
+    expect(res.status).toBe(200);
+    const text = res.data.review.result.suggestions.map((s: { message: string }) => s.message).join(" ");
+    expect(text).toContain("Patch walls (Good)");
+    expect(res.data.review.result.summary).not.toContain("No problems");
+  });
+
   it("an approved estimate is not reviewed", async () => {
     const other = await api("POST", "/api/v1/estimates", {
       client_id: clientId,

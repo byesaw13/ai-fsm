@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { useQuoteVersion } from "@/components/QuoteVersion";
 
@@ -43,7 +43,19 @@ export function EstimateReviewPanel({ estimateId, initial = null }: Props) {
   const [dismissed, setDismissed] = useState(false);
   const { updatedAt, setUpdatedAt } = useQuoteVersion();
   const { error } = useToast();
+  // The quote version this review was made for. A save in this tab moves the version on.
+  const [reviewedVersion, setReviewedVersion] = useState<string | null>(initial?.current ? updatedAt : null);
+
+  // router.refresh() keeps client state; follow the server's stored review and its current flag.
+  useEffect(() => {
+    if (!initial) return;
+    setStored(initial);
+    setReviewedVersion(initial.current ? updatedAt : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-sync only when the server's review changes
+  }, [initial?.reviewed_at, initial?.current]);
+
   const result = stored?.result ?? null;
+  const current = !!stored?.current && reviewedVersion !== null && reviewedVersion === updatedAt;
 
   async function fetchReview() {
     setLoading(true);
@@ -63,7 +75,12 @@ export function EstimateReviewPanel({ estimateId, initial = null }: Props) {
       }
       setStored({ ...json.review, current: json.stored === true });
       // Storing the review touches the row. Keep this tab's version current only if it was.
-      if (json.updated_at && updatedAt && json.previous_updated_at === updatedAt) setUpdatedAt(json.updated_at);
+      if (json.updated_at && updatedAt && json.previous_updated_at === updatedAt) {
+        setUpdatedAt(json.updated_at);
+        setReviewedVersion(json.updated_at);
+      } else {
+        setReviewedVersion(null);
+      }
     } catch {
       error("Network error — could not review estimate");
     } finally {
@@ -138,7 +155,7 @@ export function EstimateReviewPanel({ estimateId, initial = null }: Props) {
         </p>
       )}
 
-      {stored && !stored.current && !loading && (
+      {stored && !current && !loading && (
         <p style={{ margin: "var(--space-3) 0 0", fontSize: "var(--text-sm)", color: "var(--color-warning)" }} data-testid="review-stale">
           The estimate changed after this check. Re-check to update it.
         </p>
