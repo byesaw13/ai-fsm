@@ -225,7 +225,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         : null;
       const finalDueDate = resolveIssueDueDate({ invoiceKind: "final", jobStatus });
 
-      const { id: invoiceId, invoice_number: invoiceNumber } = await createInvoice(client, {
+      const created = await createInvoice(client, {
         account_id: session.accountId,
         client_id: estimate.client_id,
         job_id: estimate.job_id,
@@ -242,6 +242,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         travel_snapshot_id: estimate.travel_snapshot_id,
         travel_billing_mode: estimate.travel_snapshot_id ? "estimated" : null,
       });
+      if (!created.created) {
+        // Another request invoiced this job between the check above and now.
+        return { invoice_id: created.id, invoice_status: created.status, created: false };
+      }
+      const { id: invoiceId, invoice_number: invoiceNumber } = created;
 
       // Carry travel snapshot forward (do not recalculate — rate/charge frozen at estimate time)
       if (estimate.travel_snapshot_id) {

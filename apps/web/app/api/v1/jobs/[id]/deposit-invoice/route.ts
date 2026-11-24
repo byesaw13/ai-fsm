@@ -128,6 +128,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         notes: "Deposit",
         created_by: session.userId,
       });
+      if (!created.created) return { invoice_id: created.id, created: false };
       const { id: invoiceId, invoice_number: invoiceNumber } = created;
 
       await appendAuditLog(client, {
