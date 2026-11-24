@@ -1,0 +1,4 @@
+Invoice Number,Invoice Date,Store Number,Item Number,Item Description,Quantity,Unit Cost,Extended Cost,PO Number
+55001,10/01/2026,1234,9001,Deck screws 5 lb,1,$29.98,$29.98,DECK
+55001,10/01/2026,1234,9002,Pressure treated 2x6x10,6,$12.47,$74.82,DECK
+55002,10/03/2026,1234,9001,Deck screws 5 lb,2,$29.98,$59.96,

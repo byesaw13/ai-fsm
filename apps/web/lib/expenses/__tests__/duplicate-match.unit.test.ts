@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   amountsLikelySame,
-  csvImportStatus,
+  classifyTrip,
   findMatchingExpense,
   normalizeTxnId,
   vendorFamily,
@@ -61,8 +61,8 @@ describe("findMatchingExpense", () => {
     external_ref: "3325",
   };
 
-  it("matches a CSV trip to a photo by vendor, date, and tax-adjusted amount", () => {
-    expect(findMatchingExpense(csv, [photo])?.id).toBe("photo-1");
+  it("no longer matches a CSV trip to a photo by vendor, date and tax-adjusted amount alone (TASK-211)", () => {
+    expect(findMatchingExpense(csv, [photo])).toBeNull();
   });
 
   it("matches by transaction id even when amounts differ", () => {
@@ -100,66 +100,62 @@ describe("findMatchingExpense", () => {
   });
 });
 
-describe("csvImportStatus", () => {
-  it("marks a prior CSV of the same transaction as already imported", () => {
-    expect(
-      csvImportStatus(
-        {
-          vendor_name: "The Home Depot",
-          expense_date: "2026-09-08",
-          amount_cents: 4996,
-          external_ref: "3325",
-        },
-        [{
-          id: "csv-1",
-          vendor_name: "The Home Depot",
-          expense_date: "2026-09-08",
-          amount_cents: 4996,
-          external_ref: "3325",
-          source: "home_depot_csv",
-        }],
-      ),
-    ).toBe("already_imported");
+describe("classifyTrip (TASK-211)", () => {
+  const trip = {
+    vendor_name: "The Home Depot",
+    expense_date: "2026-09-08",
+    amount_cents: 4996,
+    external_ref: "3325",
+    store_number: "3408",
+  };
+  const photo = {
+    id: "photo-1",
+    vendor_name: "Home Depot",
+    expense_date: "2026-09-08",
+    amount_cents: 5308,
+    external_ref: null,
+    source: null,
+  };
+
+  it("a new trip with full identity and nothing on file is new", () => {
+    expect(classifyTrip(trip, [])).toEqual({ status: "new" });
   });
 
-  it("treats an OCR-stamped photo as matched receipt, not already imported", () => {
-    expect(
-      csvImportStatus(
-        {
-          vendor_name: "The Home Depot",
-          expense_date: "2026-09-08",
-          amount_cents: 4996,
-          external_ref: "3325",
-        },
-        [{
-          id: "photo-1",
-          vendor_name: "Home Depot",
-          expense_date: "2026-09-08",
-          amount_cents: 5308,
-          external_ref: "3325",
-          source: null,
-        }],
-      ),
-    ).toBe("matched_receipt");
+  it("store + date + amount without a shared transaction id is a review candidate, not a link (regression)", () => {
+    expect(classifyTrip(trip, [photo])).toEqual({ status: "review", reason: "possible_duplicate", matchId: "photo-1" });
   });
 
-  it("marks a photo of the same trip as matched receipt (still import to merge)", () => {
-    expect(
-      csvImportStatus(
-        {
-          vendor_name: "The Home Depot",
-          expense_date: "2026-09-08",
-          amount_cents: 4996,
-          external_ref: "3325",
-        },
-        [{
-          id: "photo-1",
-          vendor_name: "Home Depot",
-          expense_date: "2026-09-08",
-          amount_cents: 5308,
-          external_ref: null,
-        }],
-      ),
-    ).toBe("matched_receipt");
+  it("a receipt with the same supplier, date and transaction id links automatically", () => {
+    expect(classifyTrip(trip, [{ ...photo, external_ref: "3325" }])).toEqual({ status: "auto_link", matchId: "photo-1" });
+  });
+
+  it("the same transaction again from a CSV import is already imported", () => {
+    const prior = { ...trip, id: "csv-1", source: "home_depot_csv" };
+    expect(classifyTrip(trip, [prior])).toEqual({ status: "already_imported", matchId: "csv-1" });
+  });
+
+  it("the same transaction id at another store is conflicting_transaction_id", () => {
+    const other = { ...trip, id: "csv-2", store_number: "4719", source: "home_depot_csv" };
+    expect(classifyTrip(trip, [other])).toMatchObject({ status: "review", reason: "conflicting_transaction_id" });
+  });
+
+  it("the same transaction id on another date, supplier or total is conflicting_transaction_id", () => {
+    for (const change of [
+      { expense_date: "2026-09-09" },
+      { vendor_name: "Lowe's" },
+      { amount_cents: 99_00 },
+    ]) {
+      const other = { ...photo, external_ref: "3325", ...change };
+      expect(classifyTrip(trip, [other])).toMatchObject({ status: "review", reason: "conflicting_transaction_id" });
+    }
+  });
+
+  it("two receipts that both fit are a review candidate, never a link", () => {
+    expect(classifyTrip(trip, [photo, { ...photo, id: "photo-2" }])).toEqual({ status: "review", reason: "possible_duplicate" });
+  });
+
+  it("a trip without a store number or transaction id is never counted automatically", () => {
+    expect(classifyTrip({ ...trip, store_number: null }, [])).toEqual({ status: "review", reason: "no_transaction_identity" });
+    expect(classifyTrip({ ...trip, external_ref: null }, [])).toEqual({ status: "review", reason: "no_transaction_identity" });
   });
 });

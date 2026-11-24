@@ -38,8 +38,6 @@ export default function MaterialsCatalogClient({ materials: initial, canManage }
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [supplierFilter, setSupplierFilter] = useState("all");
-  const [importing, setImporting] = useState(false);
-  const [importMsg, setImportMsg] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editNotes, setEditNotes] = useState("");
   const [editLastCents, setEditLastCents] = useState("");
@@ -72,45 +70,6 @@ export default function MaterialsCatalogClient({ materials: initial, canManage }
       );
     });
   }, [materials, search, categoryFilter, supplierFilter]);
-
-  async function handleImportFile(file: File) {
-    setImporting(true);
-    setImportMsg(null);
-    setError(null);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/v1/materials/import", { method: "POST", body: form });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error?.message ?? "Import failed");
-        return;
-      }
-      setImportMsg(
-        `Imported ${json.data.imported} prices (${json.data.skipped} skipped). Reload to refresh the full list, or search what you need.`,
-      );
-      // Refresh list from API
-      const listRes = await fetch("/api/v1/materials?search=");
-      const listJson = await listRes.json();
-      if (listRes.ok && Array.isArray(listJson.data)) {
-        setMaterials(
-          listJson.data.map((r: MaterialCatalogRow) => ({
-            ...r,
-            last_purchased_at: r.last_purchased_at
-              ? String(r.last_purchased_at).slice(0, 10)
-              : null,
-            updated_at: String(r.updated_at ?? ""),
-            avg_paid_cents: r.avg_paid_cents ?? null,
-            purchase_count: r.purchase_count ?? 0,
-          })),
-        );
-      }
-    } catch {
-      setError("Network error during import");
-    } finally {
-      setImporting(false);
-    }
-  }
 
   function startEdit(m: MaterialCatalogRow) {
     setEditId(m.id);
@@ -200,42 +159,14 @@ export default function MaterialsCatalogClient({ materials: initial, canManage }
       <Card padding="default" style={{ marginBottom: "var(--space-4)" }}>
         <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
           Prices update automatically when you save itemized <strong>materials</strong> receipts.
-          Match order: barcode/SKU first, then name. Import a Home Depot purchase history CSV to
-          seed the catalog.
+          Match order: store and SKU first, then name. Import a Home Depot or Lowe&apos;s purchase
+          export to add your price history.
         </p>
         {canManage && (
-          <div style={{ marginTop: "var(--space-3)", display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
-            <label
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 12px",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                cursor: importing ? "wait" : "pointer",
-                fontSize: "var(--text-sm)",
-                fontWeight: 600,
-              }}
-            >
-              {importing ? "Importing…" : "Import HD CSV"}
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                disabled={importing}
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void handleImportFile(f);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-            {importMsg && (
-              <span style={{ fontSize: "var(--text-sm)", color: "var(--status-success, #16a34a)" }}>
-                {importMsg}
-              </span>
-            )}
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <LinkButton href={"/app/expenses/import" as Route} variant="secondary" size="sm">
+              Import store purchases
+            </LinkButton>
           </div>
         )}
         {error && (

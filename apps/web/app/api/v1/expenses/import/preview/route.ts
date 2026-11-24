@@ -3,11 +3,8 @@ import { withRole } from "@/lib/auth/middleware";
 import { withExpenseContext } from "@/lib/expenses/db";
 import { logger } from "@/lib/logger";
 import { parsePurchaseCsv } from "@/lib/expenses/import/detect";
-import {
-  csvImportStatus,
-  expenseDateKey,
-  type ExpenseFingerprint,
-} from "@/lib/expenses/duplicate-match";
+import { loadExpenseFingerprints, loadKnownKeys, planTrips, type ImportMode } from "@/lib/expenses/import/run";
+import { pendingSummary } from "@/lib/expenses/import/reviews";
 import {
   RECEIPT_LINKABLE_JOB_STATUS_SQL,
   receiptJobOrderSql,
@@ -18,6 +15,7 @@ import { formatJobPickerLabel } from "@ai-fsm/domain";
 export const dynamic = "force-dynamic";
 
 const MAX_SIZE = 5 * 1024 * 1024;
+const MAX_ROWS = 20_000;
 
 function norm(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -83,10 +81,11 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
   }
   if (file.size > MAX_SIZE) {
     return NextResponse.json(
-      { error: { code: "VALIDATION_ERROR", message: "File exceeds 5 MB limit", traceId: session.traceId } },
-      { status: 422 }
+      { error: { code: "PAYLOAD_TOO_LARGE", message: "The file is over 5 MB. Export a shorter date range.", traceId: session.traceId } },
+      { status: 413 }
     );
   }
+  const mode: ImportMode = formData.get("mode") === "history" ? "history" : "book";
 
   let parsed;
   try {
@@ -99,25 +98,16 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
   }
 
   const source = parsed.source;
+  if (parsed.totalRows > MAX_ROWS) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: `The file has ${parsed.totalRows.toLocaleString()} rows; the limit is 20,000. Export a shorter date range.`, traceId: session.traceId } },
+      { status: 422 }
+    );
+  }
 
   try {
     const dates = [...new Set(parsed.transactions.map((t) => t.date))];
-    const { existing, jobs } = await withExpenseContext(session, async (client) => {
-      const existingRows = dates.length
-        ? await client.query<{
-            id: string;
-            vendor_name: string;
-            amount_cents: number;
-            expense_date: string | Date;
-            external_ref: string | null;
-            source: string | null;
-          }>(
-            `SELECT id, vendor_name, amount_cents, expense_date, external_ref, source
-             FROM expenses
-             WHERE account_id = $1 AND expense_date = ANY($2::date[])`,
-            [session.accountId, dates],
-          )
-        : { rows: [] };
+    const { existing, known, jobs, pending } = await withExpenseContext(session, async (client) => {
       const jobRows = await client.query<JobRow>(
         `SELECT j.id, j.title, j.job_number, j.client_id, c.name AS client_name, p.address
          FROM jobs j
@@ -129,46 +119,36 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
          LIMIT 200`,
         [session.accountId]
       );
-      return { existing: existingRows.rows, jobs: jobRows.rows };
-    });
-
-    const fingerprints: ExpenseFingerprint[] = existing.map((row) => ({
-      id: row.id,
-      vendor_name: row.vendor_name,
-      amount_cents: row.amount_cents,
-      expense_date: expenseDateKey(row.expense_date),
-      external_ref: row.external_ref,
-      source: row.source,
-    }));
-
-    const transactions = parsed.transactions.map((t) => {
-      const status = csvImportStatus(
-        {
-          vendor_name: t.vendor,
-          expense_date: t.date,
-          amount_cents: t.amount_cents,
-          external_ref: t.external_ref,
-        },
-        fingerprints,
-      );
       return {
-        ...t,
-        already_imported: status === "already_imported",
-        matched_receipt: status === "matched_receipt",
-        suggestion: t.is_return ? null : suggestJob(t.job_name, jobs),
+        existing: await loadExpenseFingerprints(client, session.accountId, dates),
+        known: mode === "history" ? await loadKnownKeys(client, session.accountId, parsed.transactions) : new Set<string>(),
+        jobs: jobRows.rows,
+        pending: await pendingSummary(client, session.accountId),
       };
     });
 
-    const importable = transactions.filter((t) => !t.already_imported && !t.is_return);
+    const plans = planTrips(parsed.transactions, existing, mode, known);
+    const transactions = parsed.transactions.map((t, i) => ({
+      ...t,
+      plan: plans[i],
+      suggestion: mode === "book" && plans[i].action !== "return" ? suggestJob(t.job_name, jobs) : null,
+    }));
+
+    const willImport = transactions.filter((t) => t.plan.action === "import" || t.plan.action === "link");
     const summary = {
       source,
       vendor_label: parsed.vendor_label,
+      mode,
+      rows_read: parsed.totalRows,
       total_transactions: transactions.length,
-      new_importable: importable.length,
-      duplicates: transactions.filter((t) => t.already_imported).length,
-      returns_skipped: transactions.filter((t) => t.is_return).length,
-      total_cents: importable.reduce((s, t) => s + t.amount_cents, 0),
-      material_lines: importable.reduce((s, t) => s + t.line_items.length, 0),
+      new_importable: willImport.length,
+      duplicates: transactions.filter((t) => t.plan.action === "already_imported").length,
+      to_review: transactions.filter((t) => t.plan.action === "review").length,
+      returns_skipped: transactions.filter((t) => t.plan.action === "return").length,
+      total_cents: willImport.reduce((s, t) => s + t.amount_cents, 0),
+      material_lines: willImport.reduce((s, t) => s + t.line_items.length, 0),
+      skipped_rows: parsed.skipped,
+      pending,
     };
 
     return NextResponse.json({ data: { transactions, summary } });

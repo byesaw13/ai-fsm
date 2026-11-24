@@ -16,7 +16,6 @@ function headerLooksLikeHomeDepot(header: string[]): boolean {
   const cells = header.map((c) => c.trim());
   return (
     cells.includes("Date") &&
-    cells.includes("Transaction ID") &&
     cells.includes("SKU Description") &&
     cells.includes("Net Unit Price")
   );
