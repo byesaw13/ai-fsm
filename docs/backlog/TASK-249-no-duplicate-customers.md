@@ -1,0 +1,35 @@
+# TASK-249: The server never creates a second customer for the same phone
+
+Status:
+Proposed
+
+Epic:
+EPIC-003 Property Intelligence
+
+Phase:
+2
+
+Severity:
+Medium. Duplicate customers split one property's history across two records.
+
+Problem:
+`clients` has no unique key on phone or email. SMS, intake and import normalize the phone (`lib/phone.ts` `normalizePhone`) and look for a match; `POST /api/v1/clients` and `POST /api/v1/quick-book` do not. TASK-245 adds matches while typing in the intake form; nothing stops a duplicate from the other doors. Audit 2026-11-24.
+
+Scope:
+- Step 1 (read-only): a query listing existing customers that share a normalized phone, in the PR. The owner decides merges (G4); none are made by this task.
+- Client create and quick-book look up by normalized phone (then email) and return the existing customer with `matched: true` instead of inserting.
+- After the owner has cleared the duplicates: migration adding a unique partial index on `(account_id, phone_normalized)` where not null (add the normalized column if missing, backfilled with `normalizePhone`).
+
+Out of scope:
+- A merge tool. Name or address matching (TASK-245).
+
+Acceptance Criteria:
+- [ ] Creating a customer with a known phone in any format returns the existing customer.
+- [ ] Quick-book with a known phone uses the existing customer.
+- [ ] Once the index ships, a direct duplicate insert fails.
+
+Test Plan:
+- Integration: create twice with "(603) 555-0100" and "6035550100"; one row.
+
+Related:
+TASK-245, TASK-250.
