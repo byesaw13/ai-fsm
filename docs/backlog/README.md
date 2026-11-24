@@ -192,7 +192,7 @@ closed in tests; owner-flow AC still open.
 | TASK-207 | [Record password changes in the audit log](TASK-207-password-change-audit.md) | 005 | Proposed |
 | TASK-208 | [Hourly baseline on change orders](TASK-208-change-order-baseline.md) | 004 | Proposed |
 | TASK-209 | [Estimating assistant, Phase 3 slice (parent)](TASK-209-estimating-assistant-phase3.md) | 002 | Proposed |
-| TASK-210 | [Price observation ledger and catalog cache](TASK-210-price-observation-ledger.md) | 002 | In progress |
+| TASK-210 | [Price observation ledger and catalog cache](TASK-210-price-observation-ledger.md) | 002 | Done |
 | TASK-211 | [Duplicate-safe purchase imports (history and book modes)](TASK-211-duplicate-safe-purchase-imports.md) | 002 | Proposed |
 | TASK-212 | [Package sizes and units](TASK-212-package-sizes.md) | 002 | Proposed |
 | TASK-213 | [Price selection and confidence with reasons](TASK-213-price-confidence.md) | 002 | Proposed |
