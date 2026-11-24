@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { findClientByContact } from "@/lib/clients/match";
 import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
@@ -120,6 +121,15 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       custom_travel_time_rate_cents,
       minimum_project_value_exempt,
     } = parsed.data;
+
+    // Same phone (any format) or email already on file → that customer (TASK-249).
+    const existingId = await findClientByContact(client, session.accountId, { phone, email });
+    if (existingId) {
+      const existing = await client.query(`SELECT * FROM clients WHERE id = $1`, [existingId]);
+      await client.query("COMMIT");
+      return NextResponse.json({ data: existing.rows[0], matched: true }, { status: 200 });
+    }
+
     const result = await client.query(
       `INSERT INTO clients
          (account_id, name, email, phone, notes, company_name, address_line1, city, state, zip,
