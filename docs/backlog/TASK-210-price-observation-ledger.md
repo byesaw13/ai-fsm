@@ -1,7 +1,7 @@
 # TASK-210: Price observation ledger and catalog cache
 
 Status:
-In progress
+Done (2026-11-24, #768, deployed, backfilled and verified)
 
 Epic:
 EPIC-002 Estimating & Assessments

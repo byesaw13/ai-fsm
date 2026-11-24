@@ -19,18 +19,19 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : B6 TASK-195 Verified: #766 (f151f04e) deployed
-                      ~00:34 UTC 2026-11-24, no migration. Health ok,
-                      /login 200, review 401 unauth, no web errors, AI key
-                      set; 0 of 47 estimates have a stored review (no
-                      review runs on page open). Track B complete.
-In-flight PR        : C1 TASK-210, branch task/210-price-ledger; migration
-                      214 (price_observations, catalog variant columns).
-                      After deploy: backup, backfill dry run, then --apply
-                      (apps/web/scripts/backfill-price-observations.ts).
-Next step           : C1 TASK-210 merge, deploy, backfill, verify.
+Last step           : C1 TASK-210 Verified: #768 (2261c14a) deployed
+                      ~01:25 UTC 2026-11-24 with migration 214 (backup
+                      ai_fsm_20261124T011958Z.dump verified). Backfill run
+                      pl-2026-11-24-prod applied after a dry run: 1,314
+                      summaries (228 superseded), 260 receipt observations
+                      (15 receipt lines matched no item, skipped); re-run
+                      inserts 0 and changes 0. Cache before the run:
+                      /opt/business/ai-fsm/backups/price-cache-before-
+                      pl-2026-11-24-prod.json. Health ok, no web errors.
+In-flight PR        : none
+Next step           : C2 TASK-211 (duplicate-safe purchase imports; needs C1).
 Blocked on          : nothing
-Last known-good     : f151f04e (deploy-good/d1fdba88 before it)
+Last known-good     : 2261c14a (deploy-good/f151f04e before it)
 Notes               : Main checkout holds another session's uncommitted
                       drafts of TASK-235..240 (duplicates of #755); left
                       untouched. Owner checks after deploy (non-blocking):
@@ -130,7 +131,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | B4 | TASK-193 | PR 1 2026-10-31 (#743, CI green) | PR 1 2026-10-31 (#743, 8f158a7a) | PR 1 2026-10-31 (~19:13 UTC) | PR 1 2026-10-31 (health ok, /login 200, rates API 401 unauth); PR 2 2026-10-31 (#745, 6cbce4d3; deployed, verified) |
 | B5 | TASK-194 | 2026-11-23 (#764, CI green) | 2026-11-23 (#764, d1fdba88) | 2026-11-23 (~23:25 UTC) | 2026-11-23 (health ok, /login 200, sent estimates unchanged, no snapshots on old quotes) |
 | B6 | TASK-195 | 2026-11-24 (#766, CI green) | 2026-11-24 (#766, f151f04e) | 2026-11-24 (~00:34 UTC) | 2026-11-24 (health ok, /login 200, review 401 unauth, no stored reviews from page opens) |
-| C1 | TASK-210 | | | | |
+| C1 | TASK-210 | 2026-11-24 (#768, CI green) | 2026-11-24 (#768, 2261c14a) | 2026-11-24 (~01:25 UTC, migration 214; backfill pl-2026-11-24-prod) | 2026-11-24 (health ok, ledger 1,314 summaries + 260 receipts, backfill re-run no-op) |
 | C2 | TASK-211 | | | | |
 | C3 | TASK-212 | | | | |
 | C4 | TASK-213 | | | | |
@@ -698,6 +699,10 @@ Per step:
 
 ## Log
 
+- 2026-11-24 · C1 · Verified · health ok, no web errors; backfill re-run inserts 0 / changes 0; no variant counts more purchases than its real active rows
+- 2026-11-24 · C1 · Backfill · run pl-2026-11-24-prod applied after dry run (1,314 summaries, 260 receipts; averages for ~1,095 Pro Xtra-only items now blank until the C7 re-import); cleanup: DELETE FROM price_observations WHERE note = 'backfill:pl-2026-11-24-prod' + restore from price-cache-before-pl-2026-11-24-prod.json
+- 2026-11-24 · C1 · Deployed · 2261c14a · ~01:25 UTC, migration 214; backup ai_fsm_20261124T011958Z.dump verified; known-good deploy-good/f151f04e
+- 2026-11-24 · C1 · Merged · #768 · squash 2261c14a; three Codex findings fixed before merge (CSV keys carry the date, empty evidence clears the cache, store-suffixed variants reused)
 - 2026-11-24 · C1 · In progress · TASK-210: price_observations ledger (migration 214), variants per store family + SKU, every catalog writer through the ledger, backfill script (dry run on a prod copy: 1,314 summaries, 260/275 receipt lines matched)
 - 2026-11-24 · B6 · Verified · health ok, /login 200, review 401 unauth, no web errors, 0 stored reviews (page open runs none); Track B complete
 - 2026-11-24 · B6 · Deployed · f151f04e · ~00:34 UTC, no migration; known-good deploy-good/d1fdba88
