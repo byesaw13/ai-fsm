@@ -24,8 +24,11 @@ Last step           : B6 TASK-195 Verified: #766 (f151f04e) deployed
                       /login 200, review 401 unauth, no web errors, AI key
                       set; 0 of 47 estimates have a stored review (no
                       review runs on page open). Track B complete.
-In-flight PR        : none
-Next step           : C1 TASK-210 (price observation ledger; needs B1).
+In-flight PR        : C1 TASK-210, branch task/210-price-ledger; migration
+                      214 (price_observations, catalog variant columns).
+                      After deploy: backup, backfill dry run, then --apply
+                      (apps/web/scripts/backfill-price-observations.ts).
+Next step           : C1 TASK-210 merge, deploy, backfill, verify.
 Blocked on          : nothing
 Last known-good     : f151f04e (deploy-good/d1fdba88 before it)
 Notes               : Main checkout holds another session's uncommitted
@@ -695,6 +698,7 @@ Per step:
 
 ## Log
 
+- 2026-11-24 · C1 · In progress · TASK-210: price_observations ledger (migration 214), variants per store family + SKU, every catalog writer through the ledger, backfill script (dry run on a prod copy: 1,314 summaries, 260/275 receipt lines matched)
 - 2026-11-24 · B6 · Verified · health ok, /login 200, review 401 unauth, no web errors, 0 stored reviews (page open runs none); Track B complete
 - 2026-11-24 · B6 · Deployed · f151f04e · ~00:34 UTC, no migration; known-good deploy-good/d1fdba88
 - 2026-11-24 · B6 · Merged · #766 · squash f151f04e; Codex findings fixed before merge (panel follows in-page edits; option quotes reviewed by their own lines)
