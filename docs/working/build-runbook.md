@@ -19,32 +19,43 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : I5 TASK-250 PR 1 Verified (#780, 92f72791, no
-                      migration; merged from the owner's account 00:37 UTC,
-                      deployed by the agent 00:42). Health ok, /login 200,
-                      job routes 401 unauth, 71 jobs, no web errors.
-In-flight PR        : I8 TASK-255 PR 1 (money formatters, shims, duplicate
-                      client index; migration 220)
-Next step           : I8 PR 1 merge, backup, deploy, verify; then I8 PR 2
-                      (fold packages/money and packages/log into domain).
-                      I6 waits for TASK-223 PR 2. I7 is blocked (below).
-Blocked on          : owner, three questions (other steps continue):
-                      1. G4, I4 PR 2: 10 customers share a phone with an
-                         older record and 3 share an email. Merge them in
-                         the app, or approve a merge script (dry run first)?
-                      2. I5 PR 2: must every job have a property? 22 jobs
-                         belong to customers with no property on file.
-                         Options: required everywhere; required except
-                         estimate approval; or keep PR 1's fill-in and close.
-                      3. I7 TASK-252: derivePipelineStage is wrong in common
-                         cases (draft job with an unsent estimate -> "Ready to
-                         Schedule"; quoted job with no estimate -> "Estimate
-                         Sent"; in-progress job with no estimate -> "Ready to
-                         Schedule"), so it can't be the single source as is.
-                         What each case should say is an owner call, and
-                         TASK-242 (job page tabs) redesigns this page. Fold
-                         TASK-252 into TASK-242, or rule on the cases?
-Last known-good     : 92f72791 (deploy-good/e9b89372 before it)
+Last step           : I8 TASK-255 PR 1 Verified (#781, b29d288d, migration
+                      220; backup ai_fsm_20261125T011418Z.dump verified).
+                      Health ok, /login 200, one clients(account_id) index
+                      left, 113 customers, no web errors.
+In-flight PR        : none
+Next step           : owner answers below. Nothing in Track I is eligible
+                      without them (I6 also waits for TASK-223 PR 2).
+Blocked on          : owner:
+                      1. G4, I4 PR 2: merge the 3 duplicate customers in the
+                         live account? Corrected 2026-11-25: the earlier "10
+                         phone / 3 email" counted across accounts; the other
+                         pairs match a record in the historical d0000000
+                         account, which is never merged. Merge script
+                         reviewed (moves the only linked rows: 1 property, 1
+                         booking request; audits each removed record). On
+                         "go": backup, run with COMMIT, re-check 0 pairs,
+                         then PR 2 adds the unique index.
+                      2. I5 PR 2: relayed by another session as the owner's
+                         answer, to confirm here: every new job needs a
+                         property; an estimate needs one before it is sent;
+                         old jobs stay as they are.
+                      3. I7 TASK-252: fold into TASK-242, or rule on each
+                         derivePipelineStage case.
+                      4. I8 PR 2: recommend dropping the packages/money +
+                         packages/log fold. The worker image compiles both to
+                         JS (services/worker/Dockerfile); domain ships TS
+                         source only, so the fold means a new domain build and
+                         a worker image change, real deploy risk to save
+                         ~12 scaffold files. Also: how to retire the unused
+                         apps/web/lib/money.ts (map "Seen" step vs knip gate).
+                      5. I9 TASK-253: live account has 13 estimates (3 in the
+                         last 90 days): 10 wizard/quick/AI interview (the app
+                         doesn't record which), 1 Prepare Quote, 1 T&M. Which
+                         starts stay?
+                      6. I10 TASK-254: is the customer PDF fine for office
+                         printing?
+Last known-good     : b29d288d (deploy-good/92f72791 before it)
 Notes               : The stale TASK-235..240 drafts in the main checkout
                       were discarded at the owner's request 2026-11-24.
                       C3 TASK-212 resumes after Track I. Owner checks after deploy (non-blocking):
@@ -183,7 +194,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | I5 | TASK-250 | PR 1 2026-11-25 (#780, CI green) | PR 1 2026-11-25 (#780, 92f72791) | PR 1 2026-11-25 (~00:42 UTC, no migration) | PR 1 2026-11-25 (health ok, /login 200, job routes 401 unauth, no web errors); PR 2 waits for owner |
 | I6 | TASK-248 | | | | |
 | I7 | TASK-252 | blocked: owner decision (see Current state) | | | |
-| I8 | TASK-255 | | | | |
+| I8 | TASK-255 | PR 1 2026-11-25 (#781, CI green) | PR 1 2026-11-25 (#781, b29d288d) | PR 1 2026-11-25 (~01:21 UTC, migration 220) | PR 1 2026-11-25 (health ok, /login 200, duplicate index gone, no web errors); PR 2 owner decision |
 | I9 | TASK-253 | | | | |
 | I10 | TASK-254 | | | | |
 | D5 | TASK-228 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC) | 2026-10-31 (health ok, /login 200) |
@@ -796,6 +807,9 @@ Per step:
 
 ## Log
 
+- 2026-11-25 · Track I · Paused for owner · I4 PR 2, I5 PR 2, I7, I8 PR 2, I9, I10 each need an owner answer (Current state). Correction: duplicate customers are 3 in the live account, not 10 + 3 (the first count crossed accounts)
+- 2026-11-25 · I8 · PR 1 Verified · health ok, /login 200, idx_clients_account_id gone, 113 customers, no web errors. Codex P1 (list an unused file on the map before removing it) → lib/money.ts kept
+- 2026-11-25 · I8 · PR 1 Deployed · b29d288d · ~01:21 UTC, migration 220; backup ai_fsm_20261125T011418Z.dump verified; known-good deploy-good/92f72791
 - 2026-11-25 · I8 · In progress · TASK-255 PR 1: 15 hand-written money formatters → formatCents / formatCentsShort (adds thousands commas and -$ for negatives, like the rest of the app); estimates/[id]/format.ts formatDollars, the pricing.ts re-export and the formatCentsToDollars alias removed; lib/money.ts kept (nothing imports it but its own test; removal needs the map "Seen" step, which conflicts with the knip unused-file gate, so it waits for the owner); migration 220 drops idx_clients_account_id (same as idx_clients_account). Kept: company-story's "$12" style; toE164 (rejects non-US numbers the card formatter can't print)
 - 2026-11-25 · I7 · Blocked · TASK-252: a 96-case grid shows derivePipelineStage disagrees with the progress line and is itself wrong in common cases; owner decision recorded in Current state. Skipped to I8
 - 2026-11-25 · I5 · PR 1 Verified · health ok, /login 200, job routes 401 unauth, 71 jobs, no web errors; Codex P1 (Job and Invoice bubble text) fixed before merge
