@@ -19,15 +19,14 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : I8 TASK-255 PR 1 Verified (#781, b29d288d, migration
-                      220; backup ai_fsm_20261125T011418Z.dump verified).
-                      Health ok, /login 200, one clients(account_id) index
-                      left, 113 customers, no web errors.
+Last step           : J1 TASK-256 Verified (#785, 757c2e03, migration 221;
+                      backup ai_fsm_20261125T031017Z.dump verified), built and
+                      deployed ~03:18 UTC by session ai-fsm-deploy-clean-e3.
+                      First automated email ever delivered (owner check,
+                      sent 03:18:40, attempt 1). Deploys are back with this
+                      session.
 In-flight PR        : none
-Next step           : J1 TASK-256 (automated emails), built, merged,
-                      deployed and verified by session ai-fsm-deploy-clean-e3.
-                      No other deploy until it reports J1 Verified. Track I
-                      stays paused on the owner questions below.
+Next step           : J2 TASK-257 (one way to take a deposit).
 Blocked on          : owner:
                       1. G4, I4 PR 2: merge the 3 duplicate customers in the
                          live account? Corrected 2026-11-25: the earlier "10
@@ -57,7 +56,7 @@ Blocked on          : owner:
                          starts stay?
                       6. I10 TASK-254: is the customer PDF fine for office
                          printing?
-Last known-good     : b29d288d (deploy-good/92f72791 before it)
+Last known-good     : 757c2e03 (deploy-good/b29d288d before it)
 Notes               : The stale TASK-235..240 drafts in the main checkout
                       were discarded at the owner's request 2026-11-24.
                       C3 TASK-212 resumes after Track I. Owner checks after deploy (non-blocking):
@@ -118,6 +117,7 @@ Approved product decisions (do not change them):
 | Screens say Customer, Property, Estimate, Invoice; routes, tables and API names do not change | Owner 2026-11-22, `docs/canonical/DOMAIN_MODEL.md` (TASK-235) |
 | Desk and Today both stay; a deliberate tap on either is never redirected | TASK-238 (TASK-143 keeps Desk) |
 | Track E deletes no route; old links keep working | TASK-235 to TASK-237 |
+| Estimate follow-up is 3-day only; the 7-day reminder row is removed | Owner 2026-11-25, in session ai-fsm-deploy-clean-e3 (TASK-256, migration 221) |
 | Money lives at `/app/invoices` (summary cards, then the list); no new route | TASK-237, ROADMAP scope freeze |
 | Per-day production rates convert to hours with an hours-per-day setting, default 8, editable in Settings and shown next to each conversion | Owner in session 2026-10-26 (TASK-193) |
 
@@ -201,7 +201,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | I9 | TASK-253 | | | | |
 | I10 | TASK-254 | | | | |
 | J0 | Backlog TASK-256..258 | 2026-11-25 (#783, CI green) | 2026-11-25 (#783, 7439c962) | n/a | n/a |
-| J1 | TASK-256 | | | | |
+| J1 | TASK-256 | 2026-11-25 (#785, CI green) | 2026-11-25 (#785, 757c2e03) | 2026-11-25 (~03:18 UTC, migration 221; by session e3) | 2026-11-25 (health ok, /login 200, internal email route 401 unauth, one automation per type, owner check email sent) |
 | J2 | TASK-257 | | | | |
 | J3 | TASK-258 | | | | |
 | D5 | TASK-228 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC) | 2026-10-31 (health ok, /login 200) |
@@ -828,6 +828,9 @@ Per step:
 
 ## Log
 
+- 2026-11-25 · J1 · Verified · by session ai-fsm-deploy-clean-e3: health ok, /login 200, POST /api/internal/email 401 unauth, automations_one_per_type present, no duplicate types; owner check email (deploy-check-task-256) sent 03:18:40 on attempt 1, the first automated email ever delivered. The 92 old failed queue rows stay `failed` (dispatch only takes pending rows, so none is resent). TASK-256 Done
+- 2026-11-25 · J1 · Deployed · 757c2e03 · ~03:18 UTC by session e3, migration 221 (drops membership_renewal_nudge and the 7-day estimate_followup row; unique index automations_one_per_type); backup ai_fsm_20261125T031017Z.dump verified; known-good deploy-good/b29d288d; web and worker recreated. Audit correction: the two estimate_followup rows were a designed 3-day + 7-day pair (098), not a duplicate; they shared one idempotency key, so the 7-day reminder never sent
+- 2026-11-25 · J1 · Merged · #785 · squash 757c2e03 by session e3; Codex P2s fixed before merge (bounded SMTP timeouts so a slow send is not retried as a second email; the test parks and restores other pending rows)
 - 2026-11-25 · Track J · G10 Active · owner approved Track J in session ai-fsm-deploy-clean-e3 (#783 issuecomment-7150284802); J1 TASK-256 runs first, built and deployed by that session; this session holds deploys until it reports J1 Verified
 - 2026-11-25 · Track I · Paused for owner · I4 PR 2, I5 PR 2, I7, I8 PR 2, I9, I10 each need an owner answer (Current state). Correction: duplicate customers are 3 in the live account, not 10 + 3 (the first count crossed accounts)
 - 2026-11-25 · I8 · PR 1 Verified · health ok, /login 200, idx_clients_account_id gone, 113 customers, no web errors. Codex P1 (list an unused file on the map before removing it) → lib/money.ts kept
