@@ -200,7 +200,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | I8 | TASK-255 | PR 1 2026-11-25 (#781, CI green) | PR 1 2026-11-25 (#781, b29d288d) | PR 1 2026-11-25 (~01:21 UTC, migration 220) | PR 1 2026-11-25 (health ok, /login 200, duplicate index gone, no web errors); PR 2 owner decision |
 | I9 | TASK-253 | | | | |
 | I10 | TASK-254 | | | | |
-| J0 | Backlog TASK-256..258 | 2026-11-25 (#783) | | n/a | n/a |
+| J0 | Backlog TASK-256..258 | 2026-11-25 (#783, CI green) | 2026-11-25 (#783, 7439c962) | n/a | n/a |
 | J1 | TASK-256 | | | | |
 | J2 | TASK-257 | | | | |
 | J3 | TASK-258 | | | | |
