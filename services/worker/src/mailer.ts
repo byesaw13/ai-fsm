@@ -16,7 +16,7 @@ export async function sendEmail(opts: {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key },
       body: JSON.stringify(opts),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(180_000), // longer than the web mailer's SMTP timeouts
     });
     const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
     return res.ok && body.ok ? { ok: true } : { ok: false, error: body.error ?? `web returned ${res.status}` };

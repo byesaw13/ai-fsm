@@ -17,6 +17,12 @@ export function getTransporter(): Transporter {
         user: process.env.SMTP_USER!,
         pass: process.env.SMTP_PASS!,
       },
+      // Bounded so every send settles (sent or failed) well inside the
+      // worker's 3-minute wait, and a slow send is never retried as a
+      // second email (TASK-256).
+      connectionTimeout: 30_000,
+      greetingTimeout: 30_000,
+      socketTimeout: 60_000,
     });
   }
   return _transporter;

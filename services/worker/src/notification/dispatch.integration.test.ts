@@ -14,6 +14,8 @@ const ACCOUNT = "11111111-1111-1111-1111-111111111111";
 describe.skipIf(!TEST_DB_URL)("dispatchNotificationQueue (TASK-256)", () => {
   let client: Client;
   const ids: string[] = [];
+  // Other pending rows are parked in the future for the test and put back after.
+  let parked: { id: string; next_attempt_at: Date }[] = [];
 
   const enqueue = async (maxAttempts = 1) => {
     const { rows } = await client.query(
@@ -40,15 +42,24 @@ describe.skipIf(!TEST_DB_URL)("dispatchNotificationQueue (TASK-256)", () => {
     await client.connect();
     process.env.LOCATION_INTERNAL_KEY = "test-key";
     process.env.WEB_INTERNAL_URL = "http://web.test";
+    parked = (await client.query(
+      `SELECT id, next_attempt_at FROM notification_queue WHERE status = 'pending'`,
+    )).rows;
+    await client.query(
+      `UPDATE notification_queue SET next_attempt_at = now() + interval '100 years' WHERE id = ANY($1)`,
+      [parked.map((p) => p.id)],
+    );
   });
 
   beforeEach(async () => {
     await client.query(`DELETE FROM attention_events WHERE account_id = $1 AND type = 'notification.failed'`, [ACCOUNT]);
-    await client.query(`UPDATE notification_queue SET status = 'cancelled' WHERE status = 'pending'`);
   });
 
   afterAll(async () => {
     vi.unstubAllGlobals();
+    for (const p of parked) {
+      await client.query(`UPDATE notification_queue SET next_attempt_at = $2 WHERE id = $1`, [p.id, p.next_attempt_at]);
+    }
     await client.query(`DELETE FROM notification_queue WHERE id = ANY($1)`, [ids]);
     await client.query(`DELETE FROM attention_events WHERE account_id = $1 AND type = 'notification.failed'`, [ACCOUNT]);
     await client.end();
