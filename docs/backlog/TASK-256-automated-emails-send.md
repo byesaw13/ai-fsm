@@ -1,7 +1,7 @@
 # TASK-256: Automated emails actually send
 
 Status:
-In Progress
+Done
 
 Epic:
 EPIC-005 Platform & Delivery
@@ -29,11 +29,11 @@ Out of scope:
 - Customer SMS (the worker sends none today).
 
 Acceptance Criteria:
-- [ ] On production, one automation email (e.g. the owner's "invoice paid" alert) is delivered and its queue row is `sent`.
-- [ ] `automations` has one row per type per account, enforced by the index.
-- [ ] No failed row from before the deploy is sent.
-- [ ] A forced send failure shows up for the owner as an attention item.
-- [ ] The worker no longer contains a mailer.
+- [x] On production, one automation email (e.g. the owner's "invoice paid" alert) is delivered and its queue row is `sent`.
+- [x] `automations` has one row per type per account, enforced by the index.
+- [x] No failed row from before the deploy is sent.
+- [x] A forced send failure shows up for the owner as an attention item.
+- [x] The worker no longer contains a mailer.
 
 Test Plan:
 - Integration: the dispatch route sends a queued row through a stubbed transport and marks it sent; a failure on the last attempt creates the attention item; the unique index refuses a second automation of the same type.
