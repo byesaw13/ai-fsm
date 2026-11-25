@@ -232,7 +232,7 @@ closed in tests; owner-flow AC still open.
 | TASK-247 | [One function creates invoices, with one set of duplicate rules](TASK-247-one-invoice-writer.md) | 004 | Done |
 | TASK-248 | [Both estimate forms save through one payload builder](TASK-248-one-estimate-save-payload.md) | 002 | Proposed |
 | TASK-249 | [The server never creates a second customer for the same phone](TASK-249-no-duplicate-customers.md) | 003 | In Progress |
-| TASK-250 | [One function creates jobs, and a job always has a property](TASK-250-one-job-writer.md) | 003 | Proposed |
+| TASK-250 | [One function creates jobs, and a job always has a property](TASK-250-one-job-writer.md) | 003 | In Progress |
 | TASK-251 | [Invoice lock exceptions live in one place](TASK-251-invoice-lock-rules-in-one-place.md) | 004 | Done |
 | TASK-252 | [The job page works out where a job stands once](TASK-252-one-job-stage.md) | 006 | Proposed |
 | TASK-253 | [Keep only the estimate starts the owner uses](TASK-253-retire-unused-estimate-starts.md) | 002 | Proposed |

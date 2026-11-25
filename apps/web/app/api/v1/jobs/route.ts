@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createJob } from "@/lib/jobs/create-job";
 import { z } from "zod";
 import { withAuth, withRole } from "../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../lib/auth/middleware";
@@ -94,24 +95,17 @@ export const POST = withRole(
         [session.userId, session.accountId, session.role]
       );
 
-      const { rows } = await client.query(
-        `INSERT INTO jobs (account_id, client_id, property_id, title, description, job_type, job_category, priority, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         RETURNING *`,
-        [
-          session.accountId,
-          client_id,
-          property_id ?? null,
-          title,
-          description ?? null,
-          job_type,
-          job_category ?? null,
-          priority,
-          session.userId,
-        ]
-      );
-
-      const job = rows[0];
+      const job = await createJob(client, {
+        account_id: session.accountId,
+        client_id,
+        property_id: property_id ?? null,
+        title,
+        description: description ?? null,
+        job_type,
+        job_category: job_category ?? null,
+        priority,
+        created_by: session.userId,
+      });
 
       await appendAuditLog(client, {
         account_id: session.accountId,

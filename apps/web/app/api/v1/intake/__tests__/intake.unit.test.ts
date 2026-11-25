@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
+/** Column → value of a mocked INSERT INTO jobs call (createJob builds the column list). */
+function jobInsertValues(call: unknown[]): Record<string, unknown> {
+  const cols = String(call[0]).match(/INSERT INTO jobs \(([^)]*)\)/)![1].split(",").map((c) => c.trim());
+  return Object.fromEntries(cols.map((c, i) => [c, (call[1] as unknown[])[i]]));
+}
+
 const OWNER_SESSION = {
   userId: "00000000-0000-0000-0000-000000000001",
   accountId: "00000000-0000-0000-0000-000000000002",
@@ -137,15 +143,16 @@ describe("POST /api/v1/intake", () => {
     const jobInsert = mockClientQuery.mock.calls.find((call) =>
       String(call[0]).includes("INSERT INTO jobs")
     );
-    expect(jobInsert?.[1]).toEqual([
-      OWNER_SESSION.accountId,
-      CLIENT_ID,
-      PROPERTY_ID,
-      "General Repairs - Jane Client",
-      "Door latch is loose and needs adjustment.",
-      "repair",
-      OWNER_SESSION.userId,
-    ]);
+    expect(jobInsertValues(jobInsert!)).toMatchObject({
+      account_id: OWNER_SESSION.accountId,
+      client_id: CLIENT_ID,
+      property_id: PROPERTY_ID,
+      title: "General Repairs - Jane Client",
+      description: "Door latch is loose and needs adjustment.",
+      status: "draft",
+      job_type: "repair",
+      created_by: OWNER_SESSION.userId,
+    });
 
     const duplicateSelect = mockClientQuery.mock.calls.find((call) =>
       String(call[0]).includes("status NOT IN ('cancelled','converted','lost','duplicate')")
@@ -194,8 +201,7 @@ describe("POST /api/v1/intake", () => {
     const jobInsert = mockClientQuery.mock.calls.find((call) =>
       String(call[0]).includes("INSERT INTO jobs")
     );
-    expect(jobInsert?.[1]?.[2]).toBeNull();
-    expect(jobInsert?.[1]?.[3]).toBe("Request - John Smith");
+    expect(jobInsertValues(jobInsert!)).toMatchObject({ property_id: null, title: "Request - John Smith" });
   });
 
   it("returns 400 for missing required fields", async () => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createJob } from "@/lib/jobs/create-job";
 import { z } from "zod";
-import { query, queryOne } from "@/lib/db";
+import { getPool, query, queryOne } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { randomUUID } from "crypto";
 import { normalizePhone } from "@/lib/phone";
@@ -211,20 +212,17 @@ async function createDraftJob(
   ai: SmsClassification,
   message: string
 ): Promise<string> {
-  const [job] = await query<{ id: string }>(
-    `INSERT INTO jobs (account_id, client_id, title, description, status, job_type, created_by)
-     VALUES ($1, $2, $3, $4, 'draft', $5, $6) RETURNING id`,
-    [
-      accountId,
-      clientId,
-      ai.job_title ?? "SMS Inquiry",
-      [`Original SMS: "${message}"`, ai.description ? `\nDetails: ${ai.description}` : ""]
-        .filter(Boolean)
-        .join(""),
-      ai.job_type,
-      userId,
-    ]
-  );
+  const job = await createJob(getPool(), {
+    account_id: accountId,
+    client_id: clientId,
+    title: ai.job_title ?? "SMS Inquiry",
+    description: [`Original SMS: "${message}"`, ai.description ? `\nDetails: ${ai.description}` : ""]
+      .filter(Boolean)
+      .join(""),
+    status: "draft",
+    job_type: ai.job_type,
+    created_by: userId,
+  });
   return job.id;
 }
 
