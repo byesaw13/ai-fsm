@@ -24,8 +24,10 @@ Last step           : I8 TASK-255 PR 1 Verified (#781, b29d288d, migration
                       Health ok, /login 200, one clients(account_id) index
                       left, 113 customers, no web errors.
 In-flight PR        : none
-Next step           : owner answers below. Nothing in Track I is eligible
-                      without them (I6 also waits for TASK-223 PR 2).
+Next step           : J1 TASK-256 (automated emails), built, merged,
+                      deployed and verified by session ai-fsm-deploy-clean-e3.
+                      No other deploy until it reports J1 Verified. Track I
+                      stays paused on the owner questions below.
 Blocked on          : owner:
                       1. G4, I4 PR 2: merge the 3 duplicate customers in the
                          live account? Corrected 2026-11-25: the earlier "10
@@ -92,6 +94,7 @@ this one, as an approval.
 | G6 | TASK-225 table-freeze exception (one nullable column for chosen add-ons) | Approved 2026-10-31 | Owner in session: "approve both, use craftsman factors, start TASK-227", answering (1) TASK-225's one new column and (2) TASK-228's factors. |
 | G8 | Track E: build TASK-235 to TASK-240 in the order and with the decisions in "Plan: Track E", merging and deploying under G0 | **Active** 2026-11-23 | Owner comment on PR #755 at 2026-11-23 15:06 UTC, from `byesaw13`: `I approve Track E as described in docs/working/build-runbook.md` (issuecomment-7105048753). |
 | G9 | Track I: build TASK-246 to TASK-255 in the order and with the gates in "Plan: Track I", merging and deploying under G0 | **Active** 2026-11-24 | Owner in session 2026-11-24 asked the agent to post the approval and merge: "comment I approve Track I as described in docs/working/build-runbook.md on #775, merge it". Posted from `byesaw13` at 2026-11-24 21:42 UTC (issuecomment-7145287174). |
+| G10 | Track J: build TASK-256 to TASK-258 in the order in "Track J", TASK-256 first and ahead of the paused Track I steps, merging and deploying under G0 | **Active** 2026-11-25 | Owner in session ai-fsm-deploy-clean-e3: "approve it and do the email fix first". Posted from `byesaw13` on #783 at 2026-11-25 02:04 UTC (issuecomment-7150284802). |
 | G7 | TASK-228 height factors: Craftsman ×1.23 (9–13 ft), ×1.46 (13–17 ft), ×1.69 (17–19 ft), ×1.92 (19–21 ft) | Approved 2026-10-31 | Same session answer as G6. |
 
 **Without G0 active** the agent works in "PRs only" mode: it builds, tests and
@@ -197,6 +200,10 @@ docs-only commit after the event. Planned tests are not passing tests.
 | I8 | TASK-255 | PR 1 2026-11-25 (#781, CI green) | PR 1 2026-11-25 (#781, b29d288d) | PR 1 2026-11-25 (~01:21 UTC, migration 220) | PR 1 2026-11-25 (health ok, /login 200, duplicate index gone, no web errors); PR 2 owner decision |
 | I9 | TASK-253 | | | | |
 | I10 | TASK-254 | | | | |
+| J0 | Backlog TASK-256..258 | 2026-11-25 (#783, CI green) | 2026-11-25 (#783, 7439c962) | n/a | n/a |
+| J1 | TASK-256 | | | | |
+| J2 | TASK-257 | | | | |
+| J3 | TASK-258 | | | | |
 | D5 | TASK-228 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC) | 2026-10-31 (health ok, /login 200) |
 
 ## Operating rules
@@ -447,7 +454,21 @@ the remaining B, C and F steps. One step at a time, in this order:
 - **I9** TASK-253 Estimate starts (owner gate after the usage table).
 - **I10** TASK-254 Print shows the PDF (owner gate first).
 
-Not in this runbook: TASK-183 (deferred until Good/Better/Best is used) and
+### Track J: second audit fixes (G10)
+
+Owner decisions 2026-11-25 (second audit): automated email has never been
+delivered because the worker cannot reach smtp.gmail.com; one deposit model;
+three features with no data removed. Track J runs ahead of the paused Track I
+steps. One step at a time:
+
+- **J0** Backlog TASK-256 to TASK-258 (#783, docs only).
+- **J1** TASK-256 Automated emails send (migration; cleanup before the first
+  send). Built and deployed by session ai-fsm-deploy-clean-e3; this session
+  records its states.
+- **J2** TASK-257 One way to take a deposit (needs J1).
+- **J3** TASK-258 Remove three unused features (needs J2).
+
+ (deferred until Good/Better/Best is used) and
 the Phase 4 items in `docs/canonical/ROADMAP.md`.
 
 ---
@@ -807,6 +828,7 @@ Per step:
 
 ## Log
 
+- 2026-11-25 · Track J · G10 Active · owner approved Track J in session ai-fsm-deploy-clean-e3 (#783 issuecomment-7150284802); J1 TASK-256 runs first, built and deployed by that session; this session holds deploys until it reports J1 Verified
 - 2026-11-25 · Track I · Paused for owner · I4 PR 2, I5 PR 2, I7, I8 PR 2, I9, I10 each need an owner answer (Current state). Correction: duplicate customers are 3 in the live account, not 10 + 3 (the first count crossed accounts)
 - 2026-11-25 · I8 · PR 1 Verified · health ok, /login 200, idx_clients_account_id gone, 113 customers, no web errors. Codex P1 (list an unused file on the map before removing it) → lib/money.ts kept
 - 2026-11-25 · I8 · PR 1 Deployed · b29d288d · ~01:21 UTC, migration 220; backup ai_fsm_20261125T011418Z.dump verified; known-good deploy-good/92f72791
