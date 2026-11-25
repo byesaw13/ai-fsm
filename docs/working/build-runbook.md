@@ -19,13 +19,14 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : J2 TASK-257 Verified (#787, a45a7293, no migration).
-                      Health ok, /login 200, Square link 401 unauth, a live
-                      customer invoice link 200.
-In-flight PR        : J3 TASK-258 (remove three unused features; migration
-                      222)
-Next step           : J3 merge, backup, deploy, verify. Then Track J is done;
-                      Track I waits on the owner questions below.
+Last step           : J3 TASK-258 Verified (#788, 70df1516, migration 222;
+                      backup ai_fsm_20261125T041715Z.dump verified). Track J
+                      done (J1–J3).
+In-flight PR        : none
+Next step           : owner answers below (Track I). Follow-up found in J2's
+                      check, needs a backlog task: owner alerts raised outside
+                      a transaction are never queued (lib/attention/emit.ts
+                      SAVEPOINT).
 Blocked on          : owner:
                       1. G4, I4 PR 2: merge the 3 duplicate customers in the
                          live account? Corrected 2026-11-25: the earlier "10
@@ -55,7 +56,7 @@ Blocked on          : owner:
                          starts stay?
                       6. I10 TASK-254: is the customer PDF fine for office
                          printing?
-Last known-good     : a45a7293 (deploy-good/757c2e03 before it)
+Last known-good     : 70df1516 (deploy-good/a45a7293 before it)
 Notes               : The stale TASK-235..240 drafts in the main checkout
                       were discarded at the owner's request 2026-11-24.
                       C3 TASK-212 resumes after Track I. Owner checks after deploy (non-blocking):
@@ -202,7 +203,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | J0 | Backlog TASK-256..258 | 2026-11-25 (#783, CI green) | 2026-11-25 (#783, 7439c962) | n/a | n/a |
 | J1 | TASK-256 | 2026-11-25 (#785, CI green) | 2026-11-25 (#785, 757c2e03) | 2026-11-25 (~03:18 UTC, migration 221; by session e3) | 2026-11-25 (health ok, /login 200, internal email route 401 unauth, one automation per type, owner check email sent) |
 | J2 | TASK-257 | 2026-11-25 (#787, CI green) | 2026-11-25 (#787, a45a7293) | 2026-11-25 (~03:50 UTC, no migration) | 2026-11-25 (health ok, /login 200, Square link 401 unauth, live portal invoice 200) |
-| J3 | TASK-258 | | | | |
+| J3 | TASK-258 | 2026-11-25 (#788, CI green) | 2026-11-25 (#788, 70df1516) | 2026-11-25 (~04:25 UTC, migration 222) | 2026-11-25 (health ok, /login 200, removed pages 404, scan row gone, no web errors) |
 | D5 | TASK-228 | 2026-10-31 (#741, CI green) | 2026-10-31 (#741, 047cfdb9) | 2026-10-31 (~16:42 UTC) | 2026-10-31 (health ok, /login 200) |
 
 ## Operating rules
@@ -827,6 +828,9 @@ Per step:
 
 ## Log
 
+- 2026-11-25 · J3 · Verified · health ok, /login 200, /app/reports/close, /intake/<token> and /api/intake/<token> 404, property_issue_scan row gone, no web errors. The worker logs "sms gateway health check failed" at start: the worker is on the internal network (same isolation as TASK-256); it sends no SMS today, not caused by J3. TASK-258 Done; Track J done
+- 2026-11-25 · J3 · Deployed · 70df1516 · ~04:25 UTC, migration 222; backup ai_fsm_20261125T041715Z.dump verified; known-good deploy-good/a45a7293
+- 2026-11-25 · J3 · Merged · #788 · squash 70df1516; no Codex findings
 - 2026-11-25 · J3 · In progress · TASK-258: property issues (routes, panels, visit/portal/property sections, condition seeding, worker scan + migration 222 deleting its automation row), the monthly close (page, period-closes route, close permissions; the month CSV export stays, now linked from Reports), and intake invite links (page, routes, send button, email template) removed. Tables stay. Prod read-only: all four tables empty
 - 2026-11-25 · J2 · Verified · health ok, /login 200, POST square-link 401 unauth, a live customer invoice link 200. The check opened one real invoice link, which recorded one customer view on it (03:50 UTC). It also showed an older bug: owner alerts raised outside a transaction (lib/attention/emit.ts SAVEPOINT) are never queued; reported to the owner, needs a backlog task. TASK-257 Done
 - 2026-11-25 · J2 · Deployed · a45a7293 · ~03:50 UTC, no migration; known-good deploy-good/757c2e03

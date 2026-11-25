@@ -1,7 +1,7 @@
 # TASK-258: Remove three features that were never used
 
 Status:
-In Progress
+Done
 
 Epic:
 EPIC-005 Platform & Delivery
@@ -29,10 +29,10 @@ Out of scope:
 - Vehicle service reminders, Good/Better/Best, memberships and plans (owner: keep).
 
 Acceptance Criteria:
-- [ ] None of the three features is reachable from any page or menu, and their routes are gone.
-- [ ] The worker no longer runs a property issue scan.
-- [ ] Property, visit, request and portal pages still load for real records.
-- [ ] knip, lint, typecheck and tests pass.
+- [x] None of the three features is reachable from any page or menu, and their routes are gone.
+- [x] The worker no longer runs a property issue scan.
+- [x] Property, visit, request and portal pages still load for real records.
+- [x] knip, lint, typecheck and tests pass.
 
 Test Plan:
 - E2E: property page, visit page, request page and a portal property page load.
