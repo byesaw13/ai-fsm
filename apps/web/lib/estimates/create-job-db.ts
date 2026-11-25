@@ -8,6 +8,7 @@
  */
 
 import type { PoolClient } from "pg";
+import { createJob } from "@/lib/jobs/create-job";
 import { deriveJobTitle, deriveJobDescription } from "./job-from-estimate";
 import { promoteOrCreateWorkOrderFromEstimate } from "../work-orders/from-estimate";
 
@@ -303,24 +304,18 @@ export async function createJobFromEstimate({
     total_cents: est.total_cents,
   });
 
-  const jobRes = await client.query<{ id: string }>(
-    `INSERT INTO jobs
-       (account_id, client_id, property_id, title, description,
-        status, job_type, booking_request_id, created_by, pricing_mode)
-     VALUES ($1, $2, $3, $4, $5, 'quoted', 'custom', $6, $7, $8)
-     RETURNING id`,
-    [
-      accountId,
-      est.client_id,
-      est.property_id,
-      title,
-      description,
-      est.booking_request_id ?? null,
-      createdBy,
-      est.pricing_mode === "hourly_internal" ? "hourly_internal" : "flat_rate",
-    ]
-  );
-  const jobId = jobRes.rows[0].id;
+  const { id: jobId } = await createJob(client, {
+    account_id: accountId,
+    client_id: est.client_id,
+    property_id: est.property_id,
+    title,
+    description,
+    status: "quoted",
+    job_type: "custom",
+    booking_request_id: est.booking_request_id ?? null,
+    created_by: createdBy,
+    pricing_mode: est.pricing_mode === "hourly_internal" ? "hourly_internal" : "flat_rate",
+  });
 
   // Link the estimate to the new job.
   await client.query(`UPDATE estimates SET job_id = $1 WHERE id = $2`, [

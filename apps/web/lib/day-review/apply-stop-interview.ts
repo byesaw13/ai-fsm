@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { createJob } from "@/lib/jobs/create-job";
 import {
   STOP_REASONS,
   stopCreatesJob,
@@ -278,20 +279,15 @@ async function createJobOnProperty(
   session: { accountId: string; userId: string; traceId: string },
   opts: { propertyId: string; clientId: string; title: string; notes: string },
 ): Promise<string> {
-  const { rows } = await client.query<{ id: string }>(
-    `INSERT INTO jobs (account_id, client_id, property_id, title, description, job_type, created_by)
-     VALUES ($1, $2, $3, $4, $5, 'repair', $6)
-     RETURNING id`,
-    [
-      session.accountId,
-      opts.clientId,
-      opts.propertyId,
-      opts.title,
-      opts.notes || null,
-      session.userId,
-    ],
-  );
-  const jobId = rows[0].id;
+  const { id: jobId } = await createJob(client, {
+    account_id: session.accountId,
+    client_id: opts.clientId,
+    property_id: opts.propertyId,
+    title: opts.title,
+    description: opts.notes || null,
+    job_type: "repair",
+    created_by: session.userId,
+  });
   await client.query(
     `UPDATE jobs SET status = 'scheduled', updated_at = now()
      WHERE id = $1 AND account_id = $2 AND status = 'draft'`,

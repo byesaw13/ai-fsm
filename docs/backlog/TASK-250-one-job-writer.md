@@ -1,7 +1,7 @@
 # TASK-250: One function creates jobs, and a job always has a property
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-003 Property Intelligence
@@ -16,7 +16,8 @@ Problem:
 Six places write `INSERT INTO jobs`: `lib/estimates/create-job-db.ts`, `lib/day-review/apply-stop-interview.ts`, `lib/intake/records.ts`, `app/api/internal/sms/route.ts`, `app/api/v1/jobs/route.ts`, `app/api/v1/quick-book/route.ts`. The SMS path inserts no `property_id`, and `jobs.property_id` is nullable. Starting status differs by door (`quoted`, `draft`, or the column default). The product is property-centered (PRODUCT_VISION). Audit 2026-11-24.
 
 Scope:
-- `lib/jobs/create-job.ts`: `createJob(client, {...})` with the insert, starting status rule and a required `property_id`. The six callers use it.
+- PR 1: `lib/jobs/create-job.ts`: `createJob(db, {...})` is the only `INSERT INTO jobs` (seven call sites in six files). When no property is given and the customer has exactly one, that one is filled in, in the same statement. Callers keep their own starting status.
+- PR 2 (owner decision first): whether `property_id` is required. 22 production jobs belong to customers with no property on file, and requiring one would block approving an estimate for such a customer.
 - The SMS path uses the customer's only property when there is one; otherwise it creates a request (not a job) so the address is asked for, the same as intake.
 - Read-only query in the PR: jobs with no property, for the owner.
 

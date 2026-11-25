@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { createJob } from "../jobs/create-job";
 import { normalizePhone } from "../phone";
 import { findClientByContact } from "../clients/match";
 import { SMS_CONSENT_TEXT } from "../sms/consent";
@@ -254,21 +255,16 @@ export async function createIntakeRecords(
   const jobType = (serviceCategory && JOB_TYPE_BY_CATEGORY[serviceCategory]) || "custom";
   const categoryLabel = serviceCategory ? titleCaseCategory(serviceCategory) : "Request";
 
-  const { rows: jobRows } = await client.query<{ id: string }>(
-    `INSERT INTO jobs (account_id, client_id, property_id, title, description, status, job_type, created_by)
-     VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7)
-     RETURNING id`,
-    [
-      input.accountId,
-      clientId,
-      propertyId,
-      `${categoryLabel} - ${input.name}`,
-      input.serviceDescription,
-      jobType,
-      createdByUserId,
-    ]
-  );
-  const jobId = jobRows[0].id;
+  const { id: jobId } = await createJob(client, {
+    account_id: input.accountId,
+    client_id: clientId,
+    property_id: propertyId,
+    title: `${categoryLabel} - ${input.name}`,
+    description: input.serviceDescription,
+    status: "draft",
+    job_type: jobType,
+    created_by: createdByUserId,
+  });
 
   const routingPath = input.routingPath ?? "pending";
 
@@ -369,21 +365,16 @@ export async function repairBookingRequestPipelineLinks(
     const jobType = (serviceCategory && JOB_TYPE_BY_CATEGORY[serviceCategory]) || "custom";
     const categoryLabel = serviceCategory ? titleCaseCategory(serviceCategory) : "Request";
 
-    const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO jobs (account_id, client_id, property_id, title, description, status, job_type, created_by)
-       VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7)
-       RETURNING id`,
-      [
-        normalized.accountId,
-        clientId,
-        propertyId,
-        `${categoryLabel} - ${normalized.name}`,
-        normalized.serviceDescription,
-        jobType,
-        normalized.createdByUserId,
-      ]
-    );
-    jobId = rows[0].id;
+    ({ id: jobId } = await createJob(client, {
+      account_id: normalized.accountId,
+      client_id: clientId,
+      property_id: propertyId,
+      title: `${categoryLabel} - ${normalized.name}`,
+      description: normalized.serviceDescription,
+      status: "draft",
+      job_type: jobType,
+      created_by: normalized.createdByUserId ?? null,
+    }));
   }
 
   await client.query(

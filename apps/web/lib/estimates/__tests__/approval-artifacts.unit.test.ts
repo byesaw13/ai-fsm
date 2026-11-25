@@ -19,6 +19,12 @@ vi.mock("@/lib/invoices/db", () => ({
   generateInvoiceNumber: vi.fn().mockResolvedValue("DEP-0001"),
 }));
 
+/** Column → value of a mocked INSERT INTO jobs call (createJob builds the column list). */
+function jobInsertValues(call: unknown[]): Record<string, unknown> {
+  const cols = String(call[0]).match(/INSERT INTO jobs \(([^)]*)\)/)![1].split(",").map((c) => c.trim());
+  return Object.fromEntries(cols.map((c, i) => [c, (call[1] as unknown[])[i]]));
+}
+
 // ── Mock client builder ────────────────────────────────────────────────────
 
 function makeClient(results: unknown[]): PoolClient {
@@ -290,10 +296,7 @@ describe("createJobFromEstimate", () => {
       (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO jobs")
     );
     expect(insertCall).toBeDefined();
-    const args = insertCall![1] as unknown[];
-    // booking_request_id is $6 in the INSERT
-    expect(args[5]).toBe("br-1");
-    expect(args[7]).toBe("flat_rate");
+    expect(jobInsertValues(insertCall!)).toMatchObject({ booking_request_id: "br-1", pricing_mode: "flat_rate" });
   });
 
   it("does not silently merge onto an open job at the house", async () => {
@@ -467,7 +470,7 @@ describe("createJobFromEstimate", () => {
     const insertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
       (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO jobs"),
     );
-    expect((insertCall![1] as unknown[])[7]).toBe("hourly_internal");
+    expect(jobInsertValues(insertCall!).pricing_mode).toBe("hourly_internal");
     expect(result.created).toBe(true);
   });
 });

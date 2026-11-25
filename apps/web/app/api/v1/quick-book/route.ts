@@ -4,6 +4,7 @@
  * Designed for the calendar's "quick book" flow where no estimate is needed.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { createJob } from "@/lib/jobs/create-job";
 import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
@@ -174,22 +175,16 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     }
 
     // ── 3. Create job (T&M) ──────────────────────────────────────────────────
-    const { rows: jobRows } = await client.query<{ id: string }>(
-      `INSERT INTO jobs (account_id, client_id, property_id, title, job_type, description, pricing_mode, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id`,
-      [
-        session.accountId,
-        clientId,
-        propertyId,
-        d.job_title,
-        d.job_type,
-        d.notes ?? null,
-        QUICK_JOB_PRICING_MODE,
-        session.userId,
-      ],
-    );
-    const jobId = jobRows[0].id;
+    const { id: jobId } = await createJob(client, {
+      account_id: session.accountId,
+      client_id: clientId,
+      property_id: propertyId,
+      title: d.job_title,
+      job_type: d.job_type,
+      description: d.notes ?? null,
+      pricing_mode: QUICK_JOB_PRICING_MODE,
+      created_by: session.userId,
+    });
     await appendAuditLog(client, {
       account_id: session.accountId,
       entity_type: "job",

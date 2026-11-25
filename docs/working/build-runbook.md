@@ -19,20 +19,25 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : I3 TASK-251 Verified (#778, 75767d59, migration 219;
-                      backup ai_fsm_20261124T231951Z.dump verified). Health
-                      ok, /login 200, paid-invoice edit still refused (tried
-                      in a rolled-back transaction), no web errors.
-In-flight PR        : I4 TASK-249 PR 1 (one customer lookup for create,
-                      intake and import; no migration)
-Next step           : I4 PR 1 merge, deploy, verify. Then STOP for the owner
-                      (G4): 10 customers share a phone with an older record
-                      and 3 share an email (mostly a 2026-07-01 / 07-06 double
-                      import). PR 2 (unique index) waits until the owner has
-                      merged them. Meanwhile I5 may start (it needs I4 only for
-                      the lookup, which PR 1 ships).
-Blocked on          : nothing yet
-Last known-good     : 75767d59 (deploy-good/dccaba55 before it)
+Last step           : I4 TASK-249 PR 1 Verified (#779, e9b89372, no
+                      migration). Health ok, /login 200, client routes 401
+                      unauth, 113 customers, no web errors.
+In-flight PR        : I5 TASK-250 PR 1 (one job writer; fills the customer's
+                      only property)
+Next step           : I5 PR 1 merge, deploy, verify. Then I6 TASK-248 if
+                      TASK-223 PR 2 has merged, else I7.
+Blocked on          : owner, two questions (other steps continue):
+                      1. G4, I4 PR 2: 10 customers share a phone with an
+                         older record and 3 share an email. Merge them in
+                         the app, or approve a merge script (dry run first)?
+                         The unique index waits for this.
+                      2. I5 PR 2: must every job have a property? 22 jobs
+                         belong to customers with no property on file;
+                         requiring one would block approving an estimate for
+                         such a customer. Options: require it everywhere;
+                         require it except estimate approval; or keep the
+                         PR 1 fill-in only and close TASK-250.
+Last known-good     : e9b89372 (deploy-good/75767d59 before it)
 Notes               : The stale TASK-235..240 drafts in the main checkout
                       were discarded at the owner's request 2026-11-24.
                       C3 TASK-212 resumes after Track I. Owner checks after deploy (non-blocking):
@@ -167,7 +172,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | I1 | TASK-246 | 2026-11-24 (#776, CI green) | 2026-11-24 (#776, c365fa9a) | 2026-11-24 (~22:24 UTC, migration 217) | 2026-11-24 (health ok, /login 200, DELETE 401 unauth, trigger on DELETE, paid totals unchanged) |
 | I2 | TASK-247 | 2026-11-24 (#777, CI green) | 2026-11-24 (#777, dccaba55) | 2026-11-24 (~23:04 UTC, migration 218) | 2026-11-24 (health ok, /login 200, routes 401 unauth, indexes present, no web errors) |
 | I3 | TASK-251 | 2026-11-24 (#778, CI green) | 2026-11-24 (#778, 75767d59) | 2026-11-24 (~23:25 UTC, migration 219) | 2026-11-24 (health ok, /login 200, paid lock holds, no web errors) |
-| I4 | TASK-249 | | | | |
+| I4 | TASK-249 | PR 1 2026-11-24 (#779, CI green) | PR 1 2026-11-25 (#779, e9b89372) | PR 1 2026-11-25 (~00:03 UTC, no migration) | PR 1 2026-11-25 (health ok, /login 200, client routes 401 unauth, no web errors); PR 2 waits for owner (G4) |
 | I5 | TASK-250 | | | | |
 | I6 | TASK-248 | | | | |
 | I7 | TASK-252 | | | | |
@@ -784,6 +789,10 @@ Per step:
 
 ## Log
 
+- 2026-11-25 · I5 · In progress · TASK-250 PR 1: lib/jobs/create-job.ts used by all seven job inserts (estimate→job, day review, intake ×2, jobs POST, quick-book, SMS); one INSERT fills the customer's only property when none is given. Prod read-only: 27 of 71 jobs have no property (5 customers with one property, 22 with none; 1 from SMS). Strict requirement held for the owner
+- 2026-11-25 · I4 · PR 1 Verified · health ok, /login 200, client routes 401 unauth, 113 customers, no web errors. PR 2 waits for G4
+- 2026-11-25 · I4 · PR 1 Deployed · e9b89372 · ~00:03 UTC, no migration; known-good deploy-good/75767d59
+- 2026-11-25 · I4 · PR 1 Merged · #779 · squash e9b89372; Codex P1 (import name fallback could merge two Square customers) and P2 (last-10-digit match crossed country codes) fixed before merge
 - 2026-11-24 · I4 · In progress · TASK-249 PR 1: lib/clients/match.ts findClientByContact (email any case, phone last 10 digits) used by client create (returns the existing customer, 200 matched), intake and the CSV import (which compared the raw name to the stored normalized name, the likely cause of the 07-01/07-06 doubles). Quick-book takes only a name, so it is out of scope. Prod read-only: 10 phone pairs, 3 email pairs
 - 2026-11-24 · I3 · Verified · health ok, /login 200, invoice_document_columns() live, paid edit refused (rolled back), 61 invoices, no web errors. TASK-251 Done
 - 2026-11-24 · I3 · Deployed · 75767d59 · ~23:25 UTC, migration 219; backup ai_fsm_20261124T231951Z.dump verified; known-good deploy-good/dccaba55
