@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCentsShort } from "@ai-fsm/money";
 import { Button } from "@/components/ui";
 import type { TmEstimateDraft } from "@/lib/estimates/tm-briefing";
 
@@ -9,12 +10,6 @@ interface TmDraftReviewPanelProps {
   onEdit: () => void;
 }
 
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })}`;
-}
 
 function formatRange(min: number, max: number, unit: string): string {
   if (min === max) return `${min} ${unit}`;
@@ -141,22 +136,22 @@ export function TmDraftReviewPanel({ draft, onApply, onEdit }: TmDraftReviewPane
             <div style={{ color: "var(--fg-muted)" }}>On-site labor</div>
             <strong>{formatRange(e.labor_hours_min, e.labor_hours_max, "hrs")}</strong>
             <div>
-              {formatCents(draft.labor_total_cents_min)}–{formatCents(draft.labor_total_cents_max)}
+              {formatCentsShort(draft.labor_total_cents_min)}–{formatCentsShort(draft.labor_total_cents_max)}
             </div>
           </div>
           <div style={{ padding: "var(--space-3)", border: "1px solid var(--border)", borderRadius: 4 }}>
             <div style={{ color: "var(--fg-muted)" }}>Travel</div>
             <strong>{formatRange(e.travel_hours_min, e.travel_hours_max, "hrs")}</strong>
             <div>
-              {formatCents(draft.travel_total_cents_min)}–{formatCents(draft.travel_total_cents_max)}
+              {formatCentsShort(draft.travel_total_cents_min)}–{formatCentsShort(draft.travel_total_cents_max)}
             </div>
           </div>
         </div>
         <p style={{ margin: "var(--space-3) 0 0", fontSize: "var(--text-base)", fontWeight: 700 }}>
-          Expectation: {formatCents(draft.total_estimate_cents_min)}–
-          {formatCents(draft.total_estimate_cents_max)}
+          Expectation: {formatCentsShort(draft.total_estimate_cents_min)}–
+          {formatCentsShort(draft.total_estimate_cents_max)}
           {draft.materials_estimate_cents > 0
-            ? ` (incl. ~${formatCents(draft.materials_estimate_cents)} materials)`
+            ? ` (incl. ~${formatCentsShort(draft.materials_estimate_cents)} materials)`
             : " + materials at cost"}
         </p>
         <p style={{ margin: "4px 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
@@ -216,7 +211,7 @@ export function TmDraftReviewPanel({ draft, onApply, onEdit }: TmDraftReviewPane
               <span style={{ flex: 1 }}>{li.description}</span>
               <span style={{ whiteSpace: "nowrap", fontWeight: 600 }}>
                 {li.quantity} × ${(li.unit_price_cents / 100).toFixed(2)} ={" "}
-                {formatCents(Math.round(li.quantity * li.unit_price_cents))}
+                {formatCentsShort(Math.round(li.quantity * li.unit_price_cents))}
               </span>
             </div>
           ))}

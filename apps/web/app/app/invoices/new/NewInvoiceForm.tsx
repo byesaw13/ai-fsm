@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -61,9 +62,6 @@ function lineTotal(row: LineItemRow): number {
   return Math.round(qty * parseCents(row.unit_price));
 }
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 const EMPTY_ROW: LineItemRow = { description: "", quantity: "1", unit_price: "0.00" };
 
@@ -544,7 +542,7 @@ export function NewInvoiceForm({
                         paddingLeft: "var(--space-2)",
                       }}
                     >
-                      {formatDollars(lineTotal(row))}
+                      {formatCents(lineTotal(row))}
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: "var(--space-1)" }}>
@@ -602,7 +600,7 @@ export function NewInvoiceForm({
             }}
           >
             <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
-            <span data-testid="subtotal">{formatDollars(subtotalCents)}</span>
+            <span data-testid="subtotal">{formatCents(subtotalCents)}</span>
 
             <label
               htmlFor="tax_rate"
@@ -627,12 +625,12 @@ export function NewInvoiceForm({
             {taxCents > 0 && (
               <>
                 <span style={{ color: "var(--fg-muted)" }}>Tax</span>
-                <span data-testid="tax-amount">{formatDollars(taxCents)}</span>
+                <span data-testid="tax-amount">{formatCents(taxCents)}</span>
               </>
             )}
 
             <strong>Total</strong>
-            <strong data-testid="total">{formatDollars(totalCents)}</strong>
+            <strong data-testid="total">{formatCents(totalCents)}</strong>
           </div>
         </div>
       </div>

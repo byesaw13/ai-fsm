@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useState, useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -11,7 +12,6 @@ import {
   Textarea,
   useToast,
 } from "@/components/ui";
-import { formatCents } from "@/lib/estimates/pricing";
 import { EstimateTierEditor } from "../components/EstimateTierEditor";
 import { GuardrailsSection } from "../components/GuardrailsSection";
 import { LineItemsTable } from "../components/LineItemsTable";
@@ -116,9 +116,6 @@ interface EstimateEditFormProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 function centsToDisplayDollars(cents: number): string {
   return (cents / 100).toFixed(2);
@@ -854,14 +851,14 @@ function StandardEstimateEditForm({
               {mode === "itemized" && (
                 <>
                   <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
-                  <span data-testid="edit-subtotal"><Money>{formatDollars(subtotalCents)}</Money></span>
+                  <span data-testid="edit-subtotal"><Money>{formatCents(subtotalCents)}</Money></span>
                 </>
               )}
 
               {guardrailAdjustmentCents > 0 && (
                 <>
                   <span style={{ color: "var(--fg-muted)" }}>Pricing Adjustments</span>
-                  <span><Money>{formatDollars(guardrailAdjustmentCents)}</Money></span>
+                  <span><Money>{formatCents(guardrailAdjustmentCents)}</Money></span>
                 </>
               )}
 
@@ -888,12 +885,12 @@ function StandardEstimateEditForm({
               {taxCents > 0 && (
                 <>
                   <span style={{ color: "var(--fg-muted)" }}>Tax</span>
-                  <span data-testid="edit-tax-amount"><Money>{formatDollars(taxCents)}</Money></span>
+                  <span data-testid="edit-tax-amount"><Money>{formatCents(taxCents)}</Money></span>
                 </>
               )}
 
               <strong>Total</strong>
-              <strong data-testid="edit-total"><Money>{formatDollars(totalCents)}</Money></strong>
+              <strong data-testid="edit-total"><Money>{formatCents(totalCents)}</Money></strong>
             </div>
           </div>
         </div>

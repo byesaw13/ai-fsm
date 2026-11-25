@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCentsShort } from "@ai-fsm/money";
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui";
 import {
@@ -62,9 +63,6 @@ const GRADE_LABELS: Record<PaintGrade, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatDollars(cents: number) {
-  return `$${(cents / 100).toFixed(0)}`;
-}
 
 function sqftPreview(room: RoomSpec): string {
   if (!room.length_ft || !room.width_ft || !room.ceiling_height_ft) return "—";
@@ -441,10 +439,10 @@ export function RoomByRoomEditor({ rooms, options, onChange, rateHours }: RoomBy
               { label: "Trim", value: metrics.total_trim_lf > 0 ? `${metrics.total_trim_lf.toFixed(0)} LF` : "—" },
               { label: "Paint", value: metrics.total_paint_gallons > 0 ? `${metrics.total_paint_gallons} gal` : "Customer supplied" },
               ...(metrics.total_primer_gallons > 0 ? [{ label: "Primer", value: `${metrics.total_primer_gallons} gal` }] : []),
-              { label: "Labor", value: formatDollars(engineResult.summary.laborCents) },
-              ...(engineResult.summary.materialCents > 0 ? [{ label: "Materials", value: formatDollars(engineResult.summary.materialCents) }] : []),
-              { label: "Est. total", value: formatDollars(engineResult.summary.totalCents) },
-              ...(engineResult.summary.depositCents > 0 ? [{ label: "Deposit due", value: formatDollars(engineResult.summary.depositCents) }] : []),
+              { label: "Labor", value: formatCentsShort(engineResult.summary.laborCents) },
+              ...(engineResult.summary.materialCents > 0 ? [{ label: "Materials", value: formatCentsShort(engineResult.summary.materialCents) }] : []),
+              { label: "Est. total", value: formatCentsShort(engineResult.summary.totalCents) },
+              ...(engineResult.summary.depositCents > 0 ? [{ label: "Deposit due", value: formatCentsShort(engineResult.summary.depositCents) }] : []),
             ].map(({ label, value }) => (
               <div key={label}>
                 <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{label}</p>

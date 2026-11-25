@@ -8,6 +8,3 @@ export const STATUS_LABELS: Record<EstimateStatus, string> = {
   expired: "Expired",
 };
 
-export function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}

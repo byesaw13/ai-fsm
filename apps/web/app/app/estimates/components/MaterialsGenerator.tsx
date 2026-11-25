@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useEffect, useState } from "react";
 import type { AssessmentRoom } from "@ai-fsm/domain";
 import { preserveScope } from "@/lib/estimates/assessment-context";
@@ -74,9 +75,6 @@ interface Props {
   onClose: () => void;
 }
 
-function formatCentsDisplay(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export function MaterialsGenerator({
   initialScope = "",
@@ -339,7 +337,7 @@ export function MaterialsGenerator({
                         />
                       </td>
                       <td style={{ padding: "var(--space-1) var(--space-2)", textAlign: "right", fontWeight: 500 }}>
-                        {formatCentsDisplay(item.total_cost_cents)}
+                        {formatCents(item.total_cost_cents)}
                       </td>
                       <td style={{ padding: "var(--space-1) var(--space-2)", textAlign: "center" }}>
                         <button
@@ -359,7 +357,7 @@ export function MaterialsGenerator({
           ))}
 
           <div style={{ display: "flex", justifyContent: "flex-end", fontWeight: 700, fontSize: "var(--text-sm)", paddingTop: "var(--space-2)", borderTop: "2px solid var(--border)" }}>
-            Estimated materials total: {formatCentsDisplay(editedTotal)}
+            Estimated materials total: {formatCents(editedTotal)}
           </div>
 
           {error && <div className="p7-card-danger" role="alert">{error}</div>}

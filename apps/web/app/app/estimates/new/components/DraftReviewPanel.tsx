@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCentsShort } from "@ai-fsm/money";
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import type { DraftEstimate } from "@/lib/estimates/ai-draft";
@@ -68,9 +69,6 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   );
 }
 
-function formatDollars(cents: number) {
-  return `$${(cents / 100).toFixed(0)}`;
-}
 
 export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }: DraftReviewPanelProps) {
   const [materialsExpanded, setMaterialsExpanded] = useState<Record<string, boolean>>({});
@@ -131,10 +129,10 @@ export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }:
         </div>
         {grandTotalCents > 0 && (
           <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)" }}>
-            Est. total: {formatDollars(grandTotalCents)}
+            Est. total: {formatCentsShort(grandTotalCents)}
             {totalMaterialCents > 0 && (
               <span style={{ fontWeight: 400, fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: 6 }}>
-                incl. {formatDollars(totalMaterialCents)} materials
+                incl. {formatCentsShort(totalMaterialCents)} materials
               </span>
             )}
           </div>
@@ -262,7 +260,7 @@ export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }:
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
                       <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)" }}>
-                        {formatDollars(displayPrice)}
+                        {formatCentsShort(displayPrice)}
                       </div>
                       {svc.adjusted_price_cents && svc.unit_type === "per_sqft" && (
                         <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
@@ -271,7 +269,7 @@ export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }:
                       )}
                       {hasMaterials && svc.material_total_cents != null && svc.material_total_cents > 0 && (
                         <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                          + {formatDollars(svc.material_total_cents)} materials
+                          + {formatCentsShort(svc.material_total_cents)} materials
                         </div>
                       )}
                     </div>
@@ -320,7 +318,7 @@ export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }:
                                 {mat.quantity} {mat.material.unit}
                               </span>
                               <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, minWidth: 52, textAlign: "right" }}>
-                                {formatDollars(mat.total_cost_cents)}
+                                {formatCentsShort(mat.total_cost_cents)}
                               </span>
                             </div>
                           ))}
@@ -345,7 +343,7 @@ export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }:
             }}>
               <span>Est. catalog materials:</span>
               <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", color: "var(--fg)" }}>
-                {formatDollars(totalMaterialCents)}
+                {formatCentsShort(totalMaterialCents)}
               </span>
               <span style={{ fontStyle: "italic" }}>+ 15% handling</span>
             </div>
@@ -381,7 +379,7 @@ export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }:
                       </div>
                       {mat.unit_cost_cents && (
                         <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                          {formatDollars(mat.units_to_order * mat.unit_cost_cents)} est.
+                          {formatCentsShort(mat.units_to_order * mat.unit_cost_cents)} est.
                         </div>
                       )}
                     </div>
@@ -399,7 +397,7 @@ export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }:
                 }}>
                   <span>Est. specified materials:</span>
                   <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", color: "var(--fg)" }}>
-                    {formatDollars(totalSpecifiedCents)}
+                    {formatCentsShort(totalSpecifiedCents)}
                   </span>
                 </div>
               )}
@@ -431,7 +429,7 @@ export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }:
               >
                 <span style={{ fontWeight: 600 }}>
                   {shoppingList.sections.length} section{shoppingList.sections.length > 1 ? "s" : ""} ·{" "}
-                  {formatDollars(shoppingList.total_catalog_cost_cents + shoppingList.total_specified_cost_cents)} est. total
+                  {formatCentsShort(shoppingList.total_catalog_cost_cents + shoppingList.total_specified_cost_cents)} est. total
                 </span>
                 <span>{shoppingExpanded ? "▲" : "▼"}</span>
               </button>
@@ -446,7 +444,7 @@ export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }:
                         <div key={m.material.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", padding: "2px 0", gap: "var(--space-2)" }}>
                           <span style={{ flex: 1 }}>{m.material.material_name}</span>
                           <span style={{ color: "var(--fg-muted)", minWidth: 60, textAlign: "right" }}>{m.quantity} {m.material.unit}</span>
-                          <span style={{ fontWeight: 600, minWidth: 52, textAlign: "right" }}>{formatDollars(m.total_cost_cents)}</span>
+                          <span style={{ fontWeight: 600, minWidth: 52, textAlign: "right" }}>{formatCentsShort(m.total_cost_cents)}</span>
                         </div>
                       ))}
                       {sec.specified_items.map((m, i) => (
@@ -457,7 +455,7 @@ export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }:
                           </span>
                           <span style={{ color: "var(--fg-muted)", minWidth: 60, textAlign: "right" }}>{m.units_to_order} {m.unit_label}</span>
                           <span style={{ fontWeight: 600, minWidth: 52, textAlign: "right" }}>
-                            {m.unit_cost_cents ? formatDollars(m.units_to_order * m.unit_cost_cents) : "—"}
+                            {m.unit_cost_cents ? formatCentsShort(m.units_to_order * m.unit_cost_cents) : "—"}
                           </span>
                         </div>
                       ))}

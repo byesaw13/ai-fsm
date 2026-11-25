@@ -19,25 +19,32 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : I4 TASK-249 PR 1 Verified (#779, e9b89372, no
-                      migration). Health ok, /login 200, client routes 401
-                      unauth, 113 customers, no web errors.
-In-flight PR        : I5 TASK-250 PR 1 (one job writer; fills the customer's
-                      only property)
-Next step           : I5 PR 1 merge, deploy, verify. Then I6 TASK-248 if
-                      TASK-223 PR 2 has merged, else I7.
-Blocked on          : owner, two questions (other steps continue):
+Last step           : I5 TASK-250 PR 1 Verified (#780, 92f72791, no
+                      migration; merged from the owner's account 00:37 UTC,
+                      deployed by the agent 00:42). Health ok, /login 200,
+                      job routes 401 unauth, 71 jobs, no web errors.
+In-flight PR        : I8 TASK-255 PR 1 (money formatters, shims, duplicate
+                      client index; migration 220)
+Next step           : I8 PR 1 merge, backup, deploy, verify; then I8 PR 2
+                      (fold packages/money and packages/log into domain).
+                      I6 waits for TASK-223 PR 2. I7 is blocked (below).
+Blocked on          : owner, three questions (other steps continue):
                       1. G4, I4 PR 2: 10 customers share a phone with an
                          older record and 3 share an email. Merge them in
                          the app, or approve a merge script (dry run first)?
-                         The unique index waits for this.
                       2. I5 PR 2: must every job have a property? 22 jobs
-                         belong to customers with no property on file;
-                         requiring one would block approving an estimate for
-                         such a customer. Options: require it everywhere;
-                         require it except estimate approval; or keep the
-                         PR 1 fill-in only and close TASK-250.
-Last known-good     : e9b89372 (deploy-good/75767d59 before it)
+                         belong to customers with no property on file.
+                         Options: required everywhere; required except
+                         estimate approval; or keep PR 1's fill-in and close.
+                      3. I7 TASK-252: derivePipelineStage is wrong in common
+                         cases (draft job with an unsent estimate -> "Ready to
+                         Schedule"; quoted job with no estimate -> "Estimate
+                         Sent"; in-progress job with no estimate -> "Ready to
+                         Schedule"), so it can't be the single source as is.
+                         What each case should say is an owner call, and
+                         TASK-242 (job page tabs) redesigns this page. Fold
+                         TASK-252 into TASK-242, or rule on the cases?
+Last known-good     : 92f72791 (deploy-good/e9b89372 before it)
 Notes               : The stale TASK-235..240 drafts in the main checkout
                       were discarded at the owner's request 2026-11-24.
                       C3 TASK-212 resumes after Track I. Owner checks after deploy (non-blocking):
@@ -173,9 +180,9 @@ docs-only commit after the event. Planned tests are not passing tests.
 | I2 | TASK-247 | 2026-11-24 (#777, CI green) | 2026-11-24 (#777, dccaba55) | 2026-11-24 (~23:04 UTC, migration 218) | 2026-11-24 (health ok, /login 200, routes 401 unauth, indexes present, no web errors) |
 | I3 | TASK-251 | 2026-11-24 (#778, CI green) | 2026-11-24 (#778, 75767d59) | 2026-11-24 (~23:25 UTC, migration 219) | 2026-11-24 (health ok, /login 200, paid lock holds, no web errors) |
 | I4 | TASK-249 | PR 1 2026-11-24 (#779, CI green) | PR 1 2026-11-25 (#779, e9b89372) | PR 1 2026-11-25 (~00:03 UTC, no migration) | PR 1 2026-11-25 (health ok, /login 200, client routes 401 unauth, no web errors); PR 2 waits for owner (G4) |
-| I5 | TASK-250 | | | | |
+| I5 | TASK-250 | PR 1 2026-11-25 (#780, CI green) | PR 1 2026-11-25 (#780, 92f72791) | PR 1 2026-11-25 (~00:42 UTC, no migration) | PR 1 2026-11-25 (health ok, /login 200, job routes 401 unauth, no web errors); PR 2 waits for owner |
 | I6 | TASK-248 | | | | |
-| I7 | TASK-252 | | | | |
+| I7 | TASK-252 | blocked: owner decision (see Current state) | | | |
 | I8 | TASK-255 | | | | |
 | I9 | TASK-253 | | | | |
 | I10 | TASK-254 | | | | |
@@ -789,6 +796,9 @@ Per step:
 
 ## Log
 
+- 2026-11-25 · I8 · In progress · TASK-255 PR 1: 15 hand-written money formatters → formatCents / formatCentsShort (adds thousands commas and -$ for negatives, like the rest of the app); estimates/[id]/format.ts formatDollars, the pricing.ts re-export and the formatCentsToDollars alias removed; lib/money.ts kept (nothing imports it but its own test; removal needs the map "Seen" step, which conflicts with the knip unused-file gate, so it waits for the owner); migration 220 drops idx_clients_account_id (same as idx_clients_account). Kept: company-story's "$12" style; toE164 (rejects non-US numbers the card formatter can't print)
+- 2026-11-25 · I7 · Blocked · TASK-252: a 96-case grid shows derivePipelineStage disagrees with the progress line and is itself wrong in common cases; owner decision recorded in Current state. Skipped to I8
+- 2026-11-25 · I5 · PR 1 Verified · health ok, /login 200, job routes 401 unauth, 71 jobs, no web errors; Codex P1 (Job and Invoice bubble text) fixed before merge
 - 2026-11-25 · I5 · In progress · TASK-250 PR 1: lib/jobs/create-job.ts used by all seven job inserts (estimate→job, day review, intake ×2, jobs POST, quick-book, SMS); one INSERT fills the customer's only property when none is given. Prod read-only: 27 of 71 jobs have no property (5 customers with one property, 22 with none; 1 from SMS). Strict requirement held for the owner
 - 2026-11-25 · I4 · PR 1 Verified · health ok, /login 200, client routes 401 unauth, 113 customers, no web errors. PR 2 waits for G4
 - 2026-11-25 · I4 · PR 1 Deployed · e9b89372 · ~00:03 UTC, no migration; known-good deploy-good/75767d59

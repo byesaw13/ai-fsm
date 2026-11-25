@@ -1,8 +1,8 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useMemo } from "react";
 import { computeEstimate, buildPricingRules, ENGINE_VERSION, type BusinessPricingSettings, type EstimateSpec } from "@ai-fsm/domain";
-import { formatCents } from "@/lib/estimates/pricing";
 import { calculateDepositPolicy } from "@/lib/estimates/deposit-policy";
 import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
 import { parseCents, lineTotal, handlingBasisCents, handlingBasisRows, mapPrepLevel, type LineItemRow, type OptionTier } from "@/lib/estimates/form-helpers";

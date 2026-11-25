@@ -141,9 +141,6 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
   void: "Void",
 };
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export default async function InvoiceDetailPage({
   params,
@@ -469,7 +466,7 @@ export default async function InvoiceDetailPage({
         <div>
           <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>TOTAL</div>
           <div style={{ fontSize: "clamp(1.25rem, 5vw, 2rem)", fontWeight: 700, fontFamily: "var(--font-mono)", lineHeight: 1 }} data-testid="invoice-total">
-            {formatDollars(invoice.total_cents)}
+            {formatCents(invoice.total_cents)}
           </div>
         </div>
 
@@ -485,7 +482,7 @@ export default async function InvoiceDetailPage({
             }}
             data-testid="invoice-balance"
           >
-            {formatDollars(amountDue)}
+            {formatCents(amountDue)}
           </div>
           {amountDue > 0 && currentStatus !== "draft" && (
             dueOnCompletion ? (
@@ -499,7 +496,7 @@ export default async function InvoiceDetailPage({
         <div>
           <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>PAID ON THIS INVOICE</div>
           <div style={{ fontSize: "clamp(1rem, 4vw, 1.5rem)", fontWeight: 600, fontFamily: "var(--font-mono)" }} data-testid="invoice-paid">
-            {formatDollars(invoice.paid_cents)}
+            {formatCents(invoice.paid_cents)}
           </div>
         </div>
 
@@ -509,7 +506,7 @@ export default async function InvoiceDetailPage({
               DEPOSIT CREDIT
             </div>
             <div style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-success)" }}>
-              −{formatDollars(depositCredit)}
+              −{formatCents(depositCredit)}
               {invoice.deposit_paid_at ? " ✓" : ""}
             </div>
             <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
@@ -558,7 +555,7 @@ export default async function InvoiceDetailPage({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
               <SectionHeader title="Line Items" />
               <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                {lineItems.length} lines · {formatDollars(invoice.subtotal_cents)} subtotal
+                {lineItems.length} lines · {formatCents(invoice.subtotal_cents)} subtotal
               </div>
             </div>
 
@@ -619,7 +616,7 @@ export default async function InvoiceDetailPage({
                           </td>
                           <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{item.quantity}</td>
                           <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
-                            {formatDollars(item.total_cents)}
+                            {formatCents(item.total_cents)}
                           </td>
                         </tr>
                       );
@@ -654,7 +651,7 @@ export default async function InvoiceDetailPage({
                                       {sub.label} subtotal
                                     </td>
                                     <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--fg-muted)" }}>
-                                      {formatDollars(sub.subtotalCents)}
+                                      {formatCents(sub.subtotalCents)}
                                     </td>
                                   </tr>
                                 </Fragment>
@@ -666,7 +663,7 @@ export default async function InvoiceDetailPage({
                                 {group.label} subtotal
                               </td>
                               <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--fg-muted)" }}>
-                                {formatDollars(group.subtotalCents)}
+                                {formatCents(group.subtotalCents)}
                               </td>
                             </tr>
                           )}
@@ -677,18 +674,18 @@ export default async function InvoiceDetailPage({
                   <tfoot>
                     <tr style={{ borderTop: "2px solid var(--border)" }}>
                       <td colSpan={3} style={{ textAlign: "right", fontWeight: 600 }}>Subtotal</td>
-                      <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.subtotal_cents)}</td>
+                      <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{formatCents(invoice.subtotal_cents)}</td>
                     </tr>
                     {invoice.tax_cents > 0 && (
                       <tr>
                         <td colSpan={3} style={{ textAlign: "right" }}>Tax</td>
-                        <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.tax_cents)}</td>
+                        <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{formatCents(invoice.tax_cents)}</td>
                       </tr>
                     )}
                     <tr style={{ fontWeight: 700, fontSize: "var(--text-base)" }}>
                       <td colSpan={3} style={{ textAlign: "right" }}>Total</td>
                       <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }} data-testid="invoice-total-footer">
-                        {formatDollars(invoice.total_cents)}
+                        {formatCents(invoice.total_cents)}
                       </td>
                     </tr>
                   </tfoot>
@@ -718,24 +715,24 @@ export default async function InvoiceDetailPage({
             <div style={{ display: "grid", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>Subtotal</span>
-                <span style={{ fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.subtotal_cents)}</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatCents(invoice.subtotal_cents)}</span>
               </div>
               {invoice.tax_cents > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span>Tax</span>
-                  <span style={{ fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.tax_cents)}</span>
+                  <span style={{ fontFamily: "var(--font-mono)" }}>{formatCents(invoice.tax_cents)}</span>
                 </div>
               )}
               <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)" }}>
                 <span>Total</span>
-                <span style={{ fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.total_cents)}</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatCents(invoice.total_cents)}</span>
               </div>
 
               {depositCredit > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "var(--space-1)" }} data-testid="invoice-financials-deposit-credit">
                   <span>Deposit credit</span>
                   <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
-                    −{formatDollars(depositCredit)}
+                    −{formatCents(depositCredit)}
                   </span>
                 </div>
               )}
@@ -743,13 +740,13 @@ export default async function InvoiceDetailPage({
               <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "var(--space-1)" }}>
                 <span>Paid on this invoice</span>
                 <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
-                  −{formatDollars(invoice.paid_cents)}
+                  −{formatCents(invoice.paid_cents)}
                 </span>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: "var(--text-base)", color: amountDue > 0 ? "var(--color-danger)" : "var(--fg)" }}>
                 <span>Balance remaining</span>
-                <span style={{ fontFamily: "var(--font-mono)" }} data-testid="invoice-due">{formatDollars(amountDue)}</span>
+                <span style={{ fontFamily: "var(--font-mono)" }} data-testid="invoice-due">{formatCents(amountDue)}</span>
               </div>
             </div>
 

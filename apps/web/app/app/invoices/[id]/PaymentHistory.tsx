@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui";
@@ -32,9 +33,6 @@ interface Props {
   role: string;
 }
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 function methodLabel(method: string): string {
   return paymentMethodLabels[method as PaymentMethod] ?? method;
@@ -150,7 +148,7 @@ export function PaymentHistory({ invoiceId, invoiceStatus, role }: Props) {
                 <td>{methodLabel(payment.method)}</td>
                 <td>{typeLabel(payment.payment_type)}</td>
                 <td>{statusLabel(payment.status)}</td>
-                <td>{formatDollars(payment.amount_cents)}</td>
+                <td>{formatCents(payment.amount_cents)}</td>
                 <td>{displayNotes}</td>
                 <td>{payment.created_by_name ?? "—"}</td>
                 {canDelete && (

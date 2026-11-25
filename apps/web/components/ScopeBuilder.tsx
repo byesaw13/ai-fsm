@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useState, useEffect, useMemo } from "react";
 import type {
   ScopeTemplate,
@@ -45,17 +46,14 @@ export interface ScopeBuilderResult {
   productionDailyRateCents: number | null;
 }
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 function formatModifier(multiplier: number, adderCents: number, baseCents: number): string {
   const parts: string[] = [];
   if (multiplier !== 1.0) parts.push(`×${multiplier.toFixed(2)}`);
-  if (adderCents > 0) parts.push(`+${formatDollars(adderCents)}`);
+  if (adderCents > 0) parts.push(`+${formatCents(adderCents)}`);
   if (parts.length === 0) return "No modifiers applied";
   const adjusted = Math.round(baseCents * multiplier) + adderCents;
-  return `${parts.join(" ")} → ${formatDollars(adjusted)}`;
+  return `${parts.join(" ")} → ${formatCents(adjusted)}`;
 }
 
 const UNIT_COUNT_KEYS = [
@@ -230,7 +228,7 @@ function ComplexityFactorRow({
           >
             {factor.factor_type === "multiplier"
               ? `×${factor.default_value.toFixed(2)}`
-              : `+${formatDollars(factor.default_value)}`}
+              : `+${formatCents(factor.default_value)}`}
           </span>
         </div>
         {factor.description && (
@@ -443,7 +441,7 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
               }}
             >
               {isProductionBased && laborEstimate
-                ? `Production: ${formatLaborEstimate(laborEstimate)} → ${formatDollars(adjustedPriceCents)}`
+                ? `Production: ${formatLaborEstimate(laborEstimate)} → ${formatCents(adjustedPriceCents)}`
                 : formatModifier(multiplier, adderCents, effectiveBasePriceCents)}
             </span>
           )}
@@ -538,13 +536,13 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
                   Production-based pricing
                 </span>
                 <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--accent)" }}>
-                  {formatDollars(adjustedPriceCents)}
+                  {formatCents(adjustedPriceCents)}
                 </span>
               </div>
               <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", lineHeight: 1.6 }}>
                 <span>{laborEstimate.quantity.toFixed(0)} {laborEstimate.rate_unit.replace("_per_day", "").replace("_", " ")} ÷ {laborEstimate.adjusted_rate.toFixed(0)} {laborEstimate.rate_unit.replace("_", "/")} = {laborEstimate.labor_days} day{laborEstimate.labor_days !== 1 ? "s" : ""}</span>
                 <span style={{ margin: "0 var(--space-1)" }}>×</span>
-                <span>{formatDollars(productionDailyRateCents)}/day</span>
+                <span>{formatCents(productionDailyRateCents)}/day</span>
                 {laborEstimate.applied_modifiers.length > 0 && (
                   <span style={{ marginLeft: "var(--space-2)", color: "var(--color-warning, #92400e)" }}>
                     ({laborEstimate.applied_modifiers.map(m => `${m.key.replace(/_/g, " ")} ${Math.round(m.modifier_pct * 100)}%`).join(", ")})
@@ -584,13 +582,13 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
                     textDecoration: (hasModifiers || effectiveBasePriceCents !== basePriceCents) ? "line-through" : "none",
                   }}
                 >
-                  {formatDollars(basePriceCents)}
+                  {formatCents(basePriceCents)}
                 </span>
                 {(effectiveBasePriceCents !== basePriceCents || hasModifiers) && (
                   <>
                     <span style={{ margin: "0 var(--space-1)", color: "var(--fg-muted)" }}>→</span>
                     <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)" }}>
-                      {formatDollars(adjustedPriceCents)}
+                      {formatCents(adjustedPriceCents)}
                     </span>
                     {hasModifiers && (
                       <span style={{ marginLeft: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
@@ -647,7 +645,7 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
                     ? `${v.actual}% margin (minimum ${v.required}%)`
                     : v.rule_type === "min_sqft_rate_cents"
                     ? `$${(v.actual / 100).toFixed(2)}/sqft (minimum $${(v.required / 100).toFixed(2)}/sqft)`
-                    : `${formatDollars(v.actual)} (minimum ${formatDollars(v.required)})`}
+                    : `${formatCents(v.actual)} (minimum ${formatCents(v.required)})`}
                 </p>
               ))}
             </div>
@@ -686,7 +684,7 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
                   </span>
                   {computedMaterials.length > 0 ? (
                     <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                      {computedMaterials.length} item{computedMaterials.length !== 1 ? "s" : ""} · est. {formatDollars(materialTotalCents)}
+                      {computedMaterials.length} item{computedMaterials.length !== 1 ? "s" : ""} · est. {formatCents(materialTotalCents)}
                     </span>
                   ) : (
                     <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
@@ -730,7 +728,7 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
                               {section.section}
                             </p>
                             <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                              {formatDollars(section.section_total_cents)}
+                              {formatCents(section.section_total_cents)}
                             </span>
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -783,7 +781,7 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
                                     textAlign: "right",
                                   }}
                                 >
-                                  {formatDollars(item.total_cost_cents)}
+                                  {formatCents(item.total_cost_cents)}
                                 </span>
                               </div>
                             ))}
@@ -809,7 +807,7 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
                           </span>
                         </div>
                         <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--accent)" }}>
-                          {formatDollars(materialTotalCents)}
+                          {formatCents(materialTotalCents)}
                         </span>
                       </div>
                     </>

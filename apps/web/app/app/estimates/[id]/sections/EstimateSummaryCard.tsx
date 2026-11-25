@@ -1,7 +1,7 @@
+import { formatCents } from "@ai-fsm/money";
 import { PREP_LEVEL_MULTIPLIERS, calculateFinancialComparison, computeRoomMeasurements } from "@ai-fsm/domain";
 import type { RoomSpec, Role } from "@ai-fsm/domain";
 import type { AiMaterialsDeltaItem as AiMaterialsDeltaEntry } from "@/lib/estimates/materials-delta";
-import { formatDollars } from "../format";
 import type { EstimateRow } from "../detail-data";
 import { Money } from "@/components/ui/Money";
 
@@ -40,16 +40,16 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
       {/* Money anchor: total quote */}
       <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flexWrap: "wrap", margin: "var(--space-2) 0 var(--space-1)" }}>
         <span data-testid="estimate-total" style={{ fontSize: "var(--text-3xl, 1.875rem)", fontWeight: 800, letterSpacing: "-0.02em" }}>
-          <Money>{formatDollars(estimate.total_cents)}</Money>
+          <Money>{formatCents(estimate.total_cents)}</Money>
         </span>
         {estimate.deposit_cents > 0 && (
           <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, padding: "3px 10px", borderRadius: 99, background: "color-mix(in srgb, var(--accent) 10%, transparent)", color: "var(--accent)", whiteSpace: "nowrap" }}>
-            Deposit <Money>{formatDollars(estimate.deposit_cents)}</Money>
+            Deposit <Money>{formatCents(estimate.deposit_cents)}</Money>
           </span>
         )}
         {estimate.balance_cents > 0 && (
           <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, padding: "3px 10px", borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--fg-secondary)", whiteSpace: "nowrap" }}>
-            Balance <Money>{formatDollars(estimate.balance_cents)}</Money>
+            Balance <Money>{formatCents(estimate.balance_cents)}</Money>
           </span>
         )}
       </div>
@@ -83,23 +83,23 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--space-2)" }}>
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Direct Labor Cost</span>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}><Money>{formatDollars(laborCostCents)}</Money></p>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{effectiveHours} hrs @ <Money>{formatDollars(laborCostRateCents)}</Money>/hr</span>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}><Money>{formatCents(laborCostCents)}</Money></p>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{effectiveHours} hrs @ <Money>{formatCents(laborCostRateCents)}</Money>/hr</span>
             </div>
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Material Cost Basis</span>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}><Money>{formatDollars(materialCostCents)}</Money></p>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>+15% handling ({formatDollars(materialHandlingCents)})</span>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}><Money>{formatCents(materialCostCents)}</Money></p>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>+15% handling ({formatCents(materialHandlingCents)})</span>
             </div>
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Total Direct Job Cost</span>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}><Money>{formatDollars(totalDirectCostCents)}</Money></p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}><Money>{formatCents(totalDirectCostCents)}</Money></p>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Labor + Materials</span>
             </div>
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Gross Profit ($)</span>
               <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)", color: grossProfitCents > 0 ? "var(--status-success)" : "var(--status-error)" }}>
-                <Money>{formatDollars(grossProfitCents)}</Money>
+                <Money>{formatCents(grossProfitCents)}</Money>
               </p>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{grossMarginPct}% of Estimate</span>
             </div>
@@ -118,20 +118,20 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
             {/* Fixed Rate Column */}
             <div style={{ padding: "var(--space-2)", borderRadius: 6, border: "1px solid var(--accent)", background: "color-mix(in srgb, var(--accent) 4%, transparent)" }}>
               <span style={{ fontWeight: 700, fontSize: "var(--text-xs)", color: "var(--accent)" }}>📌 FIXED RATE (Current Estimate)</span>
-              <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}><Money>{formatDollars(totalQuoteCents)}</Money></p>
-              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong><Money>{formatDollars(grossProfitCents)}</Money></strong> ({grossMarginPct}% margin)</p>
+              <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}><Money>{formatCents(totalQuoteCents)}</Money></p>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong><Money>{formatCents(grossProfitCents)}</Money></strong> ({grossMarginPct}% margin)</p>
             </div>
 
             {/* T&M Column */}
             <div style={{ padding: "var(--space-2)", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg)" }}>
               <span style={{ fontWeight: 700, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>⏱️ T&amp;M ESTIMATE (Est {tmEstimatedLaborHrs} hrs)</span>
-              <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}><Money>{formatDollars(tmTotalQuoteCents)}</Money></p>
-              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong><Money>{formatDollars(tmGrossProfitCents)}</Money></strong> ({tmGrossMarginPct}% margin)</p>
+              <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}><Money>{formatCents(tmTotalQuoteCents)}</Money></p>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong><Money>{formatCents(tmGrossProfitCents)}</Money></strong> ({tmGrossMarginPct}% margin)</p>
             </div>
           </div>
 
           <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-secondary)" }}>
-            💡 <strong>Recommendation:</strong> Fixed Rate yields <Money>{formatDollars(grossProfitCents - tmGrossProfitCents)}</Money> additional margin while giving the customer an exact guaranteed price.
+            💡 <strong>Recommendation:</strong> Fixed Rate yields <Money>{formatCents(grossProfitCents - tmGrossProfitCents)}</Money> additional margin while giving the customer an exact guaranteed price.
           </p>
         </div>
       )}
@@ -217,7 +217,7 @@ export function EstimateSummaryCard({ estimate, role, documentFilename, laborCos
             {(estimate.travel_surcharge_cents > 0 || estimate.risk_adjustment_cents > 0) && (
               <p>
                 <strong>Adjustments:</strong>{" "}
-                <Money>{formatDollars(estimate.travel_surcharge_cents + estimate.risk_adjustment_cents)}</Money>
+                <Money>{formatCents(estimate.travel_surcharge_cents + estimate.risk_adjustment_cents)}</Money>
               </p>
             )}
             {estimate.minimum_service_override_reason && (
