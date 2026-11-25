@@ -169,6 +169,15 @@ export async function dispatchNotificationQueue(client: Client): Promise<Dispatc
               [sendResult.error ?? "unknown", row.id]
             );
             result.failed++;
+            // Tell the owner, once a day, so a broken send is never silent (TASK-256).
+            await client.query(
+              `INSERT INTO attention_events
+                 (account_id, type, entity_type, entity_id, title, summary, href, dedupe_key)
+               VALUES ($1, 'notification.failed', 'notification', $2, 'Automatic emails are failing', $3,
+                       '/app/automations', 'notification-failed:' || (now() AT TIME ZONE 'America/New_York')::date)
+               ON CONFLICT (account_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`,
+              [row.account_id, row.id, `${row.automation_type} to ${row.to_address}: ${sendResult.error ?? "unknown"}`.slice(0, 300)]
+            );
             logger.error("notification permanently failed", sendResult.error, {
               type: row.automation_type,
               attempts: newAttemptCount,
