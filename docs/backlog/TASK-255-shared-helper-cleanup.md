@@ -23,7 +23,7 @@ Audit 2026-11-24 (owner approved removal in session):
 
 Scope:
 - Replace the local formatters with `formatCents` (whole dollars → `formatCentsShort`). The `$` + `toFixed(2)` copies gain thousands commas and `-$` negatives, matching the rest of the app; company-story's "$12" style stays.
-- Remove the shims and alias; import from the package.
+- Remove the shims and alias; import from the package. (`apps/web/lib/money.ts` stays for now: only its own test imports it. Listing it on the map first, per system-map.md, would make knip fail CI on an unused file; the owner decides how to retire it.)
 - ~~Use `normalizePhone` for the public card.~~ Kept: `toE164` rejects non-US numbers, which the card's US formatter needs; `normalizePhone` keeps international ones.
 - Move `money` and `log` into `packages/domain` (`@ai-fsm/domain/money`, `@ai-fsm/domain/log`) and delete the two workspaces.
 - Migration dropping `idx_clients_account_id`.
