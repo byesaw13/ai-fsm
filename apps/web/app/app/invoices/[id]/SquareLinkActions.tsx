@@ -5,21 +5,17 @@ import { useRouter } from "next/navigation";
 
 interface Props {
   invoiceId: string;
-  hasDeposit: boolean;
   remainingCents: number;
   existingLinkUrl: string | null;
 }
 
 export function SquareLinkActions({
   invoiceId,
-  hasDeposit,
   remainingCents,
   existingLinkUrl,
 }: Props) {
   const router = useRouter();
-  const [kind, setKind] = useState<"deposit" | "balance" | "custom">(
-    hasDeposit ? "deposit" : "balance"
-  );
+  const [kind, setKind] = useState<"balance" | "custom">("balance");
   const [customAmount, setCustomAmount] = useState("");
   const [linkUrl, setLinkUrl] = useState<string | null>(existingLinkUrl);
   const [loading, setLoading] = useState(false);
@@ -85,11 +81,10 @@ export function SquareLinkActions({
         <select
           value={kind}
           onChange={(e) =>
-            setKind(e.target.value as "deposit" | "balance" | "custom")
+            setKind(e.target.value as "balance" | "custom")
           }
           aria-label="Payment link amount"
         >
-          {hasDeposit && <option value="deposit">Deposit</option>}
           <option value="balance">Remaining balance</option>
           <option value="custom">Custom amount</option>
         </select>

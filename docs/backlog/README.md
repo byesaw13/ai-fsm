@@ -239,7 +239,7 @@ closed in tests; owner-flow AC still open.
 | TASK-254 | [Print shows the same PDF the customer gets](TASK-254-one-rendering-per-document.md) | 004 | Proposed |
 | TASK-255 | [Shared helpers used once, not copied](TASK-255-shared-helper-cleanup.md) | 005 | In Progress |
 | TASK-256 | [Automated emails actually send](TASK-256-automated-emails-send.md) | 005 | Done |
-| TASK-257 | [One way to take a deposit](TASK-257-one-way-to-take-a-deposit.md) | 004 | Proposed |
+| TASK-257 | [One way to take a deposit](TASK-257-one-way-to-take-a-deposit.md) | 004 | In Progress |
 | TASK-258 | [Remove three features that were never used](TASK-258-remove-unused-features.md) | 005 | Proposed |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |

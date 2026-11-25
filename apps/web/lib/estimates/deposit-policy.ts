@@ -21,6 +21,11 @@ export interface DepositPolicyResult {
   balance_cents: number;
 }
 
+/** `pct` percent of `totalCents` (pct clamped to 0–100), rounded to a cent. */
+export function percentOfCents(totalCents: number, pct: number): number {
+  return Math.round(Math.max(0, totalCents) * (clampNumber(pct, 0, 100) / 100));
+}
+
 export function calculateDepositPolicy(input: DepositPolicyInput): DepositPolicyResult {
   const total = Math.max(0, Math.round(input.total_cents || 0));
   const required = input.deposit_required === true;
@@ -34,8 +39,7 @@ export function calculateDepositPolicy(input: DepositPolicyInput): DepositPolicy
   if (type === "materials") {
     deposit = Math.max(0, Math.round(input.material_total_cents ?? 0));
   } else if (type === "percentage") {
-    const pct = clampNumber(input.deposit_percentage ?? 0, 0, 100);
-    deposit = Math.round(total * (pct / 100));
+    deposit = percentOfCents(total, input.deposit_percentage ?? 0);
   } else if (type === "fixed") {
     deposit = Math.max(0, Math.round(input.deposit_fixed_cents ?? 0));
   }

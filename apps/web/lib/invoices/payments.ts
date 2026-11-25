@@ -2,15 +2,9 @@
 /**
  * Pure payment math for invoices.
  *
- * Two deposit models exist (see migration 154 + billing.ts):
- *
- * 1. **Credit model** (`deposit_cents` on a final/standard invoice): money
- *    already billed on a separate deposit invoice. Reduces what this invoice
- *    may collect. DB generated column: `balance_cents = total - deposit`.
- *
- * 2. **First-payment model** (`deposit_type` percentage/fixed): a requested
- *    first payment on the same invoice. Does not change total; tracked via
- *    `paid_cents` only. `deposit_cents` stays 0.
+ * A deposit is its own deposit invoice (TASK-257). On the final invoice,
+ * `deposit_cents` is the credit for it: money already billed, which reduces
+ * what this invoice may collect (`balance_cents = total - deposit`).
  *
  * Collectible remaining = total − deposit_credit − paid_on_this_invoice.
  */
@@ -33,8 +27,7 @@ export function amountDueCents(
  * status === "paid" for those edge cases (avoids PAID stamp on empty drafts).
  *
  * `depositCreditCents` is the credit model field (`invoices.deposit_cents`):
- * money already billed on a separate deposit invoice, not a first-payment
- * still due on this document (that uses `deposit_type` instead).
+ * money already billed on a separate deposit invoice.
  */
 export function isInvoiceFullyPaid(
   totalCents: number,
