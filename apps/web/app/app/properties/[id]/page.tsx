@@ -20,10 +20,6 @@ import { PropertyForm } from "../PropertyForm";
 import { PropertyVaultSection } from "../PropertyVaultSection";
 import { PropertyTimeline } from "./PropertyTimeline";
 import type { TimelineEvent } from "./PropertyTimeline";
-import { PropertyConditionsPanel } from "./PropertyConditionsPanel";
-import type { ConditionRow } from "./PropertyConditionsPanel";
-import { PropertyIssuesPanel } from "./PropertyIssuesPanel";
-import type { IssueRow } from "./PropertyIssuesPanel";
 import { PropertyServiceHistory } from "./PropertyServiceHistory";
 import type { ServiceHistoryRow } from "./PropertyServiceHistory";
 import { PropertyContactsPanel, type PropertyContactRow } from "./PropertyContactsPanel";
@@ -211,8 +207,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
     documents,
     visitMedia,
     vaultItems,
-    conditions,
-    issues,
     contacts,
   ] = await Promise.all([
 
@@ -393,30 +387,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       [id, session.accountId]
     ),
 
-    // Conditions — most recent reading per area
-    query<ConditionRow>(
-      `SELECT DISTINCT ON (area)
-         area, condition, note, assessed_at::text AS assessed_at, visit_id::text AS visit_id,
-         '[]'::json AS trend
-       FROM property_condition_snapshots
-       WHERE account_id = $2 AND property_id = $1
-       ORDER BY area, assessed_at DESC`,
-      [id, session.accountId]
-    ),
-
-    // All issues (including resolved — panel groups them internally)
-    query<IssueRow>(
-      `SELECT id, area, item_key, title, description, status, severity,
-              occurrence_count, first_noted_at::text AS first_noted_at,
-              last_noted_at::text AS last_noted_at, auto_detected
-       FROM property_issues
-       WHERE account_id = $2 AND property_id = $1
-       ORDER BY
-         CASE severity WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END,
-         last_noted_at DESC`,
-      [id, session.accountId]
-    ),
-
     queryForSession<PropertyContactRow>(
       session,
       `SELECT pc.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone
@@ -434,7 +404,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   const hasDocumentsOrMedia = documents.length > 0 || visitMedia.length > 0;
   const pinnedNotes = propertyNotes.filter((n) => n.pinned);
   const recentNotes = propertyNotes.filter((n) => !n.pinned);
-  const hasHealth = issues.length > 0 || conditions.length > 0 || propertyNotes.length > 0;
+  const hasHealth = propertyNotes.length > 0;
 
   return (
     <PageContainer>
@@ -658,24 +628,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 </div>
               )}
 
-              {issues.length > 0 && (
-                <div style={{ marginBottom: "var(--space-4)" }}>
-                  <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-2)" }}>
-                    Issues
-                  </div>
-                  <PropertyIssuesPanel issues={issues} propertyId={property.id} />
-                </div>
-              )}
-
-              {conditions.length > 0 && (
-                <div style={{ marginBottom: recentNotes.length > 0 ? "var(--space-4)" : 0 }}>
-                  <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-2)" }}>
-                    Conditions
-                  </div>
-                  <PropertyConditionsPanel conditions={conditions} />
-                </div>
-              )}
-
               {recentNotes.length > 0 && (
                 <div>
                   <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-2)" }}>
@@ -699,11 +651,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 </div>
               )}
 
-              {!issues.length && !conditions.length && !propertyNotes.length && (
-                <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                  No health data recorded yet. Conditions and issues are captured during visits.
-                </p>
-              )}
             </Card>
           )}
 

@@ -185,13 +185,10 @@ export default async function ClientPortalPage({
        LIMIT 5`,
       [client.id]
     ),
-    query<{ id: string; name: string | null; address: string; open_issue_count: number }>(
-      `SELECT p.id, p.name, p.address,
-              COUNT(pi.id) FILTER (WHERE pi.status IN ('open','monitoring'))::int AS open_issue_count
+    query<{ id: string; name: string | null; address: string }>(
+      `SELECT p.id, p.name, p.address
        FROM properties p
-       LEFT JOIN property_issues pi ON pi.property_id = p.id AND pi.account_id = p.account_id
        WHERE p.client_id = $1 AND p.account_id = $2
-       GROUP BY p.id
        ORDER BY p.address`,
       [client.id, client.account_id]
     ),
@@ -403,11 +400,6 @@ export default async function ClientPortalPage({
                     {p.name && <div style={{ fontSize: 12, color: "#6b7280" }}>{p.address as string}</div>}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    {(p.open_issue_count as number) > 0 && (
-                      <span style={{ fontSize: 12, background: "#fee2e2", color: "#dc2626", borderRadius: 99, padding: "2px 8px", fontWeight: 600 }}>
-                        {p.open_issue_count as number} issue{(p.open_issue_count as number) !== 1 ? "s" : ""}
-                      </span>
-                    )}
                     <span style={{ fontSize: 13, color: "#6b7280" }}>History →</span>
                   </div>
                 </a>

@@ -1,7 +1,7 @@
 # TASK-258: Remove three features that were never used
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-005 Platform & Delivery
@@ -17,7 +17,7 @@ Decision (owner, 2026-11-25): remove property issue tracking, the monthly close 
 Problem:
 Production has no rows for any of these (second audit 2026-11-25):
 - Property issue tracking (`property_issues`, `property_condition_snapshots`): issue routes under `api/v1/properties/[id]/issues`, `PropertyIssuesPanel.tsx`, `lib/visits/condition-seeding.ts`, the worker's `property-issue-scan.ts` (an automation that runs daily and finds nothing), plus sections of the property, visit and portal pages.
-- Monthly close report (`period_closes`): `app/app/reports/close/*`, `api/v1/reports/period-closes`, `lib/reports/db.ts` parts, its integration test.
+- Monthly close report (`period_closes`; the month CSV export it linked to stays, linked from the Reports page): `app/app/reports/close/*`, `api/v1/reports/period-closes`, `lib/reports/db.ts` parts, its integration test.
 - Intake invite links (`intake_invites`): `app/intake/[token]/*`, `api/intake/[token]`, `api/v1/booking-requests/[id]/send-intake`, and the send button on the request page. No invite was ever sent, so no customer holds a link.
 
 Scope:

@@ -20,7 +20,6 @@ const ROOTS = [
   "app/portal",
   "app/estimate",
   "app/booking",
-  "app/intake",
   "components",
   "lib",
 ];

@@ -6,21 +6,6 @@ import { computeVaultCompleteness, groupVaultForCustomer, type VaultCategory } f
 
 export const dynamic = "force-dynamic";
 
-const CONDITION_COLOR: Record<string, { fg: string; bg: string }> = {
-  good:         { fg: "#16a34a", bg: "#dcfce7" },
-  fair:         { fg: "#d97706", bg: "#fef3c7" },
-  poor:         { fg: "#dc2626", bg: "#fee2e2" },
-  critical:     { fg: "#7f1d1d", bg: "#fecaca" },
-  not_assessed: { fg: "#9ca3af", bg: "#f3f4f6" },
-};
-
-const SEVERITY_ICON: Record<string, string> = {
-  minor:    "·",
-  moderate: "!",
-  major:    "!!",
-  critical: "⚠",
-};
-
 type VaultRow = {
   id: string; name: string; category: VaultCategory; location: string | null;
   manufacturer: string | null; model_number: string | null; serial_number: string | null;
@@ -69,25 +54,7 @@ export default async function PortalPropertyPage({
   );
   if (!property) notFound();
 
-  const [conditions, issues, vaultItems, recentVisits] = await Promise.all([
-    query<{ area: string; condition: string; note: string | null; assessed_at: string }>(
-      `SELECT DISTINCT ON (area) area, condition, note, assessed_at::text AS assessed_at
-       FROM property_condition_snapshots
-       WHERE account_id = $1 AND property_id = $2
-       ORDER BY area, assessed_at DESC`,
-      [client.account_id, propertyId]
-    ),
-    query<{ id: string; title: string; severity: string; area: string; occurrence_count: number; last_noted_at: string }>(
-      `SELECT id, title, severity, area, occurrence_count, last_noted_at::text AS last_noted_at
-       FROM property_issues
-       WHERE account_id = $1 AND property_id = $2
-         AND status IN ('open','monitoring')
-       ORDER BY
-         CASE severity WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END,
-         last_noted_at DESC
-       LIMIT 10`,
-      [client.account_id, propertyId]
-    ),
+  const [vaultItems, recentVisits] = await Promise.all([
     query<VaultRow>(
       `SELECT id::text, name, category, location, manufacturer, model_number, serial_number,
               install_date::text AS install_date,
@@ -137,66 +104,6 @@ export default async function PortalPropertyPage({
         </div>
 
         {/* Conditions */}
-        {conditions.length > 0 && (
-          <section style={{ marginBottom: 28 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Current Conditions</h2>
-            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-              {conditions.map((row, idx) => {
-                const c = CONDITION_COLOR[row.condition] ?? CONDITION_COLOR.not_assessed;
-                return (
-                  <div
-                    key={row.area}
-                    style={{
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                      padding: "11px 16px",
-                      borderBottom: idx < conditions.length - 1 ? "1px solid #f3f4f6" : "none",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 500 }}>{row.area}</div>
-                      {row.note && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{row.note}</div>}
-                    </div>
-                    <span style={{ background: c.bg, color: c.fg, borderRadius: 99, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>
-                      {row.condition === "not_assessed" ? "—" : row.condition.charAt(0).toUpperCase() + row.condition.slice(1)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Open Issues */}
-        {issues.length > 0 && (
-          <section style={{ marginBottom: 28 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Items We&apos;re Watching</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {issues.map((issue) => (
-                <div
-                  key={issue.id}
-                  style={{
-                    background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "12px 16px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>
-                        {SEVERITY_ICON[issue.severity]} {issue.title}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>
-                        {issue.area} · seen {issue.occurrence_count}× · last noted {formatDate(issue.last_noted_at)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>
-              These items have come up on multiple visits. We&apos;re monitoring them and will keep you informed.
-            </p>
-          </section>
-        )}
-
         {/* Home Vault (TASK-175) */}
         <section style={{ marginBottom: 28 }} aria-labelledby="vault-heading">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>

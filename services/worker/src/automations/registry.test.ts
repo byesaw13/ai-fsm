@@ -5,9 +5,9 @@ import {
 } from "./registry.js";
 
 describe("AUTOMATION_REGISTRY", () => {
-  it("dispatches exactly 12 automation types", () => {
-    expect(AUTOMATION_REGISTRY).toHaveLength(12);
-    expect([...DISPATCHED_AUTOMATION_TYPES]).toHaveLength(12);
+  it("dispatches exactly 11 automation types", () => {
+    expect(AUTOMATION_REGISTRY).toHaveLength(11);
+    expect([...DISPATCHED_AUTOMATION_TYPES]).toHaveLength(11);
   });
 
   it("registry types match DISPATCHED_AUTOMATION_TYPES exactly", () => {

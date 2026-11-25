@@ -9,7 +9,6 @@ import { describe, it, expect } from "vitest";
 import {
   ACTIVE_VISIT_STATUSES,
   TERMINAL_VISIT_STATUSES,
-  ISSUE_SEVERITY_COLORS,
   NOTE_SOURCE_DISPLAY,
   shouldShowPropertyContext,
   shouldShowFollowUp,
@@ -176,32 +175,7 @@ describe("shouldShowCompletionRecord", () => {
 });
 
 // ---------------------------------------------------------------------------
-// ISSUE_SEVERITY_COLORS
-// ---------------------------------------------------------------------------
 
-describe("ISSUE_SEVERITY_COLORS", () => {
-  const EXPECTED_SEVERITIES = ["minor", "moderate", "major", "critical"];
-
-  it("covers all four severity levels", () => {
-    for (const s of EXPECTED_SEVERITIES) {
-      expect(ISSUE_SEVERITY_COLORS[s]).toBeDefined();
-    }
-  });
-
-  it("each entry has fg and bg color strings", () => {
-    for (const s of EXPECTED_SEVERITIES) {
-      const c = ISSUE_SEVERITY_COLORS[s];
-      expect(typeof c.fg).toBe("string");
-      expect(typeof c.bg).toBe("string");
-      expect(c.fg.length).toBeGreaterThan(0);
-      expect(c.bg.length).toBeGreaterThan(0);
-    }
-  });
-
-  it("critical is visually distinct from minor (different colors)", () => {
-    expect(ISSUE_SEVERITY_COLORS.critical.fg).not.toBe(ISSUE_SEVERITY_COLORS.minor.fg);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // NOTE_SOURCE_DISPLAY
@@ -304,20 +278,10 @@ describe("Visit with no checklist", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Visit with property issues — context display
+// Visit property context
 // ---------------------------------------------------------------------------
 
-describe("Visit with property issues context", () => {
-  it("issues are sorted by severity (critical first)", () => {
-    const SEVERITY_ORDER = ["critical", "major", "moderate", "minor"];
-    const sorted = ["major", "critical", "minor"].sort(
-      (a, b) => SEVERITY_ORDER.indexOf(a) - SEVERITY_ORDER.indexOf(b)
-    );
-    expect(sorted[0]).toBe("critical");
-    expect(sorted[1]).toBe("major");
-    expect(sorted[2]).toBe("minor");
-  });
-
+describe("Visit property context", () => {
   it("property context is shown for in_progress visits with a property", () => {
     const status = "in_progress";
     const propertyId = "prop-id";

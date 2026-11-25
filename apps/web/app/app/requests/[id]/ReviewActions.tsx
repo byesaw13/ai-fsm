@@ -41,7 +41,6 @@ interface Props {
   initialNotes: string | null;
   initialPricingMode: PricingChoice;
   jobId: string | null;
-  clientEmail: string | null;
   clientId: string | null;
   propertyId: string | null;
   visitId: string | null;
@@ -56,7 +55,6 @@ export function ReviewActions({
   initialNotes,
   initialPricingMode,
   jobId,
-  clientEmail,
   clientId,
   propertyId,
   visitId,
@@ -73,9 +71,6 @@ export function ReviewActions({
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
-  const [intakeEmail, setIntakeEmail] = useState(clientEmail ?? "");
-  const [intakeSent, setIntakeSent] = useState(false);
-  const [intakeError, setIntakeError] = useState<string | null>(null);
   const [visitDate, setVisitDate] = useState(preferredDate ?? new Date().toISOString().slice(0, 10));
   const [visitSlot, setVisitSlot] = useState<string>(preferredTimeSlot ?? "morning");
 
@@ -160,31 +155,6 @@ export function ReviewActions({
       router.refresh();
     } catch {
       setError("Network error — try again");
-    } finally {
-      setPending(null);
-    }
-  }
-
-  async function handleSendIntake() {
-    setPending("intake");
-    setIntakeError(null);
-    try {
-      const body: Record<string, string> = {};
-      if (intakeEmail && !clientEmail) body.email = intakeEmail;
-      const res = await fetch(`/api/v1/booking-requests/${bookingId}/send-intake`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const json = (await res.json()) as { error?: { message?: string } };
-      if (!res.ok && res.status !== 207) {
-        setIntakeError(json.error?.message ?? "Failed to send intake form.");
-        return;
-      }
-      setIntakeSent(true);
-      router.refresh();
-    } catch {
-      setIntakeError("Network error. Try again.");
     } finally {
       setPending(null);
     }
@@ -645,60 +615,6 @@ export function ReviewActions({
           </div>
         </details>
       )}
-
-      <details>
-        <summary style={{ cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-          Send intake form to customer
-        </summary>
-        <div style={{ marginTop: "var(--space-2)" }}>
-          {intakeSent ? (
-            <p style={{ fontSize: "var(--text-xs)", color: "#16a34a", margin: 0 }}>Intake form sent.</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-              {!clientEmail && (
-                <div>
-                  <label style={{ fontSize: "var(--text-xs)", display: "block", marginBottom: 4 }}>
-                    Customer email (required)
-                  </label>
-                  <input
-                    type="email"
-                    value={intakeEmail}
-                    onChange={(e) => setIntakeEmail(e.target.value)}
-                    placeholder="client@email.com"
-                    style={{
-                      width: "100%",
-                      padding: "6px 8px",
-                      fontSize: "var(--text-xs)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-sm)",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-              )}
-              {clientEmail && (
-                <p style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", margin: 0 }}>
-                  Will send to: {clientEmail}
-                </p>
-              )}
-              {intakeError && (
-                <p style={{ fontSize: "var(--text-xs)", color: "#dc2626", margin: 0 }}>{intakeError}</p>
-              )}
-              <div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleSendIntake}
-                  loading={pending === "intake"}
-                  disabled={!!pending || (!clientEmail && !intakeEmail)}
-                >
-                  Send Intake Form
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </details>
 
       {isFinal && (
         <p style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>

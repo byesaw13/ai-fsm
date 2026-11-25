@@ -190,20 +190,6 @@ export function canViewReports(role: Role): boolean {
 }
 
 /**
- * Can close a period month for bookkeeping handoff (owner, admin)
- */
-export function canCloseMonth(role: Role): boolean {
-  return hasRole(role, ["owner", "admin"]);
-}
-
-/**
- * Can reopen a closed period month (owner only — higher-risk reversal)
- */
-export function canReopenMonth(role: Role): boolean {
-  return role === "owner";
-}
-
-/**
  * Can link/unlink Paperless documents to ai-fsm records (owner, admin).
  * Techs can view linked documents but cannot add or remove links.
  */

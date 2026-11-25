@@ -269,15 +269,6 @@ export type AuditLog = {
   created_at: string;
 }
 
-export type PeriodClose = {
-  id: string;
-  account_id: string;
-  period_month: string;
-  closed_by: string;
-  closed_at: string;
-  notes?: string | null;
-}
-
 // === API utilities ===
 
 export type ApiError = {

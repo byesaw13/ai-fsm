@@ -10,10 +10,10 @@ import { describe, it, expect } from 'vitest'
 // ---------------------------------------------------------------------------
 
 describe('worker automation registry', () => {
-  it('registry exports 12 dispatched automation definitions', async () => {
+  it('registry exports 11 dispatched automation definitions', async () => {
     const mod = await import('./automations/registry.js')
-    expect(mod.AUTOMATION_REGISTRY).toHaveLength(12)
-    expect(mod.DISPATCHED_AUTOMATION_TYPES).toHaveLength(12)
+    expect(mod.AUTOMATION_REGISTRY).toHaveLength(11)
+    expect(mod.DISPATCHED_AUTOMATION_TYPES).toHaveLength(11)
     expect(mod.DISPATCHED_AUTOMATION_TYPES).not.toContain('membership_renewal_nudge')
   })
 

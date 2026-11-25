@@ -139,47 +139,6 @@ exports[`canonical email template snapshots > estimateFollowupHtml 1`] = `
 </body></html>"
 `;
 
-exports[`canonical email template snapshots > intakeInviteEmailHtml 1`] = `
-"<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
-  <tr><td align="center">
-    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
-      <tr><td style="background:#0f172a;padding:20px 32px;">
-        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
-      </td></tr>
-      <tr><td style="padding:32px;">
-    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Tell us about your project</h2>
-    <p style="margin:0 0 16px;color:#52525b;font-size:15px;">Hi Jane Doe,</p>
-    <p style="margin:0 0 16px;color:#52525b;font-size:15px;">Thanks for reaching out to Dovetails Services LLC! To get you an accurate estimate, we'd love to hear a bit more about your project.</p>
-    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">It only takes a couple of minutes — just click below and fill out a short form at your convenience.</p>
-    <p style="margin:0 0 24px;"><a href="https://example.test/intake/token-abc" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:4px 4px 4px 0;">Fill out intake form</a></p>
-    <p style="margin:0 0 8px;font-size:13px;color:#71717a;">This link expires in 48 hours. If it's expired, just reply to this email and we'll send a new one.</p>
-    <p style="margin:0;font-size:13px;color:#71717a;">Not expecting this email? Feel free to ignore it — no action is required.</p>
-  </td></tr>
-      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
-        Dovetails Services LLC &mdash; This is an automated message.
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>"
-`;
-
-exports[`canonical email template snapshots > intakeInviteEmailText 1`] = `
-"Hi Jane Doe,
-
-Thanks for reaching out to Dovetails Services LLC! To get you an accurate estimate, we'd love to hear a bit more about your project.
-
-Fill out our short intake form here: https://example.test/intake/token-abc
-
-This link expires in 48 hours.
-
-Not expecting this email? Feel free to ignore it."
-`;
-
 exports[`canonical email template snapshots > invoiceEmailHtml 1`] = `
 "<!DOCTYPE html>
 <html lang="en">

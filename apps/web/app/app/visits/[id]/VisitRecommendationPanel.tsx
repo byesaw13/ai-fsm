@@ -9,7 +9,6 @@ interface Props {
   visitId: string;
   jobId: string | null;
   clientId: string | null;
-  propertyAddress: string | null;
   canCreateEstimate: boolean;
 }
 
@@ -18,7 +17,6 @@ export function VisitRecommendationPanel({
   visitId,
   jobId,
   clientId,
-  propertyAddress,
   canCreateEstimate,
 }: Props) {
   const toast = useToast();
@@ -161,26 +159,6 @@ export function VisitRecommendationPanel({
             </a>
           )}
 
-          <a
-            href={`/app/properties/${propertyId}`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-2)",
-              padding: "var(--space-2) var(--space-3)",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--border)",
-              fontSize: "var(--text-sm)",
-              textDecoration: "none",
-              color: "var(--fg-primary)",
-              background: "var(--bg-surface)",
-            }}
-          >
-            <span style={{ fontWeight: 600 }}>Flag property issue</span>
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: "auto" }}>
-              {propertyAddress ?? "Property"} →
-            </span>
-          </a>
         </div>
       </div>
     </div>

@@ -66,12 +66,6 @@ export interface BookingConfirmedEmailData {
   techName: string | null;
 }
 
-export interface IntakeInviteEmailData {
-  leadName: string;
-  intakeUrl: string;
-  expiresHours?: number;
-}
-
 export interface ReviewRequestEmailData {
   clientName: string;
   jobTitle: string;

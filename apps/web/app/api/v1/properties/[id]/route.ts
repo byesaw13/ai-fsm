@@ -43,11 +43,7 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
             (SELECT COALESCE(SUM(oi.total_cents), 0)::int FROM invoices oi
              WHERE oi.property_id = p.id AND oi.account_id = p.account_id
                AND oi.status IN ('sent', 'partial', 'overdue')
-            ) AS outstanding_cents,
-            (SELECT COUNT(*)::int FROM property_issues pi2
-             WHERE pi2.property_id = p.id AND pi2.account_id = p.account_id
-               AND pi2.status IN ('open', 'monitoring')
-            ) AS open_issues_count
+            ) AS outstanding_cents
      FROM properties p
      LEFT JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
      LEFT JOIN jobs j ON j.property_id = p.id AND j.account_id = p.account_id

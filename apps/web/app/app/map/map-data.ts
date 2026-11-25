@@ -61,7 +61,6 @@ export const BRANCHES: MapNode[] = [
     built: "Accepting a request creates the property with the customer. The screen says Properties. The address is the record that lasts.",
     records: [
       { name: "properties", holds: "The address and which customer we serve there." },
-      { name: "property_issues", holds: "Things noticed more than once, still being watched." },
     ],
     screenHref: "/app/properties",
     screenLabel: "Open Properties",
