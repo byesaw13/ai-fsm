@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { Button, Card, Input, SectionHeader, Textarea } from "@/components/ui";
 import { MaterialsGenerator } from "../../components/MaterialsGenerator";
@@ -8,7 +9,6 @@ import { buildAiMaterialsDelta, type AiMaterialsDeltaItem } from "@/lib/estimate
 import { PriceBookSelector } from "@/components/PriceBookSelector";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { getMaterialsByCategory, type MaterialSuggestion } from "@ai-fsm/domain";
-import { formatCents } from "@/lib/estimates/pricing";
 import { generatorMaterialRow } from "@/lib/estimates/form-helpers";
 import { PaintingEstimatorSection } from "../../components/PaintingEstimatorSection";
 import { EstimateTierEditor } from "../../components/EstimateTierEditor";

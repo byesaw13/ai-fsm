@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
@@ -24,9 +25,6 @@ interface Props {
   jobType?: string | null;
 }
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export function VisitPartsPanel({ draftKey, visitId, initialParts, canUpdate, jobType }: Props) {
   const router = useRouter();
@@ -255,10 +253,10 @@ export function VisitPartsPanel({ draftKey, visitId, initialParts, canUpdate, jo
                 </span>
               </div>
               <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", whiteSpace: "nowrap" }}>
-                {formatDollars(part.actual_cost_cents)} cost
+                {formatCents(part.actual_cost_cents)} cost
               </div>
               <div style={{ fontSize: "var(--text-sm)", fontWeight: 500, whiteSpace: "nowrap" }}>
-                {formatDollars(part.customer_price_cents)}{" "}
+                {formatCents(part.customer_price_cents)}{" "}
                 <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>(15% markup)</span>
               </div>
               {canUpdate && (
@@ -333,8 +331,8 @@ export function VisitPartsPanel({ draftKey, visitId, initialParts, canUpdate, jo
               fontWeight: 500,
             }}
           >
-            <span>Parts cost: {formatDollars(totalActual)}</span>
-            <span>Customer total: {formatDollars(totalCustomer)}</span>
+            <span>Parts cost: {formatCents(totalActual)}</span>
+            <span>Customer total: {formatCents(totalCustomer)}</span>
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui";
 import { DraftReviewPanel } from "./components/DraftReviewPanel";
@@ -31,9 +32,6 @@ interface EstimateInterviewFlowProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}`;
-}
 
 // ---------------------------------------------------------------------------
 // Component

@@ -1,7 +1,7 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { Button } from "@/components/ui";
-import { formatCents } from "@/lib/estimates/pricing";
 import { LINE_ITEM_TYPE_CHOICES, lineTotal, parseCents, type LineItemRow } from "@/lib/estimates/form-helpers";
 import { markupLabel } from "@/lib/estimates/cost-split";
 import {

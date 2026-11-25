@@ -1,9 +1,10 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { PriceBookService } from "@/components/PriceBookSelector";
-import { formatCents, getStandardEstimateTerms } from "@/lib/estimates/pricing";
+import { getStandardEstimateTerms } from "@/lib/estimates/pricing";
 import { commercialPricingForQuote } from "@/lib/estimates/commercial-pricing";
 import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
 import {

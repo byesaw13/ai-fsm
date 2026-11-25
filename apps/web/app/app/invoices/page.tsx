@@ -1,3 +1,4 @@
+import { formatCents } from "@ai-fsm/money";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Route } from "next";
@@ -71,9 +72,6 @@ const STATUS_ORDER: InvoiceStatus[] = [
   "void",
 ];
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 /** Calendar days until due (ET). 0 = due today, negative = overdue. */
 function getDaysUntilDue(dueDate: string | null): number | null {
@@ -379,10 +377,10 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                           </span>
                         )}
                         <span style={{ color: "var(--fg-muted)" }}>·</span>
-                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>{formatDollars(inv.total_cents)}</span>
+                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>{formatCents(inv.total_cents)}</span>
                         {amountDue > 0 && open && (
                           <span style={{ color: "var(--color-danger)", fontFamily: "var(--font-mono)" }}>
-                            {formatDollars(amountDue)} due
+                            {formatCents(amountDue)} due
                           </span>
                         )}
                       </span>

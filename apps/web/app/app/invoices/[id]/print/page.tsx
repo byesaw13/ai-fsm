@@ -1,3 +1,4 @@
+import { formatCents } from "@ai-fsm/money";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { withInvoiceContext } from "@/lib/invoices/db";
@@ -74,9 +75,6 @@ function fmtDate(iso: string | null | undefined): string {
   });
 }
 
-function formatCents(cents: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
 
 export default async function InvoicePrintPage({
   params,

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCents } from "@ai-fsm/money";
 import { useState, useCallback } from "react";
 import { Money } from "@/components/ui/Money";
 
@@ -28,9 +29,6 @@ interface ChangeOrder {
   line_items: LineItem[];
 }
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 const statusColors: Record<string, string> = {
   draft: "var(--fg-muted)",
@@ -256,7 +254,7 @@ export function ChangeOrdersClient({ estimateId, initialChangeOrders }: ChangeOr
                   />
                 </div>
                 <div style={{ textAlign: "right", fontSize: "var(--text-sm)", fontWeight: 600, minWidth: 80 }}>
-                  <Money>{formatDollars(item.quantity * item.unit_price_cents)}</Money>
+                  <Money>{formatCents(item.quantity * item.unit_price_cents)}</Money>
                 </div>
                 {lineItems.length > 1 && (
                   <button
@@ -270,7 +268,7 @@ export function ChangeOrdersClient({ estimateId, initialChangeOrders }: ChangeOr
               </div>
             ))}
             <div style={{ textAlign: "right", fontSize: "var(--text-sm)", fontWeight: 600, marginTop: 4 }}>
-              Subtotal: {formatDollars(subtotal)}
+              Subtotal: {formatCents(subtotal)}
             </div>
           </div>
 
@@ -345,7 +343,7 @@ export function ChangeOrdersClient({ estimateId, initialChangeOrders }: ChangeOr
                   >
                     {statusLabels[co.status] ?? co.status}
                   </span>
-                  <span style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}><Money>{formatDollars(co.total_cents)}</Money></span>
+                  <span style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}><Money>{formatCents(co.total_cents)}</Money></span>
                 </div>
               </div>
 
@@ -356,10 +354,10 @@ export function ChangeOrdersClient({ estimateId, initialChangeOrders }: ChangeOr
                       <tr key={item.id ?? i} style={{ borderBottom: "1px solid var(--border)" }}>
                         <td style={{ padding: "4px 0" }}>{item.description}</td>
                         <td style={{ padding: "4px 0", textAlign: "right", color: "var(--fg-muted)" }}>
-                          {item.quantity} × <Money>{formatDollars(item.unit_price_cents)}</Money>
+                          {item.quantity} × <Money>{formatCents(item.unit_price_cents)}</Money>
                         </td>
                         <td style={{ padding: "4px 0", textAlign: "right", fontWeight: 600 }}>
-                          <Money>{formatDollars(item.total_cents ?? item.quantity * item.unit_price_cents)}</Money>
+                          <Money>{formatCents(item.total_cents ?? item.quantity * item.unit_price_cents)}</Money>
                         </td>
                       </tr>
                     ))}

@@ -1,7 +1,8 @@
+import { formatCents } from "@ai-fsm/money";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { withEstimateContext } from "@/lib/estimates/db";
-import { getStandardEstimateTerms, formatCents } from "@/lib/estimates/pricing";
+import { getStandardEstimateTerms } from "@/lib/estimates/pricing";
 import {
   PAYMENT_OPTIONS,
   DOCUMENT_STANDARD_VERSION,

@@ -1,3 +1,4 @@
+import { formatCents } from "@ai-fsm/money";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
@@ -57,9 +58,6 @@ interface MaterialRow {
   [key: string]: unknown;
 }
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export default async function ShoppingListPage({
   params,
@@ -330,7 +328,7 @@ export default async function ShoppingListPage({
                   {section.section}
                 </h2>
                 <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--fg-muted)" }}>
-                  <Money>{formatDollars(section.section_total_cents)}</Money>
+                  <Money>{formatCents(section.section_total_cents)}</Money>
                 </span>
               </div>
 
@@ -375,7 +373,7 @@ export default async function ShoppingListPage({
                         {item.material.unit}
                       </td>
                       <td style={{ textAlign: "right", padding: "var(--space-2) 0", fontWeight: 500 }}>
-                        <Money>{formatDollars(item.total_cost_cents)}</Money>
+                        <Money>{formatCents(item.total_cost_cents)}</Money>
                       </td>
                       <td style={{ textAlign: "center", padding: "var(--space-2) 0" }} className="no-print">
                         <input type="checkbox" style={{ width: 16, height: 16 }} />
@@ -405,7 +403,7 @@ export default async function ShoppingListPage({
               </span>
             </div>
             <span style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>
-              <Money>{formatDollars(materialTotalCents)}</Money>
+              <Money>{formatCents(materialTotalCents)}</Money>
             </span>
           </div>
 
