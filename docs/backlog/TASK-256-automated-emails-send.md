@@ -1,7 +1,7 @@
 # TASK-256: Automated emails actually send
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-005 Platform & Delivery
@@ -17,14 +17,11 @@ Decision (owner, 2026-11-25): fix it. Send through the web app's mailer; clean u
 Problem:
 The worker sends the email in `notification_queue`, but it runs only on the `internal` Docker network (`internal: true` in `infra/compose.garonhome.yml`) and cannot resolve `smtp.gmail.com`. All 92 queued emails from 2026-05-16 to 2026-11-23 failed with `getaddrinfo EAI_AGAIN smtp.gmail.com`. Booking confirmations, visit reminders, invoice and estimate follow-ups, review requests, seasonal and re-engagement emails, and the owner's own "invoice paid" / "estimate approved" alerts were all lost. The 14 automations show as enabled and run every 30 minutes, and nothing tells the owner they fail. Web Push already moved its sending to the web tier for the same reason (TASK-118). Second audit 2026-11-25.
 
-Scope (in this order):
-1. Cleanup, one guarded data migration:
-   - delete one of the two `estimate_followup` automation rows (keep the older; otherwise every estimate gets two follow-ups) and add a unique index on `automations (account_id, type)`;
-   - delete the `membership_renewal_nudge` row (no handler; memberships are hidden; last ran 2026-06-07);
-   - mark the 92 failed `notification_queue` rows `cancelled` so none is resent months late.
-2. The web tier sends queued email. Lazy shape: an internal route (`/api/internal/notifications/dispatch`, internal-token auth like the other internal routes) that runs the existing dispatch logic with `lib/email/mailer.ts`; the worker calls it on its interval instead of sending itself. Pick another shape only if it is smaller, and say why in the PR.
-3. Delete what this replaces: `services/worker/src/mailer.ts` and the worker's `nodemailer` dependency.
-4. A send that fails is visible to the owner: an attention item ("Emails are failing: <reason>") when a queued email fails its last attempt.
+Scope (as built):
+1. Migration 221: one automation per type per account (unique index). Removes `membership_renewal_nudge` (no handler; memberships paused) and the 7-day `estimate_followup` row. Correction to the audit: the two `estimate_followup` rows were a designed 3-day + 7-day sequence (migration 098), not a duplicate. They share the idempotency key `estimate_followup:<estimate id>`, so the 7-day one never sent. Owner 2026-11-25: keep only the 3-day reminder.
+2. The 92 failed queue rows need no change: `failed` is final and the worker only picks up `pending`.
+3. `POST /api/internal/email` (web tier, `x-api-key` = `LOCATION_INTERNAL_KEY`, the existing internal-route pattern) sends through `lib/email/mailer.ts`. The worker's `mailer.ts` now hands each email to it (`WEB_INTERNAL_URL`, default `http://web:3000`) instead of using SMTP. Dispatch, retries, quiet hours and cooldowns are unchanged. `nodemailer` is removed from the worker.
+4. A queued email that fails its last attempt adds one `notification.failed` attention item per day ("Automatic emails are failing", linking to Automations).
 
 Out of scope:
 - Giving the worker internet access (it stays isolated by design).
@@ -34,7 +31,7 @@ Out of scope:
 Acceptance Criteria:
 - [ ] On production, one automation email (e.g. the owner's "invoice paid" alert) is delivered and its queue row is `sent`.
 - [ ] `automations` has one row per type per account, enforced by the index.
-- [ ] No queue row older than the deploy is sent.
+- [ ] No failed row from before the deploy is sent.
 - [ ] A forced send failure shows up for the owner as an attention item.
 - [ ] The worker no longer contains a mailer.
 
