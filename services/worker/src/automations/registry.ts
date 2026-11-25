@@ -9,7 +9,6 @@ import { findDueReviewRequests, processReviewRequests } from "../review-request.
 import { findDueEstimateFollowups, processEstimateFollowups } from "../estimate-followup.js";
 import { findDueLeadFollowups, processLeadFollowups } from "../lead-followup.js";
 import { findDueStaleJobNudges, processStaleJobs } from "../stale-job-nudge.js";
-import { findDuePropertyIssueScans, processPropertyIssueScan } from "../property-issue-scan.js";
 import {
   findDueClientReactivations,
   processClientReactivation,
@@ -31,7 +30,6 @@ import {
   advanceEstimateFollowupNextRun,
   advanceLeadFollowupNextRun,
   advanceStaleJobNudgeNextRun,
-  advancePropertyIssueScanNextRun,
   advanceClientReactivationNextRun,
   advanceSeasonalNextRun,
   advanceRecurringInspectionNextRun,
@@ -46,7 +44,6 @@ export const DISPATCHED_AUTOMATION_TYPES = [
   "estimate_followup",
   "lead_followup",
   "stale_job_nudge",
-  "property_issue_scan",
   "client_reactivation",
   "seasonal_reminder_spring",
   "seasonal_reminder_fall",
@@ -119,14 +116,6 @@ export const staleJobNudgeDef: AutomationDefinition = {
   advanceNextRun: advanceStaleJobNudgeNextRun,
 };
 
-export const propertyIssueScanDef: AutomationDefinition = {
-  type: "property_issue_scan",
-  logLabel: "property-issue-scan",
-  findDue: findDuePropertyIssueScans,
-  process: processPropertyIssueScan,
-  advanceNextRun: advancePropertyIssueScanNextRun,
-};
-
 export const clientReactivationDef: AutomationDefinition = {
   type: "client_reactivation",
   logLabel: "client-reactivation",
@@ -167,7 +156,6 @@ export const AUTOMATION_REGISTRY: AutomationDefinition[] = [
   estimateFollowupDef,
   leadFollowupDef,
   staleJobNudgeDef,
-  propertyIssueScanDef,
   clientReactivationDef,
   seasonalSpringDef,
   seasonalFallDef,

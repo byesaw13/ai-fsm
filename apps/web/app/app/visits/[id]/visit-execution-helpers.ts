@@ -66,13 +66,6 @@ export function visitPanelSlot(panel: VisitPanel, kind: VisitFieldKind): "defaul
   return "more";
 }
 
-export const ISSUE_SEVERITY_COLORS: Record<string, { fg: string; bg: string }> = {
-  minor:    { fg: "#6b7280", bg: "#f3f4f6" },
-  moderate: { fg: "#d97706", bg: "#fef3c7" },
-  major:    { fg: "#dc2626", bg: "#fee2e2" },
-  critical: { fg: "#7f1d1d", bg: "#fecaca" },
-};
-
 export const NOTE_SOURCE_DISPLAY: Record<string, string> = {
   owner:      "Owner",
   technician: "Tech",

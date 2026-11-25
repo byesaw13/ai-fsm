@@ -8,7 +8,6 @@ import {
   advanceBookingConfirmedNextRun,
   advanceEstimateFollowupNextRun,
   advanceStaleJobNudgeNextRun,
-  advancePropertyIssueScanNextRun,
   advanceClientReactivationNextRun,
   advanceRecurringInspectionNextRun,
   advanceSeasonalNextRun,
@@ -88,12 +87,6 @@ const LIFECYCLE_CASES: LifecycleCase[] = [
     advance: advanceStaleJobNudgeNextRun,
     type: "stale_job_nudge",
     interval: "6 hours",
-  },
-  {
-    name: "property_issue_scan",
-    advance: advancePropertyIssueScanNextRun,
-    type: "property_issue_scan",
-    interval: "24 hours",
   },
   {
     name: "client_reactivation",

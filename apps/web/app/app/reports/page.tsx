@@ -68,17 +68,25 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             <Link href={"/app/timeline" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-sm)" }}>
               Vehicle tracking →
             </Link>
-            <Link href={"/app/reports/close" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-sm)" }}>
-              Month-End Close →
-            </Link>
           </>
         }
       />
       <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/reports" />
 
-      {/* Month filter */}
+      {/* Month filter, plus the month's CSV exports (kept from the removed close page, TASK-258) */}
       <div style={{ marginBottom: "var(--space-4)" }}>
         <FilterBar filters={REPORT_FILTERS} baseHref="/app/reports" currentValues={currentValues} />
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginTop: "var(--space-2)" }}>
+          Export {monthLabel} as CSV:{" "}
+          {(["invoices", "payments", "expenses", "mileage"] as const).map((type, i) => (
+            <span key={type}>
+              {i > 0 && " · "}
+              <a href={`/api/v1/reports/month-end-export?month=${encodeURIComponent(targetMonth)}&type=${type}`} style={{ color: "var(--accent)" }}>
+                {type}
+              </a>
+            </span>
+          ))}
+        </p>
       </div>
 
       {/* KPI summary */}

@@ -136,16 +136,6 @@ export default async function BookingRequestDetailPage({
     walkthrough_score: br.walkthrough_score,
   });
 
-  // Load latest invite to determine next-step banner state
-  const inviteRows = await query<{ token: string; used_at: string | null; expires_at: string; created_at: string }>(
-    `SELECT token::text, used_at, expires_at, created_at
-     FROM intake_invites
-     WHERE booking_request_id = $1
-     ORDER BY created_at DESC LIMIT 1`,
-    [id]
-  );
-  const latestInvite = inviteRows[0] ?? null;
-
   const received = new Date(br.created_at).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
@@ -509,7 +499,6 @@ export default async function BookingRequestDetailPage({
               initialNotes={br.review_notes}
               initialPricingMode={(br.pricing_mode as "flat_rate" | "hourly_internal" | null) ?? null}
               jobId={br.job_id}
-              clientEmail={br.email}
               clientId={br.client_id}
               propertyId={br.property_id}
               visitId={br.visit_id}

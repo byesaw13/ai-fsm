@@ -347,7 +347,6 @@ export const automationTypeSchema = z.enum([
   "review_request",
   "client_reactivation",
   "recurring_inspection",
-  "property_issue_scan",
   "stale_job_nudge",
   "estimate_followup",
   "seasonal_reminder_spring",

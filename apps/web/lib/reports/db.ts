@@ -7,7 +7,7 @@ import type { SessionPayload } from "@/lib/auth/session";
  *
  * Mirrors withExpenseContext — sets app.current_user_id, app.current_account_id,
  * app.current_role as LOCAL (transaction-scoped) config vars so RLS policies
- * enforce tenant isolation on period_closes and any other report-adjacent tables.
+ * enforce tenant isolation on report queries.
  */
 export async function withReportContext<T>(
   session: SessionPayload,

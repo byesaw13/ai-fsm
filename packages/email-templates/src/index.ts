@@ -20,11 +20,6 @@ export {
   bookingConfirmedEmailHtml,
 } from "./visit.js";
 
-export {
-  intakeInviteEmailHtml,
-  intakeInviteEmailText,
-} from "./intake.js";
-
 export { reviewRequestEmailHtml } from "./review.js";
 
 export {

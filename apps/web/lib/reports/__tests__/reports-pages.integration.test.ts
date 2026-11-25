@@ -25,7 +25,6 @@ describe.skipIf(!RUN)("reports pages render", () => {
   const pages: Array<[string, string]> = [
     ["/app/reports", "Cash Collected"],
     ["/app/reports?month=2026-03", "Cash Collected"],
-    ["/app/reports/close", "Invoices created:"],
   ];
   for (const [path, marker] of pages) {
     it(`${path} renders`, async () => {

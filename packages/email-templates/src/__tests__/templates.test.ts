@@ -5,8 +5,6 @@ import {
   estimateEmailHtml,
   estimateEmailText,
   estimateFollowupHtml,
-  intakeInviteEmailHtml,
-  intakeInviteEmailText,
   invoiceEmailHtml,
   invoiceEmailText,
   invoiceFollowupEmailHtml,
@@ -170,25 +168,6 @@ describe("canonical email template snapshots", () => {
         scheduledEnd: "2026-07-15T16:00:00.000Z",
         propertyAddress: "123 Main St",
         techName: "Alex Tech",
-      }),
-    ).toMatchSnapshot();
-  });
-
-  it("intakeInviteEmailHtml", () => {
-    expect(
-      intakeInviteEmailHtml({
-        leadName: "Jane Doe",
-        intakeUrl: "https://example.test/intake/token-abc",
-        expiresHours: 48,
-      }),
-    ).toMatchSnapshot();
-  });
-
-  it("intakeInviteEmailText", () => {
-    expect(
-      intakeInviteEmailText({
-        leadName: "Jane Doe",
-        intakeUrl: "https://example.test/intake/token-abc",
       }),
     ).toMatchSnapshot();
   });

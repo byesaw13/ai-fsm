@@ -1,7 +1,7 @@
 # TASK-257: One way to take a deposit
 
 Status:
-In Progress
+Done
 
 Epic:
 EPIC-004 Billing & Profitability
@@ -27,9 +27,9 @@ Out of scope:
 - Removing the "materials" deposit type (ask the owner separately if wanted).
 
 Acceptance Criteria:
-- [ ] `rg "requestedDepositCents|InvoiceDepositForm"` finds nothing.
-- [ ] Invoice page, print, PDF, portal and Square link show and charge the invoice balance for every existing invoice (same amounts as before for all 61).
-- [ ] One percentage helper; the estimate and job deposit amounts are unchanged.
+- [x] `rg "requestedDepositCents|InvoiceDepositForm"` finds nothing.
+- [x] Invoice page, print, PDF, portal and Square link show and charge the invoice balance for every existing invoice (same amounts as before for all 61).
+- [x] One percentage helper; the estimate and job deposit amounts are unchanged.
 
 Test Plan:
 - Unit: the shared percentage helper; deposit gate amounts unchanged.

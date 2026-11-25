@@ -1,18 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import {
-  ISSUE_SEVERITY_COLORS,
-  NOTE_SOURCE_DISPLAY,
-  formatContextDate,
-} from "./visit-execution-helpers";
-
-export type PropertyIssueContextRow = {
-  id: string;
-  title: string;
-  severity: string;
-  area: string;
-  occurrence_count: number;
-};
+import { NOTE_SOURCE_DISPLAY, formatContextDate } from "./visit-execution-helpers";
 
 export type PropertyNoteContextRow = {
   id: string;
@@ -30,7 +18,6 @@ export type LastServiceRow = {
 interface Props {
   propertyId: string;
   propertyAddress: string | null;
-  issues: PropertyIssueContextRow[];
   pinnedNotes: PropertyNoteContextRow[];
   lastService: LastServiceRow | null;
 }
@@ -38,11 +25,10 @@ interface Props {
 export function VisitPropertyContext({
   propertyId,
   propertyAddress,
-  issues,
   pinnedNotes,
   lastService,
 }: Props) {
-  const hasContent = issues.length > 0 || pinnedNotes.length > 0 || lastService !== null;
+  const hasContent = pinnedNotes.length > 0 || lastService !== null;
   if (!hasContent) return null;
 
   return (
@@ -88,45 +74,6 @@ export function VisitPropertyContext({
       ) : (
         <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
           No previous service on file.
-        </div>
-      )}
-
-      {/* Open issues */}
-      {issues.length > 0 && (
-        <div>
-          <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--fg-muted)", marginBottom: "var(--space-1)" }}>
-            Open issues
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {issues.map((issue) => {
-              const sev = ISSUE_SEVERITY_COLORS[issue.severity] ?? ISSUE_SEVERITY_COLORS.minor;
-              return (
-                <div
-                  key={issue.id}
-                  style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}
-                >
-                  <span
-                    style={{
-                      fontSize: "var(--text-xs)",
-                      fontWeight: 600,
-                      color: sev.fg,
-                      background: sev.bg,
-                      padding: "1px 7px",
-                      borderRadius: 99,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {issue.severity}
-                  </span>
-                  <span style={{ fontWeight: 500 }}>{issue.title}</span>
-                  <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-                    {issue.area}
-                    {issue.occurrence_count > 1 && ` · ${issue.occurrence_count}×`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 

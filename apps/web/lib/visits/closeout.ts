@@ -16,7 +16,6 @@ import { easternWallToUtc } from "@/lib/time/business-tz";
 import { setVisitPlannedTasks } from "@/lib/work-orders/job-tasks";
 import { syncWorkOrderStatus, syncWorkOrdersForJob } from "@/lib/work-orders/sync-status";
 import { writeWorkflowEvent } from "@/lib/workflow-events";
-import { seedConditionSnapshots } from "@/lib/visits/condition-seeding";
 import { tagMileageForCompletedVisit } from "@/lib/mileage/tag-from-visit";
 import { formatBusinessYmd } from "@/lib/time/business-tz";
 
@@ -217,14 +216,6 @@ async function completeVisitRow(
          WHERE id = $1 AND account_id = $2`,
         [updated.job_id, session.accountId],
       );
-    }
-    const jobProp = await client.query<{ property_id: string | null }>(
-      `SELECT property_id FROM jobs WHERE id = $1 AND account_id = $2`,
-      [updated.job_id, session.accountId],
-    );
-    const propertyId = jobProp.rows[0]?.property_id;
-    if (propertyId) {
-      await seedConditionSnapshots(client, visitId, propertyId, session.accountId);
     }
   }
 

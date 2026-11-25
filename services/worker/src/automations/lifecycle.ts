@@ -112,21 +112,6 @@ export async function advanceStaleJobNudgeNextRun(
   );
 }
 
-export async function advancePropertyIssueScanNextRun(
-  client: Client,
-  automation: AutomationRow,
-  _result: RunResult
-): Promise<void> {
-  await client.query(
-    `UPDATE automations
-        SET last_run_at = now(),
-            next_run_at = now() + interval '24 hours',
-            updated_at  = now()
-      WHERE id = $1`,
-    [automation.id]
-  );
-}
-
 export async function advanceClientReactivationNextRun(
   client: Client,
   automation: AutomationRow,

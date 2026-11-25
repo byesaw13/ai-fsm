@@ -48,7 +48,7 @@ import { loadVisitPlannedTasks } from "@/lib/work-orders/job-tasks";
 import { VisitPropertyContext } from "./VisitPropertyContext";
 import { VisitHandoffCard } from "@/components/visits/VisitHandoffCard";
 import { loadVisitBriefing } from "@/lib/visits/briefing";
-import type { PropertyIssueContextRow, PropertyNoteContextRow, LastServiceRow } from "./VisitPropertyContext";
+import type { PropertyNoteContextRow, LastServiceRow } from "./VisitPropertyContext";
 import { VisitRecommendationPanel } from "./VisitRecommendationPanel";
 import { OnMyWayButton } from "./OnMyWayButton";
 import {
@@ -229,7 +229,6 @@ export default async function VisitDetailPage({
   const [
     membershipVisitNumberRow,
     propertyVaultRows,
-    propertyContextIssues,
     propertyContextNotes,
     lastServiceVisit,
     siteVisitAssessment,
@@ -258,22 +257,6 @@ export default async function VisitDetailPage({
           [visit.job_property_id, session.accountId]
         )
       : Promise.resolve([] as VaultCategoryRow[]),
-
-    // Open property issues — shown as context before/during visit
-    needsPropertyContext
-      ? queryForSession<PropertyIssueContextRow>(
-          session,
-          `SELECT id, title, severity, area, occurrence_count
-           FROM property_issues
-           WHERE property_id = $1 AND account_id = $2
-             AND status IN ('open','monitoring')
-           ORDER BY CASE severity
-             WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4
-           END
-           LIMIT 5`,
-          [visit.job_property_id!, session.accountId]
-        )
-      : Promise.resolve([] as PropertyIssueContextRow[]),
 
     // Pinned property notes — surface warnings/alerts for the tech
     needsPropertyContext
@@ -784,7 +767,6 @@ export default async function VisitDetailPage({
                 <VisitPropertyContext
                   propertyId={visit.job_property_id}
                   propertyAddress={visit.property_address}
-                  issues={propertyContextIssues}
                   pinnedNotes={propertyContextNotes}
                   lastService={lastServiceVisit}
                 />
@@ -793,7 +775,6 @@ export default async function VisitDetailPage({
               <VisitPropertyContext
                 propertyId={visit.job_property_id}
                 propertyAddress={visit.property_address}
-                issues={propertyContextIssues}
                 pinnedNotes={propertyContextNotes}
                 lastService={lastServiceVisit}
               />
@@ -1148,7 +1129,6 @@ export default async function VisitDetailPage({
                   visitId={visit.id}
                   jobId={visit.job_id ?? null}
                   clientId={visit.job_client_id ?? null}
-                  propertyAddress={visit.property_address}
                   canCreateEstimate={canCreateEstimate}
                 />
               </Disclosure>
@@ -1160,7 +1140,6 @@ export default async function VisitDetailPage({
                   visitId={visit.id}
                   jobId={visit.job_id ?? null}
                   clientId={visit.job_client_id ?? null}
-                  propertyAddress={visit.property_address}
                   canCreateEstimate={canCreateEstimate}
                 />
               </Card>
