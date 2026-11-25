@@ -87,7 +87,7 @@ export const BRANCHES: MapNode[] = [
     kind: "branch",
     step: 5,
     intended: "The accepted commitment. The estimate, the visits, and the invoice hang off this one job.",
-    built: "Approving the estimate creates the job and a \"Schedule this job\" item, and sends the deposit request with its pay link (Settings can turn that off). The item waits on the deposit when the estimate says so, and turns ready to book once the deposit is paid. A work order sits under it for planning. You open the job, then its visits.",
+    built: "Approving the estimate creates the job and a \"Schedule this job\" item, and sends the deposit request with its pay link (Settings can turn that off). The item waits on the deposit when the estimate says so, and turns ready to book once the deposit is paid. A work order sits under it for planning. You open the job, then its visits. A job made without a property gets the customer's property when they have just one; with several or none it stays open until you pick.",
     records: [
       { name: "jobs", holds: "Title, property, customer, and where it stands from quoted through invoiced." },
       { name: "work_orders", holds: "The internal plan. Not a screen of its own." },
@@ -115,7 +115,7 @@ export const BRANCHES: MapNode[] = [
     kind: "branch",
     step: 7,
     intended: "The charge for the job. The customer can pay by card, and the receipt stays.",
-    built: "The invoice is for the job. Converted from an estimate, it shows the approved lines, including only the chosen option on a Good/Better/Best estimate, and those lines add up to the subtotal. An equipment line on the estimate stays an equipment line on the invoice. The customer opens a link and pays. What is still owed also shows on their home page. The invoice and estimate carry your logo; a wide logo that already says the business name is printed larger and the name is not repeated.",
+    built: "The invoice is for the job. Converted from an estimate, it shows the approved lines, including only the chosen option on a Good/Better/Best estimate, and those lines add up to the subtotal. An equipment line on the estimate stays an equipment line on the invoice. A job has one open invoice: a second one on the same job is refused and points you to the one to edit, and Convert returns it instead of billing twice. A voided invoice can be replaced. The customer opens a link and pays. What is still owed also shows on their home page. The invoice and estimate carry your logo; a wide logo that already says the business name is printed larger and the name is not repeated.",
     records: [
       { name: "invoices", holds: "The invoice, its total, and what has been paid." },
       { name: "payments", holds: "Each payment against that invoice." },
