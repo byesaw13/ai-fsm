@@ -8,7 +8,6 @@
  */
 import type { PoolClient } from "pg";
 import { buildClientDocumentFilename } from "@ai-fsm/domain";
-import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import {
   resolveCompanyBranding,
   type CompanyProfileSettings,
@@ -145,7 +144,6 @@ export async function loadInvoicePdf(
     `SELECT i.id, i.invoice_number, i.status, i.job_id, i.subtotal_cents, i.tax_cents,
             i.total_cents, i.paid_cents, i.deposit_cents, i.paid_at, i.due_date, i.notes,
             i.work_summary, i.show_itemized_receipts, i.share_token,
-            i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
             i.sent_at, i.created_at, i.client_id,
             j.title AS job_title,
             a.name AS account_name, a.settings AS account_settings,
@@ -207,17 +205,6 @@ export async function loadInvoicePdf(
     totalCents: Number(inv.total_cents ?? 0),
     paidCents: Number(inv.paid_cents ?? 0),
     depositCreditCents: Number(inv.deposit_cents ?? 0),
-    depositDueNowCents: Math.max(
-      0,
-      requestedDepositCents(
-        {
-          depositType: (inv.deposit_type ?? "none") as InvoiceDepositType,
-          depositPercentage: inv.deposit_percentage as number | null,
-          depositFixedCents: inv.deposit_fixed_cents as number | null,
-        },
-        Number(inv.total_cents ?? 0),
-      ) - Number(inv.paid_cents ?? 0),
-    ),
     notes: inv.notes as string | null,
     workSummary: inv.work_summary as string | null,
     itemizedReceiptsUrl: inv.show_itemized_receipts

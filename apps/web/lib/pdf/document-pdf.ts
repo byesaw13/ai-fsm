@@ -99,8 +99,6 @@ export interface InvoicePdfData {
    * (final-invoice credit model). Reduces balance due.
    */
   depositCreditCents?: number | null;
-  /** Deposit still owed as a first payment (0 when none / already covered). */
-  depositDueNowCents?: number | null;
   notes?: string | null;
   /** TASK-157: room-by-room "Work completed" section above the line items. */
   workSummary?: string | null;
@@ -799,9 +797,6 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
   const covered = d.paidCents + depositCredit;
   const isInvoicePaid =
     d.status === "paid" || (d.totalCents > 0 && covered >= d.totalCents);
-  if (!isInvoicePaid && d.depositDueNowCents && d.depositDueNowCents > 0) {
-    totals.push({ label: "Deposit Due Now", value: money(d.depositDueNowCents), strong: true });
-  }
 
   const terms =
     d.branding?.invoiceTerms?.trim() ||

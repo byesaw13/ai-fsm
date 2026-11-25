@@ -1,7 +1,7 @@
 # TASK-257: One way to take a deposit
 
 Status:
-Proposed
+In Progress
 
 Epic:
 EPIC-004 Billing & Profitability

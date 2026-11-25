@@ -25,8 +25,8 @@ Last step           : J1 TASK-256 Verified (#785, 757c2e03, migration 221;
                       First automated email ever delivered (owner check,
                       sent 03:18:40, attempt 1). Deploys are back with this
                       session.
-In-flight PR        : none
-Next step           : J2 TASK-257 (one way to take a deposit).
+In-flight PR        : J2 TASK-257 (one way to take a deposit; no migration)
+Next step           : J2 merge, deploy, verify; then J3 TASK-258.
 Blocked on          : owner:
                       1. G4, I4 PR 2: merge the 3 duplicate customers in the
                          live account? Corrected 2026-11-25: the earlier "10
@@ -828,6 +828,7 @@ Per step:
 
 ## Log
 
+- 2026-11-25 · J2 · In progress · TASK-257: the invoice-level deposit option is removed from the invoice page, print, PDF, portal page, portal pay route, Square link route and invoice PATCH; InvoiceDepositForm.tsx and requestedDepositCents deleted; one percentOfCents helper for the estimate deposit and the job deposit gate. Prod read-only: all 61 invoices have deposit_type none, so no amount changes
 - 2026-11-25 · J1 · Verified · by session ai-fsm-deploy-clean-e3: health ok, /login 200, POST /api/internal/email 401 unauth, automations_one_per_type present, no duplicate types; owner check email (deploy-check-task-256) sent 03:18:40 on attempt 1, the first automated email ever delivered. The 92 old failed queue rows stay `failed` (dispatch only takes pending rows, so none is resent). TASK-256 Done
 - 2026-11-25 · J1 · Deployed · 757c2e03 · ~03:18 UTC by session e3, migration 221 (drops membership_renewal_nudge and the 7-day estimate_followup row; unique index automations_one_per_type); backup ai_fsm_20261125T031017Z.dump verified; known-good deploy-good/b29d288d; web and worker recreated. Audit correction: the two estimate_followup rows were a designed 3-day + 7-day pair (098), not a duplicate; they shared one idempotency key, so the 7-day reminder never sent
 - 2026-11-25 · J1 · Merged · #785 · squash 757c2e03 by session e3; Codex P2s fixed before merge (bounded SMTP timeouts so a slow send is not retried as a second email; the test parks and restores other pending rows)

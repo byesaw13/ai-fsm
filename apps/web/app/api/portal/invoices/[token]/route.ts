@@ -3,7 +3,6 @@ import { isPortalPreview, PREVIEW_READ_ONLY_MESSAGE } from "@/lib/portal/session
 import { SPONSORED_DOCUMENT_JOIN, SPONSORED_DOCUMENT_SELECT } from "@/lib/invoices/sponsored";
 import { queryOne, query, getPool } from "@/lib/db";
 import { loadSquareSettings, createSquarePaymentLink } from "@/lib/integrations/square-payments";
-import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import { amountDueCents } from "@/lib/invoices/payments";
 import { logger } from "@/lib/logger";
 
@@ -22,9 +21,6 @@ interface InvoiceRow extends Record<string, unknown> {
   total_cents: number;
   paid_cents: number;
   deposit_cents: number | null;
-  deposit_type: string | null;
-  deposit_percentage: number | null;
-  deposit_fixed_cents: number | null;
   notes: string | null;
   due_date: string | null;
   sent_at: string | null;
@@ -101,7 +97,6 @@ export async function POST(
   const invoice = await queryOne<InvoiceRow>(
     `SELECT i.id, i.account_id, i.status, i.invoice_number, i.total_cents,
             i.paid_cents, i.deposit_cents, i.job_id, i.client_id, i.created_by,
-            i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
             i.square_payment_link_url
      FROM invoices i
      WHERE i.share_token = $1`,
@@ -125,23 +120,10 @@ export async function POST(
     return NextResponse.json({ error: "Nothing left to pay" }, { status: 422 });
   }
 
-  // First-payment model: while a deposit is still owed, the online payment
-  // charges the deposit-due-now, not the full balance. Once the deposit is
-  // covered, it charges the remaining balance (after deposit credit).
-  const depositDueNow = Math.max(
-    0,
-    requestedDepositCents(
-      {
-        depositType: (invoice.deposit_type ?? "none") as InvoiceDepositType,
-        depositPercentage: invoice.deposit_percentage,
-        depositFixedCents: invoice.deposit_fixed_cents,
-      },
-      invoice.total_cents,
-    ) - invoice.paid_cents,
-  );
-  const chargeCents = depositDueNow > 0 ? depositDueNow : balance;
-  const chargeKind: "deposit" | "progress" = depositDueNow > 0 ? "deposit" : "progress";
-  const chargeLabel = depositDueNow > 0 ? "Deposit" : "Balance";
+  // The online payment charges the balance; a deposit is its own invoice (TASK-257).
+  const chargeCents = balance;
+  const chargeKind = "progress";
+  const chargeLabel = "Balance";
 
   const pool = getPool();
   const client = await pool.connect();

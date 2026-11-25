@@ -7,20 +7,19 @@ import {
   loadSquareSettings,
   createSquarePaymentLink,
 } from "@/lib/integrations/square-payments";
-import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import { amountDueCents } from "@/lib/invoices/payments";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  kind: z.enum(["deposit", "balance", "custom"]),
+  kind: z.enum(["balance", "custom"]),
   amount_cents: z.number().int().positive().optional(),
 });
 
 // === POST /api/v1/invoices/[id]/square-link — create a Square payment link ===
-// Creates a Square-hosted checkout link for the deposit, the remaining balance,
-// or a custom amount. Saves the link + order id to the invoice and records a
+// Creates a Square-hosted checkout link for the remaining balance or a custom
+// amount (a deposit is its own deposit invoice, TASK-257). Saves the link + order id to the invoice and records a
 // PENDING payment row; the webhook flips it to paid when the customer pays.
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {
@@ -62,15 +61,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         paid_cents: number;
         deposit_cents: number;
         balance_cents: number;
-        deposit_type: InvoiceDepositType;
-        deposit_percentage: number | null;
-        deposit_fixed_cents: number | null;
         client_id: string;
         job_id: string | null;
       }>(
         `SELECT id, status, invoice_number, total_cents, paid_cents,
                 deposit_cents, balance_cents,
-                deposit_type, deposit_percentage, deposit_fixed_cents,
                 client_id, job_id
          FROM invoices
          WHERE id = $1 AND account_id = $2
@@ -97,35 +92,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         invoice.paid_cents,
         invoice.deposit_cents,
       );
+      const paymentType = "progress";
       let amount: number;
-      let paymentType: "deposit" | "progress";
-      if (kind === "deposit") {
-        // First-payment model only (deposit_type percentage/fixed).
-        // Do not fall back to deposit_cents credit — that would charge a deposit
-        // that was already billed on a separate deposit invoice.
-        const policyDeposit = requestedDepositCents(
-          {
-            depositType: invoice.deposit_type,
-            depositPercentage: invoice.deposit_percentage,
-            depositFixedCents: invoice.deposit_fixed_cents,
-          },
-          invoice.total_cents,
-        );
-        const policyDepositRemaining = Math.max(0, policyDeposit - invoice.paid_cents);
-        amount = policyDepositRemaining;
-        paymentType = "deposit";
-        if (amount <= 0) {
-          throw Object.assign(
-            new Error("This invoice has no deposit amount due"),
-            { code: "VALIDATION_ERROR" },
-          );
-        }
-      } else if (kind === "balance") {
+      if (kind === "balance") {
         amount = remaining;
-        paymentType = "progress";
       } else {
         amount = amount_cents ?? 0;
-        paymentType = "progress";
         if (amount <= 0) {
           throw Object.assign(new Error("A custom amount is required"), { code: "VALIDATION_ERROR" });
         }
@@ -148,7 +120,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
-      const linkName = `${invoice.invoice_number} — ${kind === "deposit" ? "Deposit" : kind === "balance" ? "Balance" : "Payment"}`;
+      const linkName = `${invoice.invoice_number} — ${kind === "balance" ? "Balance" : "Payment"}`;
       const link = await createSquarePaymentLink(settings, {
         name: linkName,
         amountCents: amount,
