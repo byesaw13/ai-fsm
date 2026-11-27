@@ -112,5 +112,6 @@
   { "id": "TASK-252", "title": "The job page agrees with itself", "branch": "job", "status": "backlog", "phase": "Cross-cutting", "fit": "The next step, status sentence and progress line come from one answer to where the job stands." },
   { "id": "TASK-253", "title": "Keep only the estimate starts you use", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Fewer ways to start an estimate, chosen from how you actually start them." },
   { "id": "TASK-254", "title": "Print matches the customer's PDF", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "What you print is exactly what the customer was sent." },
-  { "id": "TASK-255", "title": "Shared helpers, not copies", "branch": "floor", "status": "progress", "phase": "Cross-cutting", "fit": "Under the floor: one money format and one phone format everywhere." }
+  { "id": "TASK-255", "title": "Shared helpers, not copies", "branch": "floor", "status": "progress", "phase": "Cross-cutting", "fit": "Under the floor: one money format and one phone format everywhere." },
+  { "id": "TASK-259", "title": "AI features on the current Claude models", "branch": "floor", "status": "progress", "phase": "Cross-cutting", "fit": "Under the floor: estimating, receipts and texts run on newer, cheaper models. Nothing on screen changes." }
 ]
