@@ -143,8 +143,9 @@ export async function translateScope(notes: string): Promise<ScopeTranslation> {
     const client = getClient();
     const response = await client.messages
       .stream({
-        model: "claude-opus-4-7",
-        max_tokens: 4096,
+        model: "claude-opus-5-5",
+        max_tokens: 16000,
+        output_config: { effort: "medium" },
         system: [
           {
             type: "text",
@@ -153,11 +154,13 @@ export async function translateScope(notes: string): Promise<ScopeTranslation> {
           },
         ] as Anthropic.TextBlockParam[],
         tools: [SCOPE_TOOL],
-        tool_choice: { type: "tool", name: "translate_scope" },
+        // Opus 5.5 rejects forced tool_choice; the prompt names the tool and a
+        // missing tool_use falls back to the rule-based parser below.
+        tool_choice: { type: "auto" },
         messages: [
           {
             role: "user",
-            content: `Parse the following customer notes into structured estimate fields:\n\n${notes}`,
+            content: `Parse the following customer notes into structured estimate fields. Use the translate_scope tool to give your answer.\n\n${notes}`,
           },
         ],
       })

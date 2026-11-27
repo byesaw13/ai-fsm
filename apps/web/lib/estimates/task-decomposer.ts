@@ -139,12 +139,14 @@ export async function decomposeIntoTasks(input: DecomposeInput): Promise<TaskDec
   let response: Anthropic.Message;
   try {
     response = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
+      model: "claude-sonnet-5-5",
+      max_tokens: 8192,
+      output_config: { effort: "medium" },
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       tools: [DECOMPOSE_TOOL],
-      tool_choice: { type: "tool", name: "propose_work_breakdown" },
-      messages: [{ role: "user", content: buildUserMessage(input) }],
+      // Sonnet 5.5 rejects forced tool_choice; the prompt names the tool.
+      tool_choice: { type: "auto" },
+      messages: [{ role: "user", content: `${buildUserMessage(input)}\n\nUse the propose_work_breakdown tool to give your answer.` }],
     });
   } catch (err) {
     if (err instanceof Anthropic.APIError && (err.status === 401 || err.status === 403)) {

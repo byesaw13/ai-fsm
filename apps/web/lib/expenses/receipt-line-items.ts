@@ -4,7 +4,7 @@
  */
 
 /** Default: Sonnet for precision. Override with RECEIPT_PARSE_MODEL (e.g. haiku for cost). */
-export const DEFAULT_RECEIPT_PARSE_MODEL = "claude-sonnet-4-6";
+export const DEFAULT_RECEIPT_PARSE_MODEL = "claude-sonnet-5-5";
 
 export function getReceiptParseModel(): string {
   const fromEnv = process.env.RECEIPT_PARSE_MODEL?.trim();

@@ -346,13 +346,15 @@ export async function generateMaterials(
   let response: Anthropic.Message;
   try {
     response = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-5-5",
       // Output headroom for a full 25-item list plus the assumptions /
       // missing_measurements / excluded arrays. History: 2048 then 4096 both
       // truncated mid-JSON on richer, whole-house assessments (a real whole-house
       // job needs ~4700 output tokens), surfacing as a 500 / "truncated" reject.
-      // 8192 clears that with margin; Sonnet supports far more if needed.
-      max_tokens: 8192,
+      // 8192 cleared that with margin; 16000 leaves room for Sonnet 5.5's
+      // thinking, which counts toward max_tokens.
+      max_tokens: 16000,
+      output_config: { effort: "medium" },
       system: [
         {
           type: "text",
@@ -361,8 +363,9 @@ export async function generateMaterials(
         },
       ],
       tools: [MATERIALS_TOOL],
-      tool_choice: { type: "tool", name: "generate_materials_list" },
-      messages: [{ role: "user", content: userMessage }],
+      // Sonnet 5.5 rejects forced tool_choice; the prompt names the tool.
+      tool_choice: { type: "auto" },
+      messages: [{ role: "user", content: `${userMessage}\n\nUse the generate_materials_list tool to give your answer.` }],
     });
   } catch (err) {
     // A rejected/expired key is a configuration problem, not a transient one —

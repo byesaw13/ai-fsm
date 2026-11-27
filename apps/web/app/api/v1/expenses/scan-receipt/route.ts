@@ -81,8 +81,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
       model,
-      max_tokens: 8192,
-      temperature: 0,
+      max_tokens: 16000,
       messages: [
         {
           role: "user",

@@ -10,7 +10,7 @@ import { z } from "zod";
 import { materialLineCents, type BaselineResult, type PreparedScope } from "@ai-fsm/domain";
 
 /** Kept as it was before this rewrite (runbook B6: keep the current model ID). */
-export const REVIEW_MODEL = "claude-opus-4-7";
+export const REVIEW_MODEL = "claude-opus-5-5";
 
 const FIELDS = ["hours", "materials", "pricing", "baseline", "scope", "questions", "line_items", "notes"] as const;
 
@@ -158,7 +158,7 @@ const REVIEW_TOOL: Anthropic.Tool = {
 };
 
 export function buildReviewMessage(input: ReviewInput): string {
-  return `Review this estimate.\n\n${JSON.stringify(input, null, 2)}`;
+  return `Review this estimate. Use the review_estimate tool to give your answer.\n\n${JSON.stringify(input, null, 2)}`;
 }
 
 let _client: Anthropic | null = null;
@@ -175,10 +175,12 @@ export async function reviewEstimate(input: ReviewInput, client: Anthropic = get
   const response = await client.messages
     .stream({
       model: REVIEW_MODEL,
-      max_tokens: 8192,
+      max_tokens: 16000,
+      output_config: { effort: "medium" },
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       tools: [REVIEW_TOOL],
-      tool_choice: { type: "tool", name: "review_estimate" },
+      // Opus 5.5 rejects forced tool_choice; the prompt names the tool.
+      tool_choice: { type: "auto" },
       messages: [{ role: "user", content: buildReviewMessage(input) }],
     })
     .finalMessage();
