@@ -515,8 +515,9 @@ export async function draftEstimate(
     const client = getClient();
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8192,
+      model: "claude-sonnet-5-5",
+      max_tokens: 16000,
+      output_config: { effort: "medium" },
       system: [
         {
           type: "text",
@@ -530,8 +531,9 @@ export async function draftEstimate(
         },
       ] as Anthropic.TextBlockParam[],
       tools: [DRAFT_TOOL],
-      tool_choice: { type: "tool", name: "draft_estimate" },
-      messages: [{ role: "user", content: userContent }],
+      // Sonnet 5.5 rejects forced tool_choice; the prompt names the tool.
+      tool_choice: { type: "auto" },
+      messages: [{ role: "user", content: `${userContent}\n\nUse the draft_estimate tool to give your answer.` }],
     });
 
     const toolUse = response.content.find(

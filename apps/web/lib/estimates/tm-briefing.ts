@@ -671,8 +671,9 @@ export async function extractTmBriefing(
 
   const client = getClient();
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    model: "claude-sonnet-5-5",
+    max_tokens: 8192,
+    output_config: { effort: "medium" },
     system: [
       {
         type: "text",
@@ -681,8 +682,9 @@ export async function extractTmBriefing(
       },
     ] as Anthropic.TextBlockParam[],
     tools: [EXTRACT_TOOL],
-    tool_choice: { type: "tool", name: "extract_tm_briefing" },
-    messages: [{ role: "user", content: userContent }],
+    // Sonnet 5.5 rejects forced tool_choice; the prompt names the tool.
+    tool_choice: { type: "auto" },
+    messages: [{ role: "user", content: `${userContent}\n\nUse the extract_tm_briefing tool to give your answer.` }],
   });
 
   const toolUse = response.content.find(

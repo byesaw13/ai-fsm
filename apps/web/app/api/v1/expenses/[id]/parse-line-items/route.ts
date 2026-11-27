@@ -77,8 +77,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       const anthropic = new Anthropic({ apiKey });
       const message = await anthropic.messages.create({
         model,
-        max_tokens: 8192,
-        temperature: 0,
+        max_tokens: 16000,
         messages: [
           {
             role: "user",

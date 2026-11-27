@@ -107,12 +107,16 @@ Write the summary now:`;
   try {
     const client = new Anthropic();
     const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 200,
+      model: "claude-haiku-5-5",
+      // Room for thinking, which counts toward max_tokens.
+      max_tokens: 1024,
+      output_config: { effort: "low" },
       messages: [{ role: "user", content: prompt }],
     });
 
-    const summary = (message.content[0] as { type: string; text: string }).text?.trim() ?? "";
+    // The reply can start with a thinking block, so read the text block by type.
+    const textBlock = message.content.find((b): b is Anthropic.TextBlock => b.type === "text");
+    const summary = textBlock?.text.trim() ?? "";
     return NextResponse.json({ summary }, { status: 200 });
   } catch (err) {
     logger.error("POST /api/v1/booking-requests/[id]/summary error", err as Error, { traceId: session.traceId });

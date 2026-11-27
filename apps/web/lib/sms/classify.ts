@@ -135,7 +135,7 @@ export async function classifySms(params: {
 
   try {
     const response = await getClient().messages.create({
-      model: "claude-haiku-4-5",
+      model: "claude-haiku-5-5",
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       tools: [CLASSIFY_TOOL],

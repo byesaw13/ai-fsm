@@ -22,8 +22,10 @@ export async function narrateDayDraft(draft: DayDraft, date: string): Promise<st
   const client = new Anthropic();
   try {
     const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 400,
+      model: "claude-sonnet-5-5",
+      // Room for thinking, which counts toward max_tokens.
+      max_tokens: 2048,
+      output_config: { effort: "low" },
       system: [{
         type: "text",
         text: "You write a 2-3 sentence end-of-day verification for a residential handyman. Use only the provided timeline. Do not invent stops, jobs, or times. Mention exceptions that still need a human. No markdown.",
@@ -38,7 +40,8 @@ export async function narrateDayDraft(draft: DayDraft, date: string): Promise<st
           required: ["summary"],
         },
       }],
-      tool_choice: { type: "tool", name: "day_draft_narrative" },
+      // Sonnet 5.5 rejects forced tool_choice; the prompt names the tool.
+      tool_choice: { type: "auto" },
       messages: [{
         role: "user",
         content: `Date: ${date}
@@ -47,7 +50,9 @@ Attributed (ready + already logged): ${formatHours(draft.attributedMinutes)}
 ${draft.reconciliation}
 
 Timeline:
-${lines || "(no GPS signal today)"}`,
+${lines || "(no GPS signal today)"}
+
+Use the day_draft_narrative tool to give your answer.`,
       }],
     });
     const toolUse = response.content.find((b) => b.type === "tool_use");

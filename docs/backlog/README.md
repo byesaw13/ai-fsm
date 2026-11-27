@@ -103,7 +103,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-259**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-260**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -241,6 +241,7 @@ closed in tests; owner-flow AC still open.
 | TASK-256 | [Automated emails actually send](TASK-256-automated-emails-send.md) | 005 | Done |
 | TASK-257 | [One way to take a deposit](TASK-257-one-way-to-take-a-deposit.md) | 004 | Done |
 | TASK-258 | [Remove three features that were never used](TASK-258-remove-unused-features.md) | 005 | Done |
+| TASK-259 | [Move AI features to the current Claude models](TASK-259-claude-5-5-models.md) | 005 | In Progress |
 | TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |

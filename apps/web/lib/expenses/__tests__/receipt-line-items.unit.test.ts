@@ -153,8 +153,8 @@ describe("getReceiptParseModel", () => {
 
   it("honors RECEIPT_PARSE_MODEL override", () => {
     const prev = process.env.RECEIPT_PARSE_MODEL;
-    process.env.RECEIPT_PARSE_MODEL = "claude-haiku-4-5-20251001";
-    expect(getReceiptParseModel()).toBe("claude-haiku-4-5-20251001");
+    process.env.RECEIPT_PARSE_MODEL = "claude-haiku-5-5";
+    expect(getReceiptParseModel()).toBe("claude-haiku-5-5");
     if (prev !== undefined) process.env.RECEIPT_PARSE_MODEL = prev;
     else delete process.env.RECEIPT_PARSE_MODEL;
   });

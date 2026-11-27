@@ -136,8 +136,10 @@ export async function runInterviewTurn(
   }
 
   const response = await client.messages.create({
-    model: "claude-haiku-4-5",  // Fast, conversational — not the full Sonnet
-    max_tokens: 512,
+    model: "claude-haiku-5-5",  // Fast, conversational — not the full Sonnet
+    // Room for thinking, which counts toward max_tokens.
+    max_tokens: 2048,
+    output_config: { effort: "low" },
     system: systemBlocks as Anthropic.TextBlockParam[],
     tools: [ESTIMATE_READY_TOOL],
     tool_choice: { type: "auto" },

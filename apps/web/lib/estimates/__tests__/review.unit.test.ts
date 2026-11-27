@@ -219,8 +219,8 @@ describe("reviewEstimate", () => {
     expect(r.summary).toContain("Four areas");
     const params = (stream.mock.calls[0] as unknown[])[0] as Anthropic.MessageStreamParams;
     expect(params.model).toBe(REVIEW_MODEL);
-    expect(REVIEW_MODEL).toBe("claude-opus-4-7");
-    expect(params.tool_choice).toEqual({ type: "tool", name: "review_estimate" });
+    expect(REVIEW_MODEL).toBe("claude-opus-5-5");
+    expect(params.tool_choice).toEqual({ type: "auto" });
     const system = JSON.stringify(params.system);
     expect(system).not.toMatch(/sq ft|\$85/);
   });
