@@ -1,7 +1,7 @@
 # TASK-259: Move AI features to the current Claude models
 
 Status:
-In Review
+In Progress
 
 Epic:
 EPIC-005 Platform & Delivery
