@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isSmsGatewayConfigured, sendSmsViaGateway } from "../gateway";
+import { gatewayDevicesLastSeen, isSmsGatewayConfigured, sendSmsViaGateway } from "../gateway";
+
+const phoneDb = vi.hoisted(() => ({
+  getOwnerContext: vi.fn(),
+  enqueuePhoneText: vi.fn(),
+  phoneLastSeen: vi.fn(),
+}));
+vi.mock("@/lib/db/phone", () => phoneDb);
 
 describe("isSmsGatewayConfigured", () => {
   afterEach(() => {
@@ -90,5 +97,43 @@ describe("sendSmsViaGateway", () => {
       expect(r.status).toBe(503);
       expect(r.error).toMatch(/queue limits/i);
     }
+  });
+});
+
+describe("SMS_TRANSPORT=phone_app (TASK-260)", () => {
+  afterEach(() => {
+    delete process.env.SMS_TRANSPORT;
+    delete process.env.PHONE_APP_KEY;
+    vi.unstubAllGlobals();
+  });
+
+  it("is configured by the phone key alone", () => {
+    process.env.SMS_TRANSPORT = "phone_app";
+    expect(isSmsGatewayConfigured()).toBe(false);
+    process.env.PHONE_APP_KEY = "k";
+    expect(isSmsGatewayConfigured()).toBe(true);
+  });
+
+  it("queues the text for the phone instead of calling the gateway", async () => {
+    process.env.SMS_TRANSPORT = "phone_app";
+    process.env.PHONE_APP_KEY = "k";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    phoneDb.getOwnerContext.mockResolvedValue({ accountId: "acct", userId: "u" });
+    phoneDb.enqueuePhoneText.mockResolvedValue("outbox-1");
+
+    const r = await sendSmsViaGateway({ phone: "+16035551212", message: "On the way" });
+    expect(r).toEqual({ ok: true, messageId: "outbox-1" });
+    expect(phoneDb.enqueuePhoneText).toHaveBeenCalledWith("acct", "+16035551212", "On the way");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports the phone's last check-in as the gateway's", async () => {
+    process.env.SMS_TRANSPORT = "phone_app";
+    process.env.PHONE_APP_KEY = "k";
+    const seen = new Date("2026-11-27T12:00:00Z");
+    phoneDb.getOwnerContext.mockResolvedValue({ accountId: "acct", userId: "u" });
+    phoneDb.phoneLastSeen.mockResolvedValue(seen);
+    expect(await gatewayDevicesLastSeen()).toEqual(seen);
   });
 });

@@ -74,6 +74,8 @@ Location capture, visit candidates, day map, hybrid tracking are **shipped infra
 
 **Phase 1 exception — TASK-116 Field-ops Web Push.** Authorized 2026-09-05. No new table. Wires start-day and home-arrival day-review onto the TASK-118 send helper, stamps arrival `live_prompted_at`, adds a one-time My Work subscribe prompt, and drops the remaining Companion `notify.mobile_app` actions for those events. Does not reopen Owner OS or replace Companion GPS/Bluetooth.
 
+**Phase 1 exception — TASK-260 Dovetails Phone.** Authorized 2026-11-27 by the owner in session ("I'm looking to build something of its own that can converse with the AI FSM platform [...] I don't need to record phone calls"). Replaces the third-party SMS Gateway app with our own sideloaded Android app on the business SIM: it sends the FSM's service texts from a server outbox, uploads customer texts, and uploads call records (number, direction, answered/missed, duration; no audio). Two tables (`phone_outbox`, `phone_devices`), one column and two outcomes on `communications_log`, and `/api/internal/phone/*` routes, as an explicit exception to the table freeze. Calls and the owner's own texts are kept only for numbers that match a customer. A missed customer call raises an attention item and a "Call back" bucket in Needs Attention until we call or text back. Does not add call recording, a conversation inbox, an iPhone app, or a second copy of the web app.
+
 ### Phase 2 — Property-Centered Surfaces
 
 - Property timeline reachable from client, job, visit, estimate, invoice surfaces
@@ -126,6 +128,7 @@ Backlog tasks must cite a phase. EPICs organize tasks; phases set priority.
 Phase 0 → EPIC-006 (role workspaces), TASK-059, day-close field work
 Phase 1 → EPIC-001 (operations engine), EPIC-007 (field execution infrastructure)
 Phase 1 exception → TASK-115 (promise capture; EPIC-005 delivery surface)
+Phase 1 exception → TASK-260 (Dovetails Phone; EPIC-005 delivery surface)
 Phase 2 → EPIC-003 (property intelligence)
 Phase 3 → EPIC-002 (estimating), EPIC-004 (billing)
 Phase 4 → EPIC-008 (production intelligence stub)

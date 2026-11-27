@@ -47,8 +47,11 @@ export const BRANCHES: MapNode[] = [
     kind: "branch",
     step: 2,
     intended: "Who we talk to, how they want to be reached, and who can open the customer page.",
-    built: "Accepting a request creates the customer. The screen says Customers. The customer can later change phone and email from a link, with no password.",
-    records: [{ name: "clients", holds: "Name, phone, email, preferred contact, and text consent." }],
+    built: "Accepting a request creates the customer. The screen says Customers. The customer can later change phone and email from a link, with no password. With the Dovetails Phone app on the business phone, calls and texts with a customer's number land on their page, and a missed call stays in Call back until you call or text them.",
+    records: [
+      { name: "clients", holds: "Name, phone, email, preferred contact, and text consent." },
+      { name: "communications_log", holds: "Every text and call with the customer: when, which way, and how it ended." },
+    ],
     screenHref: "/app/clients",
     screenLabel: "Open Customers",
   },

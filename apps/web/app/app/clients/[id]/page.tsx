@@ -257,6 +257,17 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                     THEN 'SMS out: ' || left(coalesce(cl.body_preview, ''), 80)
                   WHEN cl.channel = 'email' AND cl.direction = 'outbound'
                     THEN 'Email: ' || left(coalesce(cl.body_preview, ''), 80)
+                  WHEN cl.channel = 'phone' AND cl.direction = 'inbound' AND cl.outcome = 'missed'
+                    THEN 'Missed call'
+                  WHEN cl.channel = 'phone' AND cl.direction = 'inbound' AND cl.outcome = 'left_voicemail'
+                    THEN 'Voicemail'
+                  WHEN cl.channel = 'phone' AND cl.direction = 'outbound' AND cl.outcome = 'no_answer'
+                    THEN 'You called — no answer'
+                  WHEN cl.channel = 'phone'
+                    THEN (CASE WHEN cl.direction = 'inbound' THEN 'Customer called' ELSE 'You called' END)
+                      || CASE WHEN coalesce(cl.duration_seconds, 0) > 0
+                           THEN ' (' || greatest(1, round(cl.duration_seconds / 60.0))::int || ' min)'
+                           ELSE '' END
                   ELSE initcap(cl.channel) || ' ' || cl.direction
                 END AS label,
                 cl.outcome, cl.job_id AS link_id, NULL::int AS total_cents,

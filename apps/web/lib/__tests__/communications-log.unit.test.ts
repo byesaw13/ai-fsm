@@ -44,6 +44,8 @@ describe("logCommunication", () => {
       "Preview text",
       "user-1",
       "provider-1",
+      null,
+      null,
     ]);
   });
 
@@ -69,6 +71,27 @@ describe("logCommunication", () => {
       null,
       null,
       null,
+      null,
+      null,
     ]);
+  });
+
+  it("records a call's duration and when it happened", async () => {
+    mockQuery.mockResolvedValueOnce([{ id: "log-1" }]);
+    const at = new Date("2026-11-27T15:00:00Z");
+
+    const id = await logCommunication({
+      accountId: "account-1",
+      channel: "phone",
+      direction: "inbound",
+      outcome: "answered",
+      durationSeconds: 240,
+      occurredAt: at,
+    });
+
+    expect(id).toBe("log-1");
+    const params = mockQuery.mock.calls[0][1] as unknown[];
+    expect(params.slice(-2)).toEqual([240, at]);
+    expect(mockQuery.mock.calls[0][0]).toContain("COALESCE($13, now())");
   });
 });
