@@ -28,6 +28,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
+        with:
+          # The default list includes the retired "tools" package, which fails.
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
       - name: Unit tests and lint
         run: ./gradlew --no-daemon test lintDebug
       - name: Debug APK
