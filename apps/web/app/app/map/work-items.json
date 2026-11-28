@@ -113,5 +113,6 @@
   { "id": "TASK-253", "title": "Keep only the estimate starts you use", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Fewer ways to start an estimate, chosen from how you actually start them." },
   { "id": "TASK-254", "title": "Print matches the customer's PDF", "branch": "bill", "status": "backlog", "phase": "Phase 3", "fit": "What you print is exactly what the customer was sent." },
   { "id": "TASK-255", "title": "Shared helpers, not copies", "branch": "floor", "status": "progress", "phase": "Cross-cutting", "fit": "Under the floor: one money format and one phone format everywhere." },
-  { "id": "TASK-259", "title": "AI features on the current Claude models", "branch": "floor", "status": "progress", "phase": "Cross-cutting", "fit": "Under the floor: estimating, receipts and texts run on newer, cheaper models. Nothing on screen changes." }
+  { "id": "TASK-259", "title": "AI features on the current Claude models", "branch": "floor", "status": "progress", "phase": "Cross-cutting", "fit": "Under the floor: estimating, receipts and texts run on newer, cheaper models. Nothing on screen changes." },
+  { "id": "TASK-261", "title": "Owner alert emails always queued", "branch": "floor", "status": "progress", "phase": "Cross-cutting", "fit": "Under the floor: alerts raised outside a transaction now send their owner email instead of being dropped." }
 ]
