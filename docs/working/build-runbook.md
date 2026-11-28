@@ -23,10 +23,9 @@ Last step           : J3 TASK-258 Verified (#788, 70df1516, migration 222;
                       backup ai_fsm_20261125T041715Z.dump verified). Track J
                       done (J1–J3).
 In-flight PR        : none
-Next step           : owner answers below (Track I). Follow-up found in J2's
-                      check, needs a backlog task: owner alerts raised outside
-                      a transaction are never queued (lib/attention/emit.ts
-                      SAVEPOINT).
+Next step           : owner answers below (Track I). The J2 follow-up
+                      (owner alerts outside a transaction never queued) is
+                      TASK-261.
 Blocked on          : owner:
                       1. G4, I4 PR 2: merge the 3 duplicate customers in the
                          live account? Corrected 2026-11-25: the earlier "10

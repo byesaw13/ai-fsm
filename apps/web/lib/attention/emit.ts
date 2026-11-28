@@ -54,9 +54,8 @@ export async function emitAttentionEvent(
     // SAVEPOINT so a failed queue insert cannot abort the caller's transaction
     // (e.g. Square payment COMMIT must not roll back after a non-fatal email error).
     if (insertedId) {
-      try {
-        await client.query("SAVEPOINT attention_email");
-        await enqueueAttentionOwnerEmail(client, {
+      const enqueue = () =>
+        enqueueAttentionOwnerEmail(client, {
           accountId: input.accountId,
           type: input.type,
           entityType: input.entityType,
@@ -65,12 +64,25 @@ export async function emitAttentionEvent(
           summary: input.summary,
           href: input.href,
         });
-        await client.query("RELEASE SAVEPOINT attention_email");
-      } catch (emailErr) {
+      let inTx = true;
+      try {
         try {
-          await client.query("ROLLBACK TO SAVEPOINT attention_email");
-        } catch {
-          // ignore nested rollback errors
+          await client.query("SAVEPOINT attention_email");
+        } catch (spErr) {
+          // 25P01: no transaction open (autocommit caller). Nothing to protect,
+          // so enqueue directly instead of silently dropping the email.
+          if ((spErr as { code?: string }).code !== "25P01") throw spErr;
+          inTx = false;
+        }
+        await enqueue();
+        if (inTx) await client.query("RELEASE SAVEPOINT attention_email");
+      } catch (emailErr) {
+        if (inTx) {
+          try {
+            await client.query("ROLLBACK TO SAVEPOINT attention_email");
+          } catch {
+            // ignore nested rollback errors
+          }
         }
         logger.error("attention owner email failed (non-fatal)", emailErr, {
           type: input.type,
