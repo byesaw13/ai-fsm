@@ -12,6 +12,7 @@ import { loadCloseoutLeftovers } from "@/lib/attention/closeout-leftovers";
 import { attentionPriority, compareNeedsAttention } from "@/lib/attention/priority";
 import { HOLD_SEND_BILL_LABEL, CUSTOMER_REPORTS_LABEL } from "@/lib/attention/surfaces";
 import { REPORT_QUEUE_PARAMS, REPORT_QUEUE_WHERE } from "@/lib/job-reports/queue";
+import { CALL_BACK_LABEL, CALL_BACK_SQL, callBackBucket, type CallBackRow } from "@/lib/attention/call-back";
 
 export type NeedsAttentionItem = {
   label: string;
@@ -27,7 +28,7 @@ export type NeedsAttentionItem = {
 
 function presentAttention(
   item: Omit<NeedsAttentionItem, "action" | "priorityReason">,
-  hints: { promiseTitle: string | null; materialTitle: string | null },
+  hints: { promiseTitle: string | null; materialTitle: string | null; callBackName: string | null },
 ): NeedsAttentionItem {
   const priority = attentionPriority(item);
   let action = item.label;
@@ -45,6 +46,7 @@ function presentAttention(
   }
   if (item.label === "Review requests") action = "Decide the next step";
   if (item.label === "Draft invoices") action = "Send the draft invoice";
+  if (item.label === CALL_BACK_LABEL && hints.callBackName) action = `Call back ${hints.callBackName}`;
   return { ...item, action, priorityReason: priority.reason };
 }
 
@@ -82,6 +84,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
     openPromiseRows,
     leftovers,
     reportQueue,
+    callBacks,
   ] = await Promise.all([
     queryForSession<CountRow>(
       session,
@@ -197,6 +200,8 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
       `SELECT COUNT(*)::text AS count FROM jobs j WHERE ${REPORT_QUEUE_WHERE}`,
       REPORT_QUEUE_PARAMS(accountId),
     ),
+    // TASK-260: customers whose missed call we have not returned.
+    queryForSession<CallBackRow>(session, CALL_BACK_SQL, [accountId]),
   ]);
 
   const draftInvoiceCount = parseN(draftInvoices[0]);
@@ -315,6 +320,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         tone: "default",
       },
       customerPromiseBucket(toPromiseToneInput(openPromiseRows)),
+      callBackBucket(callBacks),
   ];
   const items = rawItems
     .filter((item) => item.count > 0)
@@ -322,6 +328,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
       presentAttention(item, {
         promiseTitle: openPromiseRows.length === 1 ? openPromiseRows[0].title : null,
         materialTitle: materialJobs.length === 1 ? materialJobs[0].title : null,
+        callBackName: callBacks.length === 1 ? callBacks[0].name : null,
       }),
     )
     .sort(compareNeedsAttention);

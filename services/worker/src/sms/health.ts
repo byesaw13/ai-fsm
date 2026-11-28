@@ -8,7 +8,7 @@ let lastCheckAt = 0;
 
 /**
  * One attention item per hour when the business phone has not checked in.
- * Texts fail silently while the SMS Gateway app is asleep.
+ * Texts wait or fail while the phone app (SMS Gateway or Dovetails Phone) is asleep.
  */
 export async function alertIfSmsGatewayStale(client: Client): Promise<void> {
   if (!smsGatewayConfigured()) return;
@@ -46,7 +46,7 @@ export async function alertIfSmsGatewayStale(client: Client): Promise<void> {
     [
       accountId,
       "Business phone is offline",
-      "The SMS Gateway app has not checked in. Service texts will fail until that phone is awake.",
+      "The phone app on the business phone has not checked in. Service texts wait until that phone is awake.",
       `sms-gateway-stale:${hour}`,
     ]
   );

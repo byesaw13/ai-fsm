@@ -8,13 +8,24 @@
  *   SMS_GATEWAY_USERNAME Basic-auth username from the app Home tab
  *   SMS_GATEWAY_PASSWORD Basic-auth password
  *   SMS_GATEWAY_SIM_NUMBER Optional SIM slot (default 1 = business line)
+ *
+ * TASK-260: SMS_TRANSPORT=phone_app sends through our own Dovetails Phone app
+ * instead. The text is queued in phone_outbox; the phone pulls it, sends it,
+ * and reports back. messageId is the outbox id, so the phone's report updates
+ * the logged text. Needs PHONE_APP_KEY. Default transport stays the gateway.
  */
+import { enqueuePhoneText, getOwnerContext, phoneLastSeen } from "@/lib/db/phone";
 
 export type SendSmsResult =
   | { ok: true; messageId: string; raw?: unknown }
   | { ok: false; error: string; status?: number };
 
+export function usesPhoneApp(): boolean {
+  return process.env.SMS_TRANSPORT?.trim() === "phone_app";
+}
+
 export function isSmsGatewayConfigured(): boolean {
+  if (usesPhoneApp()) return Boolean(process.env.PHONE_APP_KEY?.trim());
   return Boolean(
     process.env.SMS_GATEWAY_URL?.trim() &&
       process.env.SMS_GATEWAY_USERNAME?.trim() &&
@@ -28,6 +39,7 @@ export async function sendSmsViaGateway(opts: {
   /** Optional idempotency / correlation id */
   id?: string;
 }): Promise<SendSmsResult> {
+  if (usesPhoneApp()) return queueForPhoneApp(opts.phone, opts.message);
   const url = process.env.SMS_GATEWAY_URL?.trim();
   const username = process.env.SMS_GATEWAY_USERNAME?.trim();
   const password = process.env.SMS_GATEWAY_PASSWORD?.trim();
@@ -95,8 +107,26 @@ export async function sendSmsViaGateway(opts: {
   }
 }
 
+async function queueForPhoneApp(phone: string, message: string): Promise<SendSmsResult> {
+  if (!process.env.PHONE_APP_KEY?.trim()) {
+    return { ok: false, error: "Dovetails Phone is not configured. Set PHONE_APP_KEY." };
+  }
+  try {
+    const { accountId } = await getOwnerContext();
+    const id = await enqueuePhoneText(accountId, phone, message);
+    return { ok: true, messageId: id };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Could not queue the text" };
+  }
+}
+
 /** Newest device check-in. Null when the gateway answers but no device has checked in. */
 export async function gatewayDevicesLastSeen(): Promise<Date | null> {
+  if (usesPhoneApp()) {
+    if (!isSmsGatewayConfigured()) return null;
+    const { accountId } = await getOwnerContext();
+    return phoneLastSeen(accountId);
+  }
   const username = process.env.SMS_GATEWAY_USERNAME?.trim();
   const password = process.env.SMS_GATEWAY_PASSWORD?.trim();
   if (!username || !password || !isSmsGatewayConfigured()) return null;

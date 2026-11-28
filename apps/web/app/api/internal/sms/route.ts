@@ -18,6 +18,7 @@ import {
 } from "@/lib/sms/messages";
 import { isSmsGatewayConfigured, sendSmsViaGateway } from "@/lib/sms/gateway";
 import { logOutboundSms } from "@/lib/sms/outbound";
+import { phoneAppAuthorized } from "@/lib/phone-app/ingest";
 
 export const dynamic = "force-dynamic";
 
@@ -264,7 +265,9 @@ function buildNotification(
 export async function POST(req: NextRequest) {
   const traceId = randomUUID();
 
-  if (!SMS_KEY || req.headers.get("x-api-key") !== SMS_KEY) {
+  // TASK-260: the Dovetails Phone app posts customer texts here with its own key.
+  const key = req.headers.get("x-api-key");
+  if (!(SMS_KEY && key === SMS_KEY) && !phoneAppAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

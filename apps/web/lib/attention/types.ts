@@ -9,6 +9,8 @@ export const ATTENTION_EVENT_TYPES = [
   "invoice.paid",
   "invoice.partial",
   "client.profile_updated",
+  // TASK-260: a customer called the business phone and nobody picked up.
+  "call.missed",
 ] as const;
 
 export type AttentionEventType = (typeof ATTENTION_EVENT_TYPES)[number];
@@ -66,6 +68,7 @@ export const ATTENTION_PUSH_TYPES = [
   "invoice.paid",
   "estimate.approved",
   "estimate.declined",
+  "call.missed",
 ] as const;
 
 export type AttentionPushType = (typeof ATTENTION_PUSH_TYPES)[number];

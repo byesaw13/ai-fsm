@@ -12,6 +12,7 @@ export type AttentionPriority = {
  */
 const RANK_BY_LABEL: Record<string, AttentionPriority> = {
   "Customer Promises": { rank: 20, reason: "Customer promise" },
+  "Call back": { rank: 25, reason: "A customer called and nobody picked up" },
   "Collect overdue invoices": { rank: 30, reason: "Money is late" },
   "Collect deposits": { rank: 40, reason: "Money to collect" },
   "Hold — send the invoice": { rank: 50, reason: "Finished work is not billed" },

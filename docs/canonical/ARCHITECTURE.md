@@ -10,6 +10,7 @@ Dovetails FSM is a pnpm monorepo with a Next.js web app, shared domain package, 
 |---|---|---|
 | Web app | `apps/web` | Owner/admin/tech UI and API routes. |
 | Worker | `services/worker` | Background notification, queue, and automation processing. |
+| Phone app | `apps/android` | Sideloaded Kotlin app on the business Android phone. Sends queued service texts, uploads customer texts and call records to `/api/internal/phone/*`. Not a pnpm workspace; built with Gradle. |
 | Domain package | `packages/domain` | Shared schemas, constants, status labels, and Dovetails-specific domain helpers. |
 | Database migrations | `db/migrations` | SQL schema, policies, and additive migrations. |
 | Infrastructure | `infra` | Local, production, and garonhome Docker Compose profiles. |

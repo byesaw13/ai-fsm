@@ -1,0 +1,55 @@
+name: android
+
+# Dovetails Phone (apps/android, TASK-260). Not part of the five required
+# checks; runs only when the app changes. The APK is attached to the run.
+on:
+  push:
+    branches: ["**"]
+    paths: ["apps/android/**", ".github/workflows/android.yml"]
+  pull_request:
+    paths: ["apps/android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: android-apk
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+        with:
+          # The default list includes the retired "tools" package, which fails.
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+      - name: Unit tests and lint
+        run: ./gradlew --no-daemon test lintDebug
+      - name: Debug APK
+        run: ./gradlew --no-daemon assembleDebug
+      # Release signing needs the same key every time, or the phone refuses the
+      # update. Add repository secrets DOVETAILS_PHONE_KEYSTORE_B64 (base64 of the
+      # .jks) and DOVETAILS_PHONE_KEYSTORE_PASSWORD to get a signed release APK.
+      - name: Release APK (signed)
+        env:
+          KEYSTORE_B64: ${{ secrets.DOVETAILS_PHONE_KEYSTORE_B64 }}
+          DOVETAILS_PHONE_KEYSTORE_PASSWORD: ${{ secrets.DOVETAILS_PHONE_KEYSTORE_PASSWORD }}
+        if: env.KEYSTORE_B64 != ''
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/phone.jks"
+          DOVETAILS_PHONE_KEYSTORE="$RUNNER_TEMP/phone.jks" ./gradlew --no-daemon assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dovetails-phone-apk
+          path: |
+            apps/android/app/build/outputs/apk/debug/*.apk
+            apps/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
